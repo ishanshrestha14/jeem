@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../../../core/services/image_storage_service.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../db/app_database.dart';
 import '../data/exercise_repository.dart';
@@ -44,6 +48,11 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
   bool _initialized = false;
   bool _saving = false;
 
+  /// Managed image files superseded by a replace or a remove. Deletion is
+  /// deferred until save so cancelling never orphans a file the database
+  /// still points to.
+  final List<String> _pendingImageDeletions = [];
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -62,6 +71,26 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
     _category = exercise.category;
     _loggingType = exercise.loggingType;
     _imagePath = exercise.imagePath;
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final service = ref.read(imageStorageServiceProvider);
+    final picked = await service.pickAndStore(source: source);
+    if (picked == null || !mounted) return;
+    final old = _imagePath;
+    setState(() {
+      if (old != null) _pendingImageDeletions.add(old);
+      _imagePath = picked;
+    });
+  }
+
+  void _removeImage() {
+    final old = _imagePath;
+    if (old == null) return;
+    setState(() {
+      _pendingImageDeletions.add(old);
+      _imagePath = null;
+    });
   }
 
   Future<void> _save() async {
@@ -100,6 +129,14 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
           notes: notes.isEmpty ? null : notes,
           imagePath: _imagePath,
         );
+      }
+
+      if (_pendingImageDeletions.isNotEmpty) {
+        final service = ref.read(imageStorageServiceProvider);
+        for (final path in _pendingImageDeletions) {
+          await service.deleteIfManaged(path);
+        }
+        _pendingImageDeletions.clear();
       }
 
       if (!mounted) return;
@@ -247,12 +284,9 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
           const SizedBox(height: 16),
           _ImageField(
             imagePath: _imagePath,
-            onChoosePhoto: () {
-              // TODO(Task 5): wire up the real image picker.
-            },
-            onTakePhoto: () {
-              // TODO(Task 5): wire up the real camera capture.
-            },
+            onChoosePhoto: () => _pickImage(ImageSource.gallery),
+            onTakePhoto: () => _pickImage(ImageSource.camera),
+            onRemove: _removeImage,
           ),
           const SizedBox(height: 24),
           Row(
@@ -280,38 +314,47 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
   }
 }
 
-/// Placeholder image field. Renders the "choose photo" / "take photo"
-/// affordances but does nothing on tap — Task 5 wires the real picker.
+/// Image field: shows a 16:9 preview of the stored photo (or a dashed
+/// placeholder when there is none), plus buttons to choose/take a photo and,
+/// when a photo is set, remove it. An exercise with no image remains fully
+/// usable — the placeholder never blocks any action.
 class _ImageField extends StatelessWidget {
   const _ImageField({
     required this.imagePath,
     required this.onChoosePhoto,
     required this.onTakePhoto,
+    required this.onRemove,
   });
 
   final String? imagePath;
   final VoidCallback onChoosePhoto;
   final VoidCallback onTakePhoto;
+  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final path = imagePath;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Photo', style: theme.textTheme.titleSmall),
         const SizedBox(height: 8),
-        Container(
-          height: 120,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
+        AspectRatio(
+          aspectRatio: 16 / 9,
+          child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(
-            Icons.fitness_center,
-            size: 40,
-            color: theme.colorScheme.outline,
+            child: path == null
+                ? _DashedPlaceholder(
+                    color: theme.colorScheme.outline,
+                    fill: theme.colorScheme.surfaceContainerHighest,
+                  )
+                : Image.file(
+                    File(path),
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                  ),
           ),
         ),
         const SizedBox(height: 8),
@@ -334,7 +377,81 @@ class _ImageField extends StatelessWidget {
             ),
           ],
         ),
+        if (path != null) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onRemove,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: theme.colorScheme.error,
+                side: BorderSide(color: theme.colorScheme.error),
+              ),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Remove photo'),
+            ),
+          ),
+        ],
       ],
     );
   }
+}
+
+/// Dashed-border placeholder shown when an exercise has no photo.
+class _DashedPlaceholder extends StatelessWidget {
+  const _DashedPlaceholder({required this.color, required this.fill});
+
+  final Color color;
+  final Color fill;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DashedBorderPainter(color: color),
+      child: Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: fill,
+        child: Icon(Icons.fitness_center, size: 40, color: color),
+      ),
+    );
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  _DashedBorderPainter({required this.color});
+
+  final Color color;
+  static const _dashWidth = 6.0;
+  static const _dashSpace = 4.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    final rrect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      const Radius.circular(12),
+    );
+    final borderPath = Path()..addRRect(rrect);
+    final dashedPath = Path();
+    for (final metric in borderPath.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        final next = distance + _dashWidth;
+        dashedPath.addPath(
+          metric.extractPath(distance, next.clamp(0, metric.length)),
+          Offset.zero,
+        );
+        distance = next + _dashSpace;
+      }
+    }
+    canvas.drawPath(dashedPath, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
