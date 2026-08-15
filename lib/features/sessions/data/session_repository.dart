@@ -60,7 +60,8 @@ class SessionRepository {
 
       for (final config in templateExerciseRows) {
         final exercise = await (_db.select(_db.exercises)
-              ..where((e) => e.id.equals(config.exerciseId)))
+              ..where((e) =>
+                  e.id.equals(config.exerciseId) & e.deletedAt.isNull()))
             .getSingle();
 
         final sessionExercise = SessionExercise(
@@ -172,10 +173,19 @@ class SessionRepository {
     var pendingFetch = Future<void>.value();
 
     void scheduleEmit() {
+      // Caught explicitly and chained via `.catchError` (rather than left to
+      // propagate) so a throwing `fetch()` can't leave `pendingFetch`
+      // permanently errored — a bare `.then()` on an errored future skips
+      // the success callback forever, silently killing every later emission
+      // on this stream.
       pendingFetch = pendingFetch.then((_) async {
         if (controller.isClosed) return;
         final value = await fetch();
         if (!controller.isClosed) controller.add(value);
+      }).catchError((Object error, StackTrace stackTrace) {
+        if (!controller.isClosed) {
+          controller.addError(error, stackTrace);
+        }
       });
     }
 

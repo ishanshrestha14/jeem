@@ -65,10 +65,19 @@ class TemplateRepository {
     var pendingFetch = Future<void>.value();
 
     void scheduleEmit() {
+      // Caught explicitly and chained via `.catchError` (rather than left to
+      // propagate) so a throwing `_fetchSummaries()` can't leave
+      // `pendingFetch` permanently errored — a bare `.then()` on an errored
+      // future skips the success callback forever, silently killing every
+      // later emission on this stream.
       pendingFetch = pendingFetch.then((_) async {
         if (controller.isClosed) return;
         final summaries = await _fetchSummaries();
         if (!controller.isClosed) controller.add(summaries);
+      }).catchError((Object error, StackTrace stackTrace) {
+        if (!controller.isClosed) {
+          controller.addError(error, stackTrace);
+        }
       });
     }
 

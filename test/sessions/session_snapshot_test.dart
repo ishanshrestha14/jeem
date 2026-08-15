@@ -1,3 +1,5 @@
+import 'package:async/async.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gymflow/db/app_database.dart';
 import 'package:gymflow/features/exercises/data/exercise_repository.dart';
@@ -136,5 +138,83 @@ void main() {
     final session = (await sessions.watchSession(started.id).first)!;
     expect(session.exercises.single.exercise.name, 'Bench Press');
     expect(session.exercises.single.exercise.restSeconds, 120);
+  });
+
+  // --- Live-subscription tests -------------------------------------------
+  //
+  // Every test above uses `.first`, which spins up a fresh controller and
+  // subscription per call and is satisfied by the single emission that
+  // `onListen` schedules — it would pass identically even if the
+  // `tableUpdates` listener inside `_watchAggregate` were wired to the
+  // wrong tables, or never fired at all. These tests instead subscribe
+  // once, consume an initial emission, mutate through the SAME
+  // subscription, and assert a LATER emission reflects the mutation —
+  // the only way to prove the reactive path (not just the initial fetch)
+  // actually works. This mirrors the Task 6 lesson: identically-shaped
+  // code there hid a `cancel()` that hung forever.
+
+  test('watchSession emits again when a set is updated', () async {
+    final id = await sessions.startFromTemplate(await pushTemplate(),
+        weightUnit: 'kg');
+    final queue = StreamQueue(sessions.watchSession(id.id));
+    addTearDown(queue.cancel);
+
+    final first = await queue.next;
+    final targetSet = first!.exercises.first.sets.first;
+    expect(targetSet.weight, isNull);
+
+    await sessions.updateSet(targetSet.copyWith(weight: const Value(62.5)));
+
+    final updated = await queue.next;
+    final updatedSet =
+        updated!.exercises.first.sets.firstWhere((s) => s.id == targetSet.id);
+    expect(updatedSet.weight, 62.5);
+  });
+
+  test('watchSession emits again when a set is added', () async {
+    final id = await sessions.startFromTemplate(await pushTemplate(),
+        weightUnit: 'kg');
+    final queue = StreamQueue(sessions.watchSession(id.id));
+    addTearDown(queue.cancel);
+
+    final first = await queue.next;
+    final sessionExerciseId = first!.exercises.first.exercise.id;
+    expect(first.exercises.first.sets, hasLength(3));
+
+    await sessions.addSet(sessionExerciseId);
+
+    final updated = await queue.next;
+    expect(updated!.exercises.first.sets, hasLength(4));
+    expect(updated.exercises.first.sets.last.setIndex, 3);
+  });
+
+  test('watchActiveSession emits null again after the session finishes',
+      () async {
+    final started = await sessions.startFromTemplate(await pushTemplate(),
+        weightUnit: 'kg');
+    final queue = StreamQueue(sessions.watchActiveSession());
+    addTearDown(queue.cancel);
+
+    final first = await queue.next;
+    expect(first?.session.id, started.id);
+
+    await sessions.finishSession(started.id, notes: 'Done');
+
+    final after = await queue.next;
+    expect(after, isNull);
+  });
+
+  test(
+      'a live watchSession subscription cancels cleanly instead of hanging '
+      '(the Task 6 regression)', () async {
+    final id = await sessions.startFromTemplate(await pushTemplate(),
+        weightUnit: 'kg');
+    final queue = StreamQueue(sessions.watchSession(id.id));
+    await queue.next;
+
+    // If `onCancel` ever hangs again (the exact Task 6 failure mode), this
+    // times out and fails the test instead of stalling the whole suite.
+    await (queue.cancel() ?? Future<void>.value())
+        .timeout(const Duration(seconds: 5));
   });
 }
