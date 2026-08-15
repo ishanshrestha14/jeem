@@ -54,20 +54,24 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
   /// still points to.
   final List<String> _pendingImageDeletions = [];
 
-  /// Files this editing session wrote to disk (via pickAndStore) that have
-  /// not yet been committed by a successful save. These are the mirror image
-  /// of `_pendingImageDeletions`: "delete if I DON'T save" rather than
-  /// "delete if I DO save". Cleared (without deleting) once a save commits
-  /// them; deleted, on abandonment, by `_discardSessionImages`.
-  final List<String> _sessionCreatedPaths = [];
+  /// Set whenever `_imagePath` is a freshly picked file that lives in the
+  /// staging directory, not the managed one — i.e. it has not yet been
+  /// committed by a successful save. Nothing durable (the database) ever
+  /// references a staged path, so abandoning the editor by any means
+  /// (Cancel, AppBar back, system back gesture, the app getting killed)
+  /// requires no cleanup here: the file sits in OS temp space that the
+  /// platform reclaims on its own, not in app-durable storage. This is what
+  /// replaced the old session-tracked-deletion-list/PopScope approach.
+  String? _stagedImagePath;
 
-  Future<void> _discardSessionImages() async {
-    if (_sessionCreatedPaths.isEmpty) return;
-    final service = ref.read(imageStorageServiceProvider);
-    final paths = List<String>.of(_sessionCreatedPaths);
-    _sessionCreatedPaths.clear();
-    for (final path in paths) {
-      await service.deleteIfManaged(path);
+  Future<void> _bestEffortDeleteStaged(String path) async {
+    try {
+      final file = File(path);
+      if (file.existsSync()) await file.delete();
+    } catch (_) {
+      // Best-effort only: a leftover staged file is not user-durable data,
+      // so a failure to proactively clean it up here is not a correctness
+      // problem — just a missed opportunity for tidiness.
     }
   }
 
@@ -93,9 +97,9 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
 
   Future<void> _pickImage(ImageSource source) async {
     final service = ref.read(imageStorageServiceProvider);
-    String? picked;
+    String? staged;
     try {
-      picked = await service.pickAndStore(source: source);
+      staged = await service.pickAndStore(source: source);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -109,29 +113,36 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
       );
       return;
     }
-    if (picked == null || !mounted) return;
-    final newPath = picked;
-    final old = _imagePath;
+    if (staged == null || !mounted) return;
+    final newPath = staged;
+    // A previously staged (not-yet-committed) pick from this session can
+    // just be discarded outright — nothing references it. A committed image
+    // (loaded from the database) must instead wait for save, in case the
+    // user cancels and the database row still points at it.
+    final oldStaged = _stagedImagePath;
+    final oldCommitted = oldStaged == null ? _imagePath : null;
     setState(() {
-      if (old != null) _pendingImageDeletions.add(old);
-      _sessionCreatedPaths.add(newPath);
+      if (oldCommitted != null) _pendingImageDeletions.add(oldCommitted);
+      _stagedImagePath = newPath;
       _imagePath = newPath;
     });
+    if (oldStaged != null) {
+      unawaited(_bestEffortDeleteStaged(oldStaged));
+    }
   }
 
   void _removeImage() {
     final old = _imagePath;
     if (old == null) return;
+    final stagedToDiscard = _stagedImagePath;
     setState(() {
-      _pendingImageDeletions.add(old);
+      if (stagedToDiscard == null) _pendingImageDeletions.add(old);
+      _stagedImagePath = null;
       _imagePath = null;
     });
-  }
-
-  Future<void> _cancel() async {
-    await _discardSessionImages();
-    if (!mounted) return;
-    Navigator.of(context).maybePop();
+    if (stagedToDiscard != null) {
+      unawaited(_bestEffortDeleteStaged(stagedToDiscard));
+    }
   }
 
   Future<void> _save() async {
@@ -146,10 +157,20 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
     });
 
     final repo = ref.read(exerciseRepositoryProvider);
+    final service = ref.read(imageStorageServiceProvider);
     final description = _descriptionController.text.trim();
     final notes = _notesController.text.trim();
 
     try {
+      // Move a freshly picked image out of staging and into the managed
+      // directory *only now that the edit is actually about to be
+      // persisted*. This is the one and only place a staged path is ever
+      // promoted to something the database is allowed to reference.
+      var finalImagePath = _imagePath;
+      if (_stagedImagePath != null) {
+        finalImagePath = await service.commitStaged(_stagedImagePath!);
+      }
+
       if (widget.isEditing && _loaded != null) {
         await repo.update(
           _loaded!.copyWith(
@@ -158,7 +179,7 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
             description: Value(description.isEmpty ? null : description),
             notes: Value(notes.isEmpty ? null : notes),
             loggingType: _loggingType,
-            imagePath: Value(_imagePath),
+            imagePath: Value(finalImagePath),
           ),
         );
       } else {
@@ -168,20 +189,20 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
           category: _category,
           description: description.isEmpty ? null : description,
           notes: notes.isEmpty ? null : notes,
-          imagePath: _imagePath,
+          imagePath: finalImagePath,
         );
       }
 
+      // A replaced or removed *committed* image is only safe to delete now
+      // that the new state has actually landed in the database.
       if (_pendingImageDeletions.isNotEmpty) {
-        final service = ref.read(imageStorageServiceProvider);
         for (final path in _pendingImageDeletions) {
           await service.deleteIfManaged(path);
         }
         _pendingImageDeletions.clear();
       }
-      // Whatever remains as _imagePath (if anything) is now committed to the
-      // database — it must survive, not be swept up as an abandoned pick.
-      _sessionCreatedPaths.clear();
+      _stagedImagePath = null;
+      _imagePath = finalImagePath;
 
       if (!mounted) return;
       await Navigator.of(context).maybePop();
@@ -258,24 +279,6 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
   }
 
   Widget _buildForm(BuildContext context) {
-    // Covers the AppBar back button and the system back gesture, which
-    // otherwise bypass the Cancel button's cleanup entirely and leak any
-    // image this session picked but never saved. Cancel/Save/Archive already
-    // discard or commit session images deterministically *before* calling
-    // maybePop, so canPop stays true and every first-party pop proceeds
-    // immediately and normally — this only ever needs to react, best-effort,
-    // to a pop we didn't initiate ourselves.
-    return PopScope(
-      canPop: true,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) return;
-        unawaited(_discardSessionImages());
-      },
-      child: _buildScaffold(context),
-    );
-  }
-
-  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.isEditing ? 'Edit exercise' : 'New exercise'),
@@ -355,7 +358,9 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: _saving ? null : _cancel,
+                  onPressed: _saving
+                      ? null
+                      : () => Navigator.of(context).maybePop(),
                   child: const Text('Cancel'),
                 ),
               ),

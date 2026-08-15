@@ -13,23 +13,28 @@ import 'package:gymflow/features/exercises/data/exercise_repository.dart';
 import 'package:gymflow/features/exercises/ui/exercise_editor_screen.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as p;
 
 import '../db/test_database.dart';
 import 'pump_helpers.dart';
 
 /// Fake picker path: bypasses `ImagePicker`'s platform channel (unavailable
 /// in widget tests) while still exercising the real downscale-and-write
-/// logic in `ImageStorageService.storeBytes`, so assertions below are against
-/// real files on a real (temp) directory rather than mocked state.
+/// logic in `ImageStorageService.stageBytes`, so assertions below are
+/// against real files on real (temp) directories rather than mocked state.
+/// Picks land in the STAGING directory, matching the real
+/// `pickAndStore` -> `stageBytes` contract — the editor only promotes them
+/// into the managed directory via `commitStaged` on a successful save.
 class _FakeImageStorageService extends ImageStorageService {
-  _FakeImageStorageService(Directory dir) : super(imagesDirOverride: dir);
+  _FakeImageStorageService(Directory managedDir, Directory stagingDir)
+      : super(imagesDirOverride: managedDir, stagingDirOverride: stagingDir);
 
   final Queue<Uint8List> queued = Queue();
 
   @override
   Future<String?> pickAndStore({ImageSource source = ImageSource.gallery}) async {
     if (queued.isEmpty) return null;
-    return storeBytes(queued.removeFirst(), extension: 'jpg');
+    return stageBytes(queued.removeFirst(), extension: 'jpg');
   }
 }
 
@@ -42,17 +47,20 @@ Uint8List _fakeJpegBytes() {
 void main() {
   late AppDatabase db;
   late Directory imagesDir;
+  late Directory stagingDir;
   late _FakeImageStorageService service;
 
   setUp(() async {
     db = testDatabase();
     imagesDir = await Directory.systemTemp.createTemp('gymflow_editor_img');
-    service = _FakeImageStorageService(imagesDir);
+    stagingDir = await Directory.systemTemp.createTemp('gymflow_editor_staging');
+    service = _FakeImageStorageService(imagesDir, stagingDir);
   });
 
   tearDown(() async {
     await db.close();
     if (imagesDir.existsSync()) await imagesDir.delete(recursive: true);
+    if (stagingDir.existsSync()) await stagingDir.delete(recursive: true);
   });
 
   // The form is taller than the default 800x600 test surface, so the
@@ -65,17 +73,20 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
   }
 
-  // `ImageStorageService.storeBytes`/`deleteIfManaged` perform real dart:io
-  // file operations, and saving round-trips through the (in-memory) sqlite3
-  // isolate. Under AutomatedTestWidgetsFlutterBinding's FakeAsync zone, that
-  // real work completes at the OS/isolate level (visible to synchronous
-  // dart:io calls like `listSync()`), but the Dart-level `await` continuation
-  // inside the widget's callback never resumes — and the test hangs forever
-  // during teardown waiting on it — unless the interaction runs through
-  // `tester.runAsync`, which temporarily hands control to the real event
-  // loop for long enough that the whole chain actually finishes. Every tap
-  // that triggers a pick/save/cancel/remove must go through this helper
-  // rather than a bare `tester.tap` + `pumpAndSettle`.
+  // `ImageStorageService.stageBytes`/`storeBytes`/`commitStaged`/
+  // `deleteIfManaged` perform real dart:io file operations, and saving
+  // round-trips through the (in-memory) sqlite3 isolate. Under
+  // AutomatedTestWidgetsFlutterBinding's FakeAsync zone, that real work
+  // completes at the OS/isolate level (visible to synchronous dart:io calls
+  // like `listSync()`), but the Dart-level `await` continuation inside the
+  // widget's callback (or in test setup code) never resumes — and the test
+  // hangs forever during teardown waiting on it — unless the interaction
+  // runs through `tester.runAsync`, which temporarily hands control to the
+  // real event loop for long enough that the whole chain actually finishes.
+  // Every tap that triggers real I/O (pick, save) must go through this
+  // helper rather than a bare `tester.tap` + `pumpAndSettle`. Cancel/back
+  // navigation triggers no I/O under the staging design, so those use plain
+  // taps.
   Future<void> tapAndSettle(WidgetTester tester, Finder finder) async {
     await tester.runAsync(() async {
       await tester.tap(finder);
@@ -84,11 +95,21 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  // Same real-dart:io-under-FakeAsync issue as `tapAndSettle`: any direct
+  // `service.storeBytes` call in test setup (to seed a pre-existing managed
+  // image) must also run through `runAsync`, or its continuation never
+  // resumes.
+  Future<String> storeSeedImage(WidgetTester tester) {
+    late String path;
+    return tester
+        .runAsync(() async {
+          path = await service.storeBytes(_fakeJpegBytes(), extension: 'jpg');
+        })
+        .then((_) => path);
+  }
+
   // The editor is always pushed on top of another screen in the real app.
-  // Give it a real destination to pop back to (mirroring the archive test)
-  // rather than making it the root route, so Save/Cancel's `maybePop()` (and
-  // PopScope's forced `pop()` fallback) has a route below it to reveal
-  // instead of hitting the degenerate "pop the only route" case.
+  // Give it a real destination to pop back to (mirroring the archive test).
   Widget harness({String? exerciseId}) => ProviderScope(
         overrides: [
           databaseProvider.overrideWithValue(db),
@@ -119,19 +140,8 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  // Same real-dart:io-under-FakeAsync issue as `tapAndSettle`: any direct
-  // `service.storeBytes` call in test setup (to seed a pre-existing image)
-  // must also run through `runAsync`, or its continuation never resumes.
-  Future<String> storeSeedImage(WidgetTester tester) {
-    late String path;
-    return tester
-        .runAsync(() async {
-          path = await service.storeBytes(_fakeJpegBytes(), extension: 'jpg');
-        })
-        .then((_) => path);
-  }
-
-  testWidgets('pick then cancel: the newly created file does not survive',
+  testWidgets(
+      'pick then cancel: nothing lands in the managed directory, staged file untouched',
       (tester) async {
     useTallSurface(tester);
     service.queued.add(_fakeJpegBytes());
@@ -144,22 +154,49 @@ void main() {
     await tester.enterText(find.byType(TextField).first, 'Push-up');
     await tapAndSettle(tester, find.text('Choose photo'));
 
-    // Nothing persisted yet, so the created file must exist right after the
-    // pick, before we act on Cancel.
-    final createdFiles = imagesDir.listSync();
-    expect(createdFiles, hasLength(1));
-    final createdPath = createdFiles.single.path;
-    expect(File(createdPath).existsSync(), isTrue);
+    // The pick landed in staging, never in the managed directory.
+    expect(imagesDir.listSync(), isEmpty);
+    expect(stagingDir.listSync(), hasLength(1));
 
-    await tapAndSettle(tester, find.text('Cancel'));
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
 
-    expect(File(createdPath).existsSync(), isFalse);
+    // Nothing was ever committed, so the managed directory stays untouched.
+    // (The staged file is left for the OS to reclaim — see the report.)
     expect(imagesDir.listSync(), isEmpty);
 
     await disposeAndDrainTimers(tester);
   });
 
-  testWidgets('pick then save: the new file exists and imagePath points at it',
+  testWidgets(
+      'pick then back navigation (pageBack): nothing lands in the managed directory',
+      (tester) async {
+    useTallSurface(tester);
+    service.queued.add(_fakeJpegBytes());
+
+    await tester.pumpWidget(harness());
+    await pumpUntilData(tester);
+    await openEditor(tester);
+    await pumpUntilData(tester);
+
+    await tester.enterText(find.byType(TextField).first, 'Push-up');
+    await tapAndSettle(tester, find.text('Choose photo'));
+
+    expect(imagesDir.listSync(), isEmpty);
+
+    // The AppBar back button / system back gesture, not the Cancel button —
+    // this is the path that was never covered before.
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Destination'), findsOneWidget);
+    expect(imagesDir.listSync(), isEmpty);
+
+    await disposeAndDrainTimers(tester);
+  });
+
+  testWidgets(
+      'pick then save: imagePath points at a file inside the managed directory',
       (tester) async {
     useTallSurface(tester);
     service.queued.add(_fakeJpegBytes());
@@ -180,6 +217,7 @@ void main() {
     // and this suite's report entry for the full story.
     final saved = (await db.select(db.exercises).get()).single;
     expect(saved.imagePath, isNotNull);
+    expect(p.isWithin(imagesDir.path, saved.imagePath!), isTrue);
     expect(File(saved.imagePath!).existsSync(), isTrue);
     expect(imagesDir.listSync(), hasLength(1));
 
@@ -207,10 +245,12 @@ void main() {
 
     await tapAndSettle(tester, find.text('Choose photo'));
 
-    // A replacement has been written to disk but not committed.
-    expect(imagesDir.listSync(), hasLength(2));
+    // The replacement was staged, not committed — the managed directory
+    // still holds only the original.
+    expect(imagesDir.listSync(), hasLength(1));
 
-    await tapAndSettle(tester, find.text('Cancel'));
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
 
     expect(File(originalPath).existsSync(), isTrue);
     expect(imagesDir.listSync(), hasLength(1));
@@ -245,6 +285,7 @@ void main() {
     final updated = await repo.findById(exercise.id);
     expect(updated!.imagePath, isNotNull);
     expect(updated.imagePath, isNot(originalPath));
+    expect(p.isWithin(imagesDir.path, updated.imagePath!), isTrue);
     expect(File(updated.imagePath!).existsSync(), isTrue);
     expect(imagesDir.listSync(), hasLength(1));
 
