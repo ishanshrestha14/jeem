@@ -6,6 +6,7 @@ import 'package:gymflow/core/theme/app_theme.dart';
 import 'package:gymflow/db/app_database.dart';
 import 'package:gymflow/features/exercises/data/exercise_repository.dart';
 import 'package:gymflow/features/sessions/data/session_repository.dart';
+import 'package:gymflow/features/sessions/providers/active_session_controller.dart';
 import 'package:gymflow/features/sessions/ui/active_session_screen.dart';
 import 'package:gymflow/features/sessions/ui/widgets/duration_set_row.dart';
 import 'package:gymflow/features/sessions/ui/widgets/strength_set_row.dart';
@@ -16,40 +17,94 @@ import 'pump_helpers.dart';
 /// Both `ActiveSessionController.build()` and every one of its mutators
 /// (`completeSet`, `updateSetValues`, ...) reload the post-write session via
 /// `SessionRepository.watchSession(id).first` / `.watchActiveSession().first`.
-/// `Stream.first` awaits its subscription's `cancel()` before completing, and
-/// `SessionRepository`'s hand-rolled `_watchAggregate` cancellation needs a
-/// genuine event-loop turn to settle — which plain `tester.pump()` calls
-/// never provide (confirmed by isolating the hang to exactly this `.first`
-/// call: swapping it for a manual, non-awaited-cancel subscription resolved
-/// immediately under the same pump loop that otherwise stalled indefinitely,
-/// even across 300 pumps). `pumpUntilData` alone therefore hangs on this
-/// screen. `tester.runAsync` is flutter_test's sanctioned escape hatch for
-/// exactly this — it briefly runs real (non-simulated) async code so pending
-/// Future chains like this one can actually resolve — so every wait on this
-/// screen goes through it instead. No production code changes were needed
-/// or made; this is purely a test-environment characteristic of the
-/// `.first`-based reload pattern.
-Future<void> pumpUntilSessionData(WidgetTester tester) async {
-  await tester.runAsync(
-    () => Future<void>.delayed(const Duration(milliseconds: 100)),
-  );
-  await tester.pump();
-  await tester.pump();
+/// `Stream.first`'s `_cancelAndValue` awaits the subscription's `cancel()`
+/// future before completing, and `SessionRepository`'s hand-rolled
+/// `_watchAggregate` cancellation needs a genuine event-loop turn to settle
+/// — which plain `tester.pump()` calls never provide under
+/// `AutomatedTestWidgetsFlutterBinding`'s fake clock (confirmed by isolating
+/// the hang to exactly this `.first` call: swapping it for a manual,
+/// non-awaited-cancel subscription resolved immediately under the same pump
+/// loop that otherwise stalled indefinitely, even across 300 pumps).
+/// `pumpUntilData` alone therefore hangs on this screen.
+///
+/// `tester.runAsync` is flutter_test's sanctioned escape hatch for exactly
+/// this: it briefly runs real (non-simulated) async code so a pending Future
+/// chain can actually resolve.
+///
+/// Two things were tried and rejected before landing on the approach below
+/// — both verified by direct reproduction, not assumption:
+///
+/// 1. A single fixed sleep — `runAsync(() => Future.delayed(100ms))` then
+///    pump — works, but is a magic number: on a loaded CI runner, if the
+///    real fetch+cancel round trip ever exceeds 100ms this flakes instead
+///    of failing deterministically.
+/// 2. Awaiting the notifier's own Future directly —
+///    `container.read(activeSessionControllerProvider.future)` inside
+///    `runAsync` — looked like the "obviously correct" deterministic fix,
+///    but **hangs indefinitely** (reproduced and confirmed stuck past 30s).
+///    `container.read(...)` from *inside* `runAsync`'s real zone also does
+///    not observe the state transition even once it has genuinely happened
+///    elsewhere — polling `container.read(activeSessionControllerProvider)`
+///    on a real timer inside `runAsync` never once saw anything but
+///    `AsyncLoading`, even after 4+ real seconds, right up until the poll
+///    loop's cap was hit — yet the screen had already rendered correctly by
+///    the time normal `tester.pump()` calls ran afterwards. Reading
+///    Riverpod container state from inside a `runAsync` real-zone excursion
+///    is therefore not a reliable readiness signal in this environment.
+///
+/// What *is* a reliable readiness signal — because it's exactly what
+/// `pumpUntilData` already uses successfully on every other Drift-backed
+/// screen in this codebase — is the widget tree itself: the screen's
+/// `loading:` branch renders a `CircularProgressIndicator` and nothing
+/// else does. So this repeatedly nudges real time forward in small,
+/// bounded steps (letting the pending `.first`/cancel chain's real OS
+/// timers/isolate messages actually get delivered) and, after each nudge,
+/// pumps a frame and checks the *rendered* tree — exiting the moment the
+/// spinner is gone rather than after a fixed total duration. That makes
+/// the wait adaptive (fast when the reload is fast, tolerant of a slow
+/// CI runner up to the iteration cap) without ever guessing a constant.
+///
+/// No production code changes were needed or made; this is purely a
+/// test-environment characteristic of the `.first`-based reload pattern —
+/// see the Task 13 report and this update's fix report for the full
+/// mechanism and the two dead ends above.
+///
+/// Reused verbatim by Tasks 14/15/16/19, which also render this screen.
+Future<void> pumpUntilSessionData(
+  WidgetTester tester, {
+  int maxIterations = 50,
+}) async {
+  for (var i = 0; i < maxIterations; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pump();
+    if (find.byType(CircularProgressIndicator).evaluate().isEmpty) return;
+  }
 }
 
 void main() {
   late AppDatabase db;
+  late ProviderContainer container;
 
   setUp(() => db = testDatabase());
-  tearDown(() => db.close());
+  tearDown(() async {
+    container.dispose();
+    await db.close();
+  });
 
-  Widget harness() => ProviderScope(
-        overrides: [databaseProvider.overrideWithValue(db)],
-        child: MaterialApp(
-          theme: AppTheme.dark(),
-          home: const ActiveSessionScreen(),
-        ),
-      );
+  Widget harness() {
+    container = ProviderContainer(
+      overrides: [databaseProvider.overrideWithValue(db)],
+    );
+    return UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        home: const ActiveSessionScreen(),
+      ),
+    );
+  }
 
   testWidgets('an exercise with 3 target sets renders 3 rows', (tester) async {
     final templates = TemplateRepository(db);

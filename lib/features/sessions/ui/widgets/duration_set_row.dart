@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/semantic_colors.dart';
 import '../../../../core/widgets/numeric_field.dart';
 import '../../../../db/app_database.dart';
+import 'set_badge.dart';
 
 /// Quick-pick chips for a duration set's length. Deliberately distinct from
 /// [kRestPresets] (rest-between-sets presets) — these are common hold/carry
@@ -37,12 +38,10 @@ class DurationSetRow extends StatelessWidget {
     final row = Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        _DurationBadge(
+        SetBadge(
           index: set.setIndex,
           isComplete: _isComplete,
           isCurrent: isCurrent,
-          success: semantic.success,
-          primary: theme.colorScheme.primary,
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -100,46 +99,6 @@ class DurationSetRow extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Opacity(opacity: _isComplete ? 0.6 : 1.0, child: row),
-      ),
-    );
-  }
-}
-
-class _DurationBadge extends StatelessWidget {
-  const _DurationBadge({
-    required this.index,
-    required this.isComplete,
-    required this.isCurrent,
-    required this.success,
-    required this.primary,
-  });
-
-  final int index;
-  final bool isComplete;
-  final bool isCurrent;
-  final Color success;
-  final Color primary;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 32,
-      height: 32,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: isComplete ? success : Colors.transparent,
-        border: Border.all(
-          color: isComplete ? success : (isCurrent ? primary : Colors.grey),
-          width: 2,
-        ),
-      ),
-      child: Text(
-        '${index + 1}',
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: isComplete ? Colors.black : null,
-        ),
       ),
     );
   }

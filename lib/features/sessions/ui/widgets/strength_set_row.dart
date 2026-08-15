@@ -5,6 +5,7 @@ import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/formatting.dart';
 import '../../../../core/widgets/numeric_field.dart';
 import '../../../../db/app_database.dart';
+import 'set_badge.dart';
 
 /// A single strength set row: number badge, weight, reps, RIR and a
 /// 56dp complete button — sized for one-thumb use mid-workout (PRD §17).
@@ -44,12 +45,10 @@ class StrengthSetRow extends StatelessWidget {
     final row = Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        _SetBadge(
+        SetBadge(
           index: set.setIndex,
           isComplete: _isComplete,
           isCurrent: isCurrent,
-          success: semantic.success,
-          primary: theme.colorScheme.primary,
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -116,46 +115,6 @@ class StrengthSetRow extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Opacity(opacity: _isComplete ? 0.6 : 1.0, child: row),
-      ),
-    );
-  }
-}
-
-class _SetBadge extends StatelessWidget {
-  const _SetBadge({
-    required this.index,
-    required this.isComplete,
-    required this.isCurrent,
-    required this.success,
-    required this.primary,
-  });
-
-  final int index;
-  final bool isComplete;
-  final bool isCurrent;
-  final Color success;
-  final Color primary;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 32,
-      height: 32,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: isComplete ? success : Colors.transparent,
-        border: Border.all(
-          color: isComplete ? success : (isCurrent ? primary : Colors.grey),
-          width: 2,
-        ),
-      ),
-      child: Text(
-        '${index + 1}',
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: isComplete ? Colors.black : null,
-        ),
       ),
     );
   }
