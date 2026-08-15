@@ -26,20 +26,10 @@ class _ExercisePickerSheet extends ConsumerStatefulWidget {
 }
 
 class _ExercisePickerSheetState extends ConsumerState<_ExercisePickerSheet> {
-  @override
-  void initState() {
-    super.initState();
-    // The search query is shared with the exercise library screen; start
-    // this sheet from a clean slate rather than whatever was last typed
-    // there, and leave it clean on the way out too.
-    ref.read(exerciseSearchQueryProvider.notifier).state = '';
-  }
-
-  @override
-  void dispose() {
-    ref.read(exerciseSearchQueryProvider.notifier).state = '';
-    super.dispose();
-  }
+  // Deliberately local, not `exerciseSearchQueryProvider` — that provider is
+  // shared with the standalone Exercise Library screen, and mutating it from
+  // here would clobber a filter the user had already typed there.
+  String _query = '';
 
   Future<void> _createExercise(BuildContext context) async {
     final newId = await Navigator.of(context).push<String>(
@@ -54,7 +44,7 @@ class _ExercisePickerSheetState extends ConsumerState<_ExercisePickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final exercisesAsync = ref.watch(filteredExercisesProvider);
+    final exercisesAsync = ref.watch(exerciseListProvider);
 
     return DraggableScrollableSheet(
       expand: false,
@@ -72,9 +62,7 @@ class _ExercisePickerSheetState extends ConsumerState<_ExercisePickerSheet> {
                     hintText: 'Search exercises',
                     prefixIcon: Icon(Icons.search),
                   ),
-                  onChanged: (v) =>
-                      ref.read(exerciseSearchQueryProvider.notifier).state =
-                          v,
+                  onChanged: (v) => setState(() => _query = v),
                 ),
               ),
               Expanded(
@@ -82,7 +70,14 @@ class _ExercisePickerSheetState extends ConsumerState<_ExercisePickerSheet> {
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
                   error: (e, _) => Center(child: Text('$e')),
-                  data: (rows) {
+                  data: (allRows) {
+                    final query = _query.trim().toLowerCase();
+                    final rows = query.isEmpty
+                        ? allRows
+                        : allRows
+                            .where((e) =>
+                                e.name.toLowerCase().contains(query))
+                            .toList();
                     return ListView.builder(
                       controller: scrollController,
                       itemCount: rows.length + 1,

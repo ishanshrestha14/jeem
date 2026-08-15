@@ -93,14 +93,12 @@ void main() {
     );
 
     // A plain pumpUntilData() right after tap() can race the tap's own
-    // gesture-arena resolution and the push transition itself (before either
-    // has produced a spinner to wait out), so let one immediate frame plus
-    // the bounded 300ms push transition play out first — both finite, so
-    // this is not the pumpAndSettle-on-a-stream trap.
+    // gesture-arena resolution and the push transition itself: the *old*
+    // screen also has zero CircularProgressIndicators, so the default
+    // "no spinner" exit condition can be satisfied before the destination
+    // route has even been built. Wait on real destination content instead.
     await tester.tap(find.text('Open editor'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await pumpUntilData(tester);
+    await pumpUntilData(tester, until: find.byType(BackButton));
 
     final templates = TemplateRepository(db);
     final all = await db.select(db.workoutTemplates).get();
@@ -117,5 +115,28 @@ void main() {
     expect(await templates.createTemplate(name: 'x'), isNotNull);
 
     await disposeAndDrainTimers(tester);
+  });
+
+  testWidgets(
+      'a name edit typed just before dispose is flushed, not discarded',
+      (tester) async {
+    final templates = TemplateRepository(db);
+    final t = await templates.createTemplate(name: 'Old Name');
+
+    await tester.pumpWidget(harness(t.id));
+    await pumpUntilData(tester);
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Old Name'),
+      'New Name',
+    );
+    // Deliberately do NOT pump out the 300ms debounce. Tear the widget down
+    // immediately instead — dispose() must flush the pending write itself.
+    await disposeAndDrainTimers(tester);
+
+    final row = await (db.select(db.workoutTemplates)
+          ..where((row) => row.id.equals(t.id)))
+        .getSingle();
+    expect(row.name, 'New Name');
   });
 }

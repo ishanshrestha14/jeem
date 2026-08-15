@@ -5,10 +5,28 @@ import 'package:flutter_test/flutter_test.dart';
 /// value. Never use pumpAndSettle() on these screens: their `loading:` branch
 /// renders an indeterminate CircularProgressIndicator, which animates forever,
 /// so pumpAndSettle blocks for its full 10-minute timeout and then fails.
-Future<void> pumpUntilData(WidgetTester tester, {int maxFrames = 40}) async {
+///
+/// [until]: pass a [Finder] for real expected content (e.g.
+/// `find.text('Legs A')`) instead of relying on the default
+/// spinner-is-gone check when the pump follows a `Navigator.push`/pop. The
+/// default check races navigation: right after `tester.tap()` triggers a
+/// push, the *old* screen is still on screen and has no
+/// CircularProgressIndicator either, so the default condition can be
+/// trivially (and wrongly) satisfied before the destination route has even
+/// been built, let alone loaded its data. Waiting on real content sidesteps
+/// that race entirely.
+Future<void> pumpUntilData(
+  WidgetTester tester, {
+  Finder? until,
+  int maxFrames = 40,
+}) async {
   for (var i = 0; i < maxFrames; i++) {
     await tester.pump(const Duration(milliseconds: 20));
-    if (find.byType(CircularProgressIndicator).evaluate().isEmpty) return;
+    if (until != null) {
+      if (until.evaluate().isNotEmpty) return;
+    } else if (find.byType(CircularProgressIndicator).evaluate().isEmpty) {
+      return;
+    }
   }
 }
 

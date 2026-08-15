@@ -33,11 +33,18 @@ class _TemplateEditorScreenState extends ConsumerState<TemplateEditorScreen> {
   late final bool _isDraft = widget.templateId == null;
   String? _templateId;
 
+  // Captured once, up front, rather than reached for via `ref.read(...)` at
+  // call sites — in particular `dispose()` must be able to flush a pending
+  // debounced write, and `ref` may already be torn down by then. A plain
+  // Dart object (this repository just wraps the database) stays valid.
+  late final TemplateRepository _repo;
+
   final _nameController = TextEditingController();
   final _notesController = TextEditingController();
   Timer? _nameDebounce;
   Timer? _notesDebounce;
   Timer? _restDebounce;
+  int? _pendingRestSeconds;
 
   bool _metaHydrated = false;
 
@@ -51,6 +58,7 @@ class _TemplateEditorScreenState extends ConsumerState<TemplateEditorScreen> {
   @override
   void initState() {
     super.initState();
+    _repo = ref.read(templateRepositoryProvider);
     _templateId = widget.templateId;
     if (_templateId == null) {
       _createDraft();
@@ -58,17 +66,36 @@ class _TemplateEditorScreenState extends ConsumerState<TemplateEditorScreen> {
   }
 
   Future<void> _createDraft() async {
-    final created =
-        await ref.read(templateRepositoryProvider).createTemplate(name: '');
+    final created = await _repo.createTemplate(name: '');
     if (!mounted) return;
     setState(() => _templateId = created.id);
   }
 
   @override
   void dispose() {
-    _nameDebounce?.cancel();
-    _notesDebounce?.cancel();
-    _restDebounce?.cancel();
+    // Flush, don't discard: a pending debounced edit represents real user
+    // input that hasn't hit the repository yet. Cancelling it silently here
+    // would lose the last ~300ms of typing whenever the user backs out
+    // quickly. Read straight from the controllers/cached value rather than
+    // `ref`, which may already be unusable at this point.
+    if (_nameDebounce?.isActive ?? false) {
+      _nameDebounce!.cancel();
+      _persistTemplate((t) => t.copyWith(name: _nameController.text.trim()));
+    }
+    if (_notesDebounce?.isActive ?? false) {
+      _notesDebounce!.cancel();
+      final value = _notesController.text.trim();
+      _persistTemplate(
+        (t) => t.copyWith(notes: Value(value.isEmpty ? null : value)),
+      );
+    }
+    if (_restDebounce?.isActive ?? false) {
+      _restDebounce!.cancel();
+      final pending = _pendingRestSeconds;
+      if (pending != null) {
+        _persistTemplate((t) => t.copyWith(defaultRestSeconds: pending));
+      }
+    }
     _nameController.dispose();
     _notesController.dispose();
     super.dispose();
@@ -81,12 +108,13 @@ class _TemplateEditorScreenState extends ConsumerState<TemplateEditorScreen> {
     _notesController.text = template.notes ?? '';
   }
 
-  Future<void> _persistTemplate(
-    WorkoutTemplate Function(WorkoutTemplate) fn,
-  ) async {
+  /// Fire-and-forget: callers (including `dispose()`, which cannot await)
+  /// don't wait on this. Uses the cached `_template` row plus the captured
+  /// [_repo] rather than `ref.read`, so it is safe to call during teardown.
+  void _persistTemplate(WorkoutTemplate Function(WorkoutTemplate) fn) {
     final current = _template;
     if (current == null) return;
-    await ref.read(templateRepositoryProvider).updateTemplate(fn(current));
+    _repo.updateTemplate(fn(current));
   }
 
   void _onNameChanged(String value) {
@@ -110,8 +138,10 @@ class _TemplateEditorScreenState extends ConsumerState<TemplateEditorScreen> {
   void _onDefaultRestChanged(num? value) {
     _restDebounce?.cancel();
     final seconds = (value ?? 90).toInt();
+    _pendingRestSeconds = seconds;
     _restDebounce = Timer(const Duration(milliseconds: 300), () {
       _persistTemplate((t) => t.copyWith(defaultRestSeconds: seconds));
+      _pendingRestSeconds = null;
     });
   }
 
@@ -125,7 +155,7 @@ class _TemplateEditorScreenState extends ConsumerState<TemplateEditorScreen> {
         tid != null &&
         _nameController.text.trim().isEmpty &&
         _exerciseCount == 0) {
-      await ref.read(templateRepositoryProvider).deleteTemplate(tid);
+      await _repo.deleteTemplate(tid);
     }
     if (mounted) Navigator.of(context).pop();
   }
@@ -135,25 +165,24 @@ class _TemplateEditorScreenState extends ConsumerState<TemplateEditorScreen> {
     if (tid == null) return;
     final exerciseId = await showExercisePickerSheet(context);
     if (exerciseId == null || !mounted) return;
-    await ref.read(templateRepositoryProvider).addExercise(
-          templateId: tid,
-          exerciseId: exerciseId,
-          restSeconds: _template?.defaultRestSeconds,
-        );
+    await _repo.addExercise(
+      templateId: tid,
+      exerciseId: exerciseId,
+      restSeconds: _template?.defaultRestSeconds,
+    );
   }
 
   Future<void> _removeExercise(TemplateExerciseWithExercise te) async {
     final tid = _templateId;
     if (tid == null) return;
-    final repo = ref.read(templateRepositoryProvider);
     final messenger = ScaffoldMessenger.of(context);
-    await repo.removeTemplateExercise(te.config.id);
+    await _repo.removeTemplateExercise(te.config.id);
     messenger.showSnackBar(
       SnackBar(
         content: Text('${te.name} removed'),
         action: SnackBarAction(
           label: 'Undo',
-          onPressed: () => repo.addExercise(
+          onPressed: () => _repo.addExercise(
             templateId: tid,
             exerciseId: te.exercise.id,
             targetSets: te.config.targetSets,
@@ -284,9 +313,11 @@ class _TemplateEditorScreenState extends ConsumerState<TemplateEditorScreen> {
               itemCount: exercises.length,
               // Forward raw indices — TemplateRepository.reorderExercises
               // normalises the downward-drag off-by-one internally.
-              onReorder: (oldIndex, newIndex) => ref
-                  .read(templateRepositoryProvider)
-                  .reorderExercises(data.template.id, oldIndex, newIndex),
+              onReorder: (oldIndex, newIndex) => _repo.reorderExercises(
+                data.template.id,
+                oldIndex,
+                newIndex,
+              ),
               itemBuilder: (context, index) {
                 final te = exercises[index];
                 return _ExerciseRow(

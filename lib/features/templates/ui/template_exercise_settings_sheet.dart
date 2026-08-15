@@ -54,7 +54,17 @@ class _TemplateExerciseSettingsSheetState
 
   @override
   void dispose() {
-    _notesDebounce?.cancel();
+    // Flush, don't discard: a pending debounced note edit is real user
+    // input. `widget.onChanged` is a plain closure (not tied to `ref`), so
+    // it's safe to call here — just skip `setState`, which would throw once
+    // the widget is being torn down.
+    if (_notesDebounce?.isActive ?? false) {
+      _notesDebounce!.cancel();
+      final value = _notesController.text.trim();
+      _config =
+          _config.copyWith(notes: Value(value.isEmpty ? null : value));
+      widget.onChanged(_config);
+    }
     _notesController.dispose();
     super.dispose();
   }
