@@ -79,30 +79,38 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
     final description = _descriptionController.text.trim();
     final notes = _notesController.text.trim();
 
-    if (widget.isEditing && _loaded != null) {
-      await repo.update(
-        _loaded!.copyWith(
+    try {
+      if (widget.isEditing && _loaded != null) {
+        await repo.update(
+          _loaded!.copyWith(
+            name: name,
+            category: Value(_category),
+            description: Value(description.isEmpty ? null : description),
+            notes: Value(notes.isEmpty ? null : notes),
+            loggingType: _loggingType,
+            imagePath: Value(_imagePath),
+          ),
+        );
+      } else {
+        await repo.create(
           name: name,
-          category: Value(_category),
-          description: Value(description.isEmpty ? null : description),
-          notes: Value(notes.isEmpty ? null : notes),
           loggingType: _loggingType,
-          imagePath: Value(_imagePath),
-        ),
-      );
-    } else {
-      await repo.create(
-        name: name,
-        loggingType: _loggingType,
-        category: _category,
-        description: description.isEmpty ? null : description,
-        notes: notes.isEmpty ? null : notes,
-        imagePath: _imagePath,
-      );
-    }
+          category: _category,
+          description: description.isEmpty ? null : description,
+          notes: notes.isEmpty ? null : notes,
+          imagePath: _imagePath,
+        );
+      }
 
-    if (!mounted) return;
-    Navigator.of(context).maybePop();
+      if (!mounted) return;
+      await Navigator.of(context).maybePop();
+    } finally {
+      // If maybePop() actually popped this route, the widget is disposed and
+      // this setState is skipped (guarded by `mounted`). If it returned
+      // false (e.g. this is the root route in a test harness), Save/Cancel
+      // must not stay permanently disabled.
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   Future<void> _archive() async {
@@ -115,9 +123,29 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
       confirmLabel: 'Archive',
     );
     if (!confirmed) return;
-    await ref.read(exerciseRepositoryProvider).archive(_loaded!.id);
+    if (!mounted) return;
+
+    final exercise = _loaded!;
+    final repo = ref.read(exerciseRepositoryProvider);
+    // Capture the messenger before the archive/pop async gap so the undo
+    // snackbar reliably shows on whatever screen ends up visible after this
+    // one pops — MaterialApp provides a single ScaffoldMessenger shared by
+    // both this editor and the list screen underneath it.
+    final messenger = ScaffoldMessenger.of(context);
+
+    await repo.archive(exercise.id);
     if (!mounted) return;
     Navigator.of(context).maybePop();
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('${exercise.name} archived'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => repo.unarchive(exercise.id),
+        ),
+      ),
+    );
   }
 
   @override

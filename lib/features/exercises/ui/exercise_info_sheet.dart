@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import '../../../core/theme/semantic_colors.dart';
 import '../../../db/app_database.dart';
 
 Future<void> showExerciseInfoSheet(
@@ -41,7 +42,8 @@ Future<void> showExerciseInfoSheet(
                   if (isArchived)
                     Chip(
                       label: const Text('Archived'),
-                      backgroundColor: theme.colorScheme.errorContainer,
+                      backgroundColor:
+                          theme.extension<SemanticColors>()!.muted,
                     ),
                 ],
               ),
