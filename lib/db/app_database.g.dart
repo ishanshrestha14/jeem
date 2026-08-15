@@ -2141,6 +2141,17 @@ class $WorkoutSessionsTable extends WorkoutSessions
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _pausedAtMeta = const VerificationMeta(
+    'pausedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> pausedAt = GeneratedColumn<DateTime>(
+    'paused_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _notesMeta = const VerificationMeta('notes');
   @override
   late final GeneratedColumn<String> notes = GeneratedColumn<String>(
@@ -2218,6 +2229,7 @@ class $WorkoutSessionsTable extends WorkoutSessions
     startedAt,
     endedAt,
     pausedSeconds,
+    pausedAt,
     notes,
     restStatus,
     restEndsAt,
@@ -2325,6 +2337,12 @@ class $WorkoutSessionsTable extends WorkoutSessions
         ),
       );
     }
+    if (data.containsKey('paused_at')) {
+      context.handle(
+        _pausedAtMeta,
+        pausedAt.isAcceptableOrUnknown(data['paused_at']!, _pausedAtMeta),
+      );
+    }
     if (data.containsKey('notes')) {
       context.handle(
         _notesMeta,
@@ -2430,6 +2448,10 @@ class $WorkoutSessionsTable extends WorkoutSessions
         DriftSqlType.int,
         data['${effectivePrefix}paused_seconds'],
       )!,
+      pausedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}paused_at'],
+      ),
       notes: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
@@ -2486,6 +2508,7 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
   final DateTime startedAt;
   final DateTime? endedAt;
   final int pausedSeconds;
+  final DateTime? pausedAt;
   final String? notes;
   final RestTimerStatus restStatus;
   final DateTime? restEndsAt;
@@ -2506,6 +2529,7 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
     required this.startedAt,
     this.endedAt,
     required this.pausedSeconds,
+    this.pausedAt,
     this.notes,
     required this.restStatus,
     this.restEndsAt,
@@ -2539,6 +2563,9 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
       map['ended_at'] = Variable<DateTime>(endedAt);
     }
     map['paused_seconds'] = Variable<int>(pausedSeconds);
+    if (!nullToAbsent || pausedAt != null) {
+      map['paused_at'] = Variable<DateTime>(pausedAt);
+    }
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
     }
@@ -2583,6 +2610,9 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
           ? const Value.absent()
           : Value(endedAt),
       pausedSeconds: Value(pausedSeconds),
+      pausedAt: pausedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pausedAt),
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
@@ -2625,6 +2655,7 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
       startedAt: serializer.fromJson<DateTime>(json['startedAt']),
       endedAt: serializer.fromJson<DateTime?>(json['endedAt']),
       pausedSeconds: serializer.fromJson<int>(json['pausedSeconds']),
+      pausedAt: serializer.fromJson<DateTime?>(json['pausedAt']),
       notes: serializer.fromJson<String?>(json['notes']),
       restStatus: $WorkoutSessionsTable.$converterrestStatus.fromJson(
         serializer.fromJson<String>(json['restStatus']),
@@ -2656,6 +2687,7 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
       'startedAt': serializer.toJson<DateTime>(startedAt),
       'endedAt': serializer.toJson<DateTime?>(endedAt),
       'pausedSeconds': serializer.toJson<int>(pausedSeconds),
+      'pausedAt': serializer.toJson<DateTime?>(pausedAt),
       'notes': serializer.toJson<String?>(notes),
       'restStatus': serializer.toJson<String>(
         $WorkoutSessionsTable.$converterrestStatus.toJson(restStatus),
@@ -2681,6 +2713,7 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
     DateTime? startedAt,
     Value<DateTime?> endedAt = const Value.absent(),
     int? pausedSeconds,
+    Value<DateTime?> pausedAt = const Value.absent(),
     Value<String?> notes = const Value.absent(),
     RestTimerStatus? restStatus,
     Value<DateTime?> restEndsAt = const Value.absent(),
@@ -2701,6 +2734,7 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
     startedAt: startedAt ?? this.startedAt,
     endedAt: endedAt.present ? endedAt.value : this.endedAt,
     pausedSeconds: pausedSeconds ?? this.pausedSeconds,
+    pausedAt: pausedAt.present ? pausedAt.value : this.pausedAt,
     notes: notes.present ? notes.value : this.notes,
     restStatus: restStatus ?? this.restStatus,
     restEndsAt: restEndsAt.present ? restEndsAt.value : this.restEndsAt,
@@ -2739,6 +2773,7 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
       pausedSeconds: data.pausedSeconds.present
           ? data.pausedSeconds.value
           : this.pausedSeconds,
+      pausedAt: data.pausedAt.present ? data.pausedAt.value : this.pausedAt,
       notes: data.notes.present ? data.notes.value : this.notes,
       restStatus: data.restStatus.present
           ? data.restStatus.value
@@ -2774,6 +2809,7 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
           ..write('startedAt: $startedAt, ')
           ..write('endedAt: $endedAt, ')
           ..write('pausedSeconds: $pausedSeconds, ')
+          ..write('pausedAt: $pausedAt, ')
           ..write('notes: $notes, ')
           ..write('restStatus: $restStatus, ')
           ..write('restEndsAt: $restEndsAt, ')
@@ -2799,6 +2835,7 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
     startedAt,
     endedAt,
     pausedSeconds,
+    pausedAt,
     notes,
     restStatus,
     restEndsAt,
@@ -2823,6 +2860,7 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
           other.startedAt == this.startedAt &&
           other.endedAt == this.endedAt &&
           other.pausedSeconds == this.pausedSeconds &&
+          other.pausedAt == this.pausedAt &&
           other.notes == this.notes &&
           other.restStatus == this.restStatus &&
           other.restEndsAt == this.restEndsAt &&
@@ -2845,6 +2883,7 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
   final Value<DateTime> startedAt;
   final Value<DateTime?> endedAt;
   final Value<int> pausedSeconds;
+  final Value<DateTime?> pausedAt;
   final Value<String?> notes;
   final Value<RestTimerStatus> restStatus;
   final Value<DateTime?> restEndsAt;
@@ -2866,6 +2905,7 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
     this.startedAt = const Value.absent(),
     this.endedAt = const Value.absent(),
     this.pausedSeconds = const Value.absent(),
+    this.pausedAt = const Value.absent(),
     this.notes = const Value.absent(),
     this.restStatus = const Value.absent(),
     this.restEndsAt = const Value.absent(),
@@ -2888,6 +2928,7 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
     required DateTime startedAt,
     this.endedAt = const Value.absent(),
     this.pausedSeconds = const Value.absent(),
+    this.pausedAt = const Value.absent(),
     this.notes = const Value.absent(),
     this.restStatus = const Value.absent(),
     this.restEndsAt = const Value.absent(),
@@ -2915,6 +2956,7 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
     Expression<DateTime>? startedAt,
     Expression<DateTime>? endedAt,
     Expression<int>? pausedSeconds,
+    Expression<DateTime>? pausedAt,
     Expression<String>? notes,
     Expression<String>? restStatus,
     Expression<DateTime>? restEndsAt,
@@ -2938,6 +2980,7 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
       if (startedAt != null) 'started_at': startedAt,
       if (endedAt != null) 'ended_at': endedAt,
       if (pausedSeconds != null) 'paused_seconds': pausedSeconds,
+      if (pausedAt != null) 'paused_at': pausedAt,
       if (notes != null) 'notes': notes,
       if (restStatus != null) 'rest_status': restStatus,
       if (restEndsAt != null) 'rest_ends_at': restEndsAt,
@@ -2963,6 +3006,7 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
     Value<DateTime>? startedAt,
     Value<DateTime?>? endedAt,
     Value<int>? pausedSeconds,
+    Value<DateTime?>? pausedAt,
     Value<String?>? notes,
     Value<RestTimerStatus>? restStatus,
     Value<DateTime?>? restEndsAt,
@@ -2986,6 +3030,7 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
       startedAt: startedAt ?? this.startedAt,
       endedAt: endedAt ?? this.endedAt,
       pausedSeconds: pausedSeconds ?? this.pausedSeconds,
+      pausedAt: pausedAt ?? this.pausedAt,
       notes: notes ?? this.notes,
       restStatus: restStatus ?? this.restStatus,
       restEndsAt: restEndsAt ?? this.restEndsAt,
@@ -3042,6 +3087,9 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
     if (pausedSeconds.present) {
       map['paused_seconds'] = Variable<int>(pausedSeconds.value);
     }
+    if (pausedAt.present) {
+      map['paused_at'] = Variable<DateTime>(pausedAt.value);
+    }
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
@@ -3084,6 +3132,7 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
           ..write('startedAt: $startedAt, ')
           ..write('endedAt: $endedAt, ')
           ..write('pausedSeconds: $pausedSeconds, ')
+          ..write('pausedAt: $pausedAt, ')
           ..write('notes: $notes, ')
           ..write('restStatus: $restStatus, ')
           ..write('restEndsAt: $restEndsAt, ')
@@ -6107,6 +6156,7 @@ typedef $$WorkoutSessionsTableCreateCompanionBuilder =
       required DateTime startedAt,
       Value<DateTime?> endedAt,
       Value<int> pausedSeconds,
+      Value<DateTime?> pausedAt,
       Value<String?> notes,
       Value<RestTimerStatus> restStatus,
       Value<DateTime?> restEndsAt,
@@ -6130,6 +6180,7 @@ typedef $$WorkoutSessionsTableUpdateCompanionBuilder =
       Value<DateTime> startedAt,
       Value<DateTime?> endedAt,
       Value<int> pausedSeconds,
+      Value<DateTime?> pausedAt,
       Value<String?> notes,
       Value<RestTimerStatus> restStatus,
       Value<DateTime?> restEndsAt,
@@ -6241,6 +6292,11 @@ class $$WorkoutSessionsTableFilterComposer
 
   ColumnFilters<int> get pausedSeconds => $composableBuilder(
     column: $table.pausedSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get pausedAt => $composableBuilder(
+    column: $table.pausedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6375,6 +6431,11 @@ class $$WorkoutSessionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get pausedAt => $composableBuilder(
+    column: $table.pausedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get notes => $composableBuilder(
     column: $table.notes,
     builder: (column) => ColumnOrderings(column),
@@ -6463,6 +6524,9 @@ class $$WorkoutSessionsTableAnnotationComposer
     column: $table.pausedSeconds,
     builder: (column) => column,
   );
+
+  GeneratedColumn<DateTime> get pausedAt =>
+      $composableBuilder(column: $table.pausedAt, builder: (column) => column);
 
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
@@ -6562,6 +6626,7 @@ class $$WorkoutSessionsTableTableManager
                 Value<DateTime> startedAt = const Value.absent(),
                 Value<DateTime?> endedAt = const Value.absent(),
                 Value<int> pausedSeconds = const Value.absent(),
+                Value<DateTime?> pausedAt = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<RestTimerStatus> restStatus = const Value.absent(),
                 Value<DateTime?> restEndsAt = const Value.absent(),
@@ -6583,6 +6648,7 @@ class $$WorkoutSessionsTableTableManager
                 startedAt: startedAt,
                 endedAt: endedAt,
                 pausedSeconds: pausedSeconds,
+                pausedAt: pausedAt,
                 notes: notes,
                 restStatus: restStatus,
                 restEndsAt: restEndsAt,
@@ -6606,6 +6672,7 @@ class $$WorkoutSessionsTableTableManager
                 required DateTime startedAt,
                 Value<DateTime?> endedAt = const Value.absent(),
                 Value<int> pausedSeconds = const Value.absent(),
+                Value<DateTime?> pausedAt = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<RestTimerStatus> restStatus = const Value.absent(),
                 Value<DateTime?> restEndsAt = const Value.absent(),
@@ -6627,6 +6694,7 @@ class $$WorkoutSessionsTableTableManager
                 startedAt: startedAt,
                 endedAt: endedAt,
                 pausedSeconds: pausedSeconds,
+                pausedAt: pausedAt,
                 notes: notes,
                 restStatus: restStatus,
                 restEndsAt: restEndsAt,

@@ -28,7 +28,7 @@ class AppDatabase extends _$AppDatabase {
   factory AppDatabase.open() => AppDatabase(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   DriftDatabaseOptions get options =>
@@ -37,6 +37,11 @@ class AppDatabase extends _$AppDatabase {
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.addColumn(workoutSessions, workoutSessions.pausedAt);
+          }
+        },
         beforeOpen: (details) async {
           // Required for the onDelete: cascade references above to fire.
           await customStatement('PRAGMA foreign_keys = ON');

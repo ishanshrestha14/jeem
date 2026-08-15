@@ -85,49 +85,43 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     return value;
   }
 
+  /// Fetches the active session (via [SessionRepository.watchActiveSession]'s
+  /// first emission) and rehydrates it.
+  ///
+  /// This deliberately does **not** keep a live subscription that re-emits
+  /// [state] on every subsequent DB change. Every mutator method below
+  /// already reloads the post-write session and calls [_emit] itself,
+  /// which is the single, deterministic source of truth for this
+  /// controller's own writes. A second, independently-scheduled watcher
+  /// reacting to those same writes raced it: two DB writes issued close
+  /// together (e.g. [setExerciseRest]'s `updateSessionExercise` followed by
+  /// `saveRestState`) fire as two separate table-update events, and the
+  /// watcher's rehydration of the *first* (still-stale) event could finish
+  /// — and overwrite [state] — strictly after a mutator's own correct
+  /// `_emit` for the *second* had already landed, silently reverting a
+  /// just-completed rest back to idle. That was caught by
+  /// `doLater sends the current exercise to the back without touching rest`
+  /// failing intermittently once this was serialized (see the fix report).
+  /// `container.invalidate(activeSessionControllerProvider)` remains the
+  /// supported way to force a fresh read (used by the "survives a
+  /// controller rebuild" test, and appropriate for e.g. app resume).
   @override
   Future<ActiveSessionState?> build() async {
     final repo = ref.watch(sessionRepositoryProvider);
-    final completer = Completer<ActiveSessionState?>();
-
-    final sub = repo.watchActiveSession().listen((active) async {
-      if (active == null) {
-        if (!completer.isCompleted) {
-          completer.complete(null);
-        } else {
-          state = const AsyncData(null);
-        }
-        return;
-      }
-
-      final previous = completer.isCompleted ? state.valueOrNull : null;
-      final built = await _rehydrate(repo, active, previous: previous);
-      if (!completer.isCompleted) {
-        completer.complete(built);
-      } else {
-        state = AsyncData(built);
-      }
-    }, onError: (Object error, StackTrace stackTrace) {
-      if (!completer.isCompleted) {
-        completer.completeError(error, stackTrace);
-      } else {
-        state = AsyncError(error, stackTrace);
-      }
-    });
-    ref.onDispose(sub.cancel);
-
-    return completer.future;
+    final active = await repo.watchActiveSession().first;
+    if (active == null) return null;
+    final rest = await _settledRest(repo, active);
+    return ActiveSessionState(session: active, rest: rest);
   }
 
   /// Rehydrates rest state from the DB row (recomputing `nextTarget`, which
   /// isn't persisted) and runs it through [RestTimer.settle] so a deadline
   /// that passed while unobserved (backgrounded, process death) is reflected
   /// immediately. Persists only if settling actually changed the status.
-  Future<ActiveSessionState> _rehydrate(
+  Future<RestTimerState> _settledRest(
     SessionRepository repo,
-    ActiveSession active, {
-    ActiveSessionState? previous,
-  }) async {
+    ActiveSession active,
+  ) async {
     final now = DateTime.now();
     var rest = repo.restStateFrom(active);
     final settled = RestTimer.settle(rest, now);
@@ -135,12 +129,7 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
       await repo.saveRestState(active.session.id, settled);
       rest = settled;
     }
-    return ActiveSessionState(
-      session: active,
-      rest: rest,
-      focusedSetId: previous?.focusedSetId,
-      restJustFinished: previous?.restJustFinished ?? false,
-    );
+    return rest;
   }
 
   Future<ActiveSession> _reload(String sessionId) async {
@@ -220,7 +209,16 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     }
 
     await repo.saveRestState(reloaded.session.id, rest);
-    _emit(reloaded, rest, focusedSetId: focusedSetId, clearFocusedSetId: clearFocus);
+    // A fresh rest (or a fresh idle state) supersedes any stale "just
+    // finished" flag from a previous rest — otherwise it could coexist with
+    // a newly running timer and misfire Task 14's "rest complete" banner.
+    _emit(
+      reloaded,
+      rest,
+      focusedSetId: focusedSetId,
+      clearFocusedSetId: clearFocus,
+      restJustFinished: false,
+    );
   }
 
   /// Clears completion. If the active rest was anchored on this set, cancel
@@ -333,6 +331,7 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     if (se == null) return;
 
     await repo.updateSessionExercise(se.exercise.copyWith(restSeconds: seconds));
+    final reloaded = await _reload(current.session.session.id);
 
     var rest = current.rest;
     if (applyToActiveRest &&
@@ -344,18 +343,23 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
         final elapsed = rest.totalSeconds - rest.remainingAt(now).inSeconds;
         final newRemaining = (seconds - elapsed).clamp(0, seconds);
         if (newRemaining <= 0) {
-          rest = RestTimer.skip(rest).copyWith(totalSeconds: seconds);
-        } else {
-          rest = rest.copyWith(
-            totalSeconds: seconds,
-            endsAt: now.add(Duration(seconds: newRemaining)),
-          );
+          final skipped = RestTimer.skip(rest).copyWith(totalSeconds: seconds);
+          await repo.saveRestState(reloaded.session.id, skipped);
+          // Shrinking the total below the elapsed portion effectively
+          // finishes the rest early — route through the same finish path
+          // as skipRest/settle/adjustRest so auto-focus and
+          // restJustFinished fire consistently (PRD FR-113).
+          await _handleRestFinished(skipped, session: reloaded);
+          return;
         }
-        await repo.saveRestState(current.session.session.id, rest);
+        rest = rest.copyWith(
+          totalSeconds: seconds,
+          endsAt: now.add(Duration(seconds: newRemaining)),
+        );
+        await repo.saveRestState(reloaded.session.id, rest);
       }
     }
 
-    final reloaded = await _reload(current.session.session.id);
     _emit(reloaded, rest);
   }
 
@@ -454,7 +458,13 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
   /// not-yet-cleared rest, so the 1s ticker calling [settle] repeatedly
   /// can't re-fire the side effects or clobber a focus change the user made
   /// in between.
-  Future<void> _handleRestFinished(RestTimerState settled) async {
+  /// [session] lets a caller that already reloaded a fresher snapshot (e.g.
+  /// [setExerciseRest], which just wrote a new `restSeconds`) hand it in
+  /// directly rather than emitting the pre-update session held in [_ready].
+  Future<void> _handleRestFinished(
+    RestTimerState settled, {
+    ActiveSession? session,
+  }) async {
     final current = await _ready();
     if (current.rest.status == RestTimerStatus.finished &&
         current.restJustFinished) {
@@ -463,6 +473,8 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
 
     _onRestFinished();
 
+    final effectiveSession = session ?? current.session;
+
     String? focusedSetId;
     var clearFocusedSetId = false;
     final target = settled.nextTarget;
@@ -470,15 +482,15 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
       clearFocusedSetId = true;
     } else {
       final autoFocus = target.kind == TargetKind.sameExercise
-          ? current.session.session.autoFocusNextSet
-          : current.session.session.autoFocusNextExercise;
+          ? effectiveSession.session.autoFocusNextSet
+          : effectiveSession.session.autoFocusNextExercise;
       if (autoFocus) {
         focusedSetId = target.setId;
       }
     }
 
     _emit(
-      current.session,
+      effectiveSession,
       settled,
       focusedSetId: focusedSetId,
       clearFocusedSetId: clearFocusedSetId,
@@ -500,7 +512,10 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     final now = DateTime.now();
 
     await repo.updateSession(
-      current.session.session.copyWith(status: SessionStatus.paused),
+      current.session.session.copyWith(
+        status: SessionStatus.paused,
+        pausedAt: Value(now),
+      ),
     );
     final rest = RestTimer.pause(current.rest, now);
     await repo.saveRestState(current.session.session.id, rest);
@@ -509,23 +524,25 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     _emit(reloaded, rest);
   }
 
-  /// Adds the paused wall-time to `pausedSeconds`. There is no dedicated
-  /// "paused at" column, so the moment [pauseSession] wrote the paused
-  /// status — its `updatedAt`, stamped by [SessionRepository.updateSession]
-  /// — stands in for it.
+  /// Adds the paused wall-time to `pausedSeconds`, measured from the
+  /// `pausedAt` column [pauseSession] stamped — **not** `updatedAt`, which
+  /// any unrelated write during the pause (e.g. correcting a logged weight)
+  /// would restamp and silently shrink the measured pause.
   Future<void> resumeSession() async {
     final current = await _ready();
     final repo = _repo;
     final now = DateTime.now();
 
+    final pausedAt = current.session.session.pausedAt;
     final pausedFor =
-        now.difference(current.session.session.updatedAt).inSeconds;
+        pausedAt == null ? 0 : now.difference(pausedAt).inSeconds;
     final newPausedSeconds =
         current.session.session.pausedSeconds + (pausedFor > 0 ? pausedFor : 0);
 
     await repo.updateSession(current.session.session.copyWith(
       status: SessionStatus.active,
       pausedSeconds: newPausedSeconds,
+      pausedAt: const Value(null),
     ));
     final rest = RestTimer.resume(current.rest, now);
     await repo.saveRestState(current.session.session.id, rest);

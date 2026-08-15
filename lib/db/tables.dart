@@ -67,6 +67,12 @@ class WorkoutSessions extends Table with SyncColumns {
   DateTimeColumn get startedAt => dateTime()();
   DateTimeColumn get endedAt => dateTime().nullable()();
   IntColumn get pausedSeconds => integer().withDefault(const Constant(0))();
+  // Wall-clock moment the session was paused, cleared back to null on
+  // resume. `resumeSession` uses this (not `updatedAt`) to measure the
+  // pause duration, since any unrelated write while paused (e.g. editing a
+  // logged weight) restamps `updatedAt` and would otherwise shrink the
+  // measured pause.
+  DateTimeColumn get pausedAt => dateTime().nullable()();
   TextColumn get notes => text().nullable()();
 
   // Rest-timer persistence. Anchored on restEndsAt so the countdown survives

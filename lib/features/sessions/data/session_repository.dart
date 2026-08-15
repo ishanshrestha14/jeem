@@ -48,6 +48,7 @@ class SessionRepository {
         startedAt: now,
         endedAt: null,
         pausedSeconds: 0,
+        pausedAt: null,
         notes: null,
         restStatus: RestTimerStatus.idle,
         restEndsAt: null,
