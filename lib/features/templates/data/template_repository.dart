@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -50,15 +52,41 @@ class TemplateRepository {
     });
   }
 
-  Stream<List<TemplateSummary>> watchSummaries() async* {
-    yield await _fetchSummaries();
-    await for (final _ in _db.tableUpdates(TableUpdateQuery.onAllTables({
-      _db.workoutTemplates,
-      _db.templateExercises,
-      _db.workoutSessions,
-    }))) {
-      yield await _fetchSummaries();
+  /// Hand-rolled (rather than `async*`) because cancelling a subscription
+  /// to an `async*` generator that is parked inside `await for` over the
+  /// broadcast stream returned by `db.tableUpdates` never completes on this
+  /// drift/Dart version — `StreamSubscription.cancel()` hangs forever. A
+  /// `StreamController` with an explicit `onCancel` sidesteps that and
+  /// cancels cleanly. Emits are chained through [_pendingFetch] so that
+  /// rapid, overlapping table updates can't resolve out of order.
+  Stream<List<TemplateSummary>> watchSummaries() {
+    late StreamController<List<TemplateSummary>> controller;
+    StreamSubscription<Set<TableUpdate>>? tableSub;
+    var pendingFetch = Future<void>.value();
+
+    void scheduleEmit() {
+      pendingFetch = pendingFetch.then((_) async {
+        if (controller.isClosed) return;
+        final summaries = await _fetchSummaries();
+        if (!controller.isClosed) controller.add(summaries);
+      });
     }
+
+    controller = StreamController<List<TemplateSummary>>(
+      onListen: () {
+        scheduleEmit();
+        tableSub = _db.tableUpdates(TableUpdateQuery.onAllTables({
+          _db.workoutTemplates,
+          _db.templateExercises,
+          _db.workoutSessions,
+        })).listen((_) => scheduleEmit());
+      },
+      onCancel: () async {
+        await tableSub?.cancel();
+      },
+    );
+
+    return controller.stream;
   }
 
   Future<List<TemplateSummary>> _fetchSummaries() async {
@@ -240,6 +268,12 @@ class TemplateRepository {
     });
   }
 
+  /// Reorders exercises using `ReorderableListView.onReorder`'s raw index
+  /// convention: `newIndex` is the target index computed BEFORE `oldIndex`
+  /// is removed from the list, so for a downward drag it is one too high
+  /// relative to the post-removal list. This method normalises internally
+  /// (`if (newIndex > oldIndex) newIndex -= 1`) — callers should pass the
+  /// raw values straight from `onReorder` without adjusting them first.
   Future<void> reorderExercises(
       String templateId, int oldIndex, int newIndex) async {
     await _db.transaction(() async {
@@ -249,8 +283,11 @@ class TemplateRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.sortOrder)]))
           .get();
 
+      var target = newIndex;
+      if (target > oldIndex) target -= 1;
+
       final item = list.removeAt(oldIndex);
-      list.insert(newIndex, item);
+      list.insert(target, item);
 
       for (var i = 0; i < list.length; i++) {
         await (_db.update(_db.templateExercises)

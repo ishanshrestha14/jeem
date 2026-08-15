@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/template_models.dart';
 import '../data/template_repository.dart';
 
-export '../data/template_repository.dart' show templateRepositoryProvider;
-
 final templateSummariesProvider = StreamProvider<List<TemplateSummary>>(
   (ref) => ref.watch(templateRepositoryProvider).watchSummaries(),
 );
