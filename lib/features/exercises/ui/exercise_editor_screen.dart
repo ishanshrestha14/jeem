@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
@@ -53,6 +54,23 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
   /// still points to.
   final List<String> _pendingImageDeletions = [];
 
+  /// Files this editing session wrote to disk (via pickAndStore) that have
+  /// not yet been committed by a successful save. These are the mirror image
+  /// of `_pendingImageDeletions`: "delete if I DON'T save" rather than
+  /// "delete if I DO save". Cleared (without deleting) once a save commits
+  /// them; deleted, on abandonment, by `_discardSessionImages`.
+  final List<String> _sessionCreatedPaths = [];
+
+  Future<void> _discardSessionImages() async {
+    if (_sessionCreatedPaths.isEmpty) return;
+    final service = ref.read(imageStorageServiceProvider);
+    final paths = List<String>.of(_sessionCreatedPaths);
+    _sessionCreatedPaths.clear();
+    for (final path in paths) {
+      await service.deleteIfManaged(path);
+    }
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -75,12 +93,29 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
 
   Future<void> _pickImage(ImageSource source) async {
     final service = ref.read(imageStorageServiceProvider);
-    final picked = await service.pickAndStore(source: source);
+    String? picked;
+    try {
+      picked = await service.pickAndStore(source: source);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            source == ImageSource.camera
+                ? 'Could not open the camera: $e'
+                : 'Could not open photos: $e',
+          ),
+        ),
+      );
+      return;
+    }
     if (picked == null || !mounted) return;
+    final newPath = picked;
     final old = _imagePath;
     setState(() {
       if (old != null) _pendingImageDeletions.add(old);
-      _imagePath = picked;
+      _sessionCreatedPaths.add(newPath);
+      _imagePath = newPath;
     });
   }
 
@@ -91,6 +126,12 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
       _pendingImageDeletions.add(old);
       _imagePath = null;
     });
+  }
+
+  Future<void> _cancel() async {
+    await _discardSessionImages();
+    if (!mounted) return;
+    Navigator.of(context).maybePop();
   }
 
   Future<void> _save() async {
@@ -138,6 +179,9 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
         }
         _pendingImageDeletions.clear();
       }
+      // Whatever remains as _imagePath (if anything) is now committed to the
+      // database — it must survive, not be swept up as an abandoned pick.
+      _sessionCreatedPaths.clear();
 
       if (!mounted) return;
       await Navigator.of(context).maybePop();
@@ -214,6 +258,24 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
   }
 
   Widget _buildForm(BuildContext context) {
+    // Covers the AppBar back button and the system back gesture, which
+    // otherwise bypass the Cancel button's cleanup entirely and leak any
+    // image this session picked but never saved. Cancel/Save/Archive already
+    // discard or commit session images deterministically *before* calling
+    // maybePop, so canPop stays true and every first-party pop proceeds
+    // immediately and normally — this only ever needs to react, best-effort,
+    // to a pop we didn't initiate ourselves.
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) return;
+        unawaited(_discardSessionImages());
+      },
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.isEditing ? 'Edit exercise' : 'New exercise'),
@@ -293,9 +355,7 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: _saving
-                      ? null
-                      : () => Navigator.of(context).maybePop(),
+                  onPressed: _saving ? null : _cancel,
                   child: const Text('Cancel'),
                 ),
               ),
