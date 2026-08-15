@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/ids.dart';
 import '../../../db/app_database.dart';
+import '../domain/rest_timer.dart';
+import '../domain/session_engine.dart';
 import 'session_models.dart';
 
 class SessionRepository {
@@ -333,6 +335,36 @@ class SessionRepository {
       restTotalSeconds: const Value(null),
       restAfterSetId: const Value(null),
     ));
+  }
+
+  Future<void> saveRestState(String sessionId, RestTimerState rest) async {
+    await (_db.update(_db.workoutSessions)..where((t) => t.id.equals(sessionId)))
+        .write(WorkoutSessionsCompanion(
+      restStatus: Value(rest.status),
+      restEndsAt: Value(rest.endsAt),
+      restRemainingSeconds: Value(rest.remainingSeconds),
+      restTotalSeconds: Value(rest.totalSeconds),
+      restAfterSetId: Value(rest.afterSetId),
+      updatedAt: Value(DateTime.now()),
+    ));
+  }
+
+  /// Rehydrates persisted rest columns into a [RestTimerState]. `nextTarget`
+  /// is not a DB column — it is recomputed from `restAfterSetId` via
+  /// [nextTargetAfter] since the session's set order may have changed.
+  RestTimerState restStateFrom(ActiveSession s) {
+    final row = s.session;
+    if (row.restStatus == RestTimerStatus.idle) return const RestTimerState.idle();
+    return RestTimerState(
+      status: row.restStatus,
+      totalSeconds: row.restTotalSeconds ?? 0,
+      endsAt: row.restEndsAt,
+      remainingSeconds: row.restRemainingSeconds,
+      afterSetId: row.restAfterSetId,
+      nextTarget: row.restAfterSetId == null
+          ? null
+          : nextTargetAfter(s, row.restAfterSetId!),
+    );
   }
 
   Future<void> cancelSession(String id) async {
