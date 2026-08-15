@@ -103,9 +103,9 @@ void main() {
 
     test('update bumps updatedAt', () async {
       final ex = await repo.create(name: 'Plank', loggingType: LoggingType.durationOnly);
-      // Drift stores DateTimeColumn as unix-epoch seconds by default, so the
-      // delay must clear a full second boundary for updatedAt to differ.
-      await Future<void>.delayed(const Duration(milliseconds: 1100));
+      // Timestamps are stored as ISO-8601 text with sub-second precision, so
+      // a short delay is enough for updatedAt to differ.
+      await Future<void>.delayed(const Duration(milliseconds: 10));
       await repo.update(ex.copyWith(name: 'Side Plank'));
 
       final saved = await repo.watchAll().first;

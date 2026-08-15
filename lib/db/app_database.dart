@@ -31,6 +31,10 @@ class AppDatabase extends _$AppDatabase {
   int get schemaVersion => 1;
 
   @override
+  DriftDatabaseOptions get options =>
+      const DriftDatabaseOptions(storeDateTimeAsText: true);
+
+  @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) => m.createAll(),
         beforeOpen: (details) async {
