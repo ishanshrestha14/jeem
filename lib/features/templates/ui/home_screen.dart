@@ -81,8 +81,7 @@ class _TemplateCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final muted = theme.extension<SemanticColors>()?.muted ??
-        theme.colorScheme.onSurfaceVariant;
+    final muted = theme.extension<SemanticColors>()!.muted;
     final template = summary.template;
     final canStart = summary.exerciseCount > 0;
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gymflow/core/theme/app_theme.dart';
 import 'package:gymflow/db/app_database.dart';
 import 'package:gymflow/features/exercises/data/exercise_repository.dart';
 import 'package:gymflow/features/exercises/ui/exercise_list_screen.dart';
@@ -15,7 +16,8 @@ void main() {
 
   Widget harness() => ProviderScope(
         overrides: [databaseProvider.overrideWithValue(db)],
-        child: const MaterialApp(home: ExerciseListScreen()),
+        child:
+            MaterialApp(theme: AppTheme.dark(), home: const ExerciseListScreen()),
       );
 
   testWidgets('shows an empty state with a call to action', (tester) async {
