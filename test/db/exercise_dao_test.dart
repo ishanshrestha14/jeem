@@ -1,6 +1,8 @@
 import 'package:drift/drift.dart' hide isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gymflow/db/app_database.dart';
+import 'package:gymflow/db/seed_exercises.dart';
+import 'package:gymflow/features/exercises/data/exercise_repository.dart';
 import 'test_database.dart';
 
 void main() {
@@ -63,5 +65,52 @@ void main() {
 
     expect(await db.select(db.sessionExercises).get(), isEmpty);
     expect(await db.select(db.sessionSets).get(), isEmpty);
+  });
+
+  group('ExerciseRepository', () {
+    late ExerciseRepository repo;
+
+    setUp(() => repo = ExerciseRepository(db));
+
+    test('seedIfEmpty populates the starter library exactly once', () async {
+      await repo.seedIfEmpty();
+      final first = await repo.watchAll().first;
+      expect(first, hasLength(seedExercises.length));
+
+      await repo.seedIfEmpty();
+      final second = await repo.watchAll().first;
+      expect(second, hasLength(seedExercises.length));
+    });
+
+    test('watchAll hides archived exercises unless asked', () async {
+      final ex = await repo.create(
+        name: 'Bench Press',
+        loggingType: LoggingType.strengthWeightRepsRir,
+      );
+      await repo.archive(ex.id);
+
+      expect(await repo.watchAll().first, isEmpty);
+      expect(await repo.watchAll(includeArchived: true).first, hasLength(1));
+    });
+
+    test('watchSearch matches name case-insensitively', () async {
+      await repo.create(name: 'Lat Pulldown', loggingType: LoggingType.strengthWeightRepsRir);
+      await repo.create(name: 'Leg Press', loggingType: LoggingType.strengthWeightRepsRir);
+
+      final hits = await repo.watchSearch('pull').first;
+      expect(hits.map((e) => e.name), ['Lat Pulldown']);
+    });
+
+    test('update bumps updatedAt', () async {
+      final ex = await repo.create(name: 'Plank', loggingType: LoggingType.durationOnly);
+      // Drift stores DateTimeColumn as unix-epoch seconds by default, so the
+      // delay must clear a full second boundary for updatedAt to differ.
+      await Future<void>.delayed(const Duration(milliseconds: 1100));
+      await repo.update(ex.copyWith(name: 'Side Plank'));
+
+      final saved = await repo.watchAll().first;
+      expect(saved.single.name, 'Side Plank');
+      expect(saved.single.updatedAt.isAfter(ex.updatedAt), isTrue);
+    });
   });
 }
