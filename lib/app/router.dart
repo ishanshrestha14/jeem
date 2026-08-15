@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../features/exercises/ui/exercise_editor_screen.dart';
 import '../features/exercises/ui/exercise_list_screen.dart';
 import '../features/templates/ui/home_screen.dart';
+import '../features/templates/ui/template_editor_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -23,6 +24,15 @@ final appRouter = GoRouter(
       path: '/exercises/:id',
       builder: (_, s) =>
           ExerciseEditorScreen(exerciseId: s.pathParameters['id']),
+    ),
+    GoRoute(
+      path: '/templates/new',
+      builder: (_, _) => const TemplateEditorScreen(),
+    ),
+    GoRoute(
+      path: '/templates/:id',
+      builder: (_, s) =>
+          TemplateEditorScreen(templateId: s.pathParameters['id']),
     ),
   ],
 );

@@ -171,6 +171,10 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
         finalImagePath = await service.commitStaged(_stagedImagePath!);
       }
 
+      // Captured only for a brand-new exercise so callers that pushed this
+      // screen expecting a result (the template editor's exercise picker)
+      // can pop straight to the newly created id.
+      String? createdId;
       if (widget.isEditing && _loaded != null) {
         await repo.update(
           _loaded!.copyWith(
@@ -183,7 +187,7 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
           ),
         );
       } else {
-        await repo.create(
+        final created = await repo.create(
           name: name,
           loggingType: _loggingType,
           category: _category,
@@ -191,6 +195,7 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
           notes: notes.isEmpty ? null : notes,
           imagePath: finalImagePath,
         );
+        createdId = created.id;
       }
 
       // A replaced or removed *committed* image is only safe to delete now
@@ -205,7 +210,7 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
       _imagePath = finalImagePath;
 
       if (!mounted) return;
-      await Navigator.of(context).maybePop();
+      await Navigator.of(context).maybePop(createdId);
     } finally {
       // If maybePop() actually popped this route, the widget is disposed and
       // this setState is skipped (guarded by `mounted`). If it returned
