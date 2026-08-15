@@ -6,9 +6,54 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/semantic_colors.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../sessions/data/session_repository.dart';
 import '../data/template_models.dart';
 import '../data/template_repository.dart';
 import '../providers/template_providers.dart';
+
+enum _StartChoice { resume, discard }
+
+/// Starts a session from [templateId] and navigates to it. If a session is
+/// already running, offers to resume it or discard it in favour of the new
+/// one, rather than silently starting a second session. Goes through
+/// [sessionRepositoryProvider] directly (there is no controller yet before
+/// a session exists to drive one).
+Future<void> _startWorkout(
+  BuildContext context,
+  WidgetRef ref,
+  String templateId,
+) async {
+  final repo = ref.read(sessionRepositoryProvider);
+  final active = await repo.watchActiveSession().first;
+  if (active != null) {
+    if (!context.mounted) return;
+    final choice = await showDialog<_StartChoice>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Workout already in progress'),
+        content: Text('"${active.session.name}" is still running.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(_StartChoice.resume),
+            child: const Text('Resume the running session'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(_StartChoice.discard),
+            child: const Text('Discard it and start this one'),
+          ),
+        ],
+      ),
+    );
+    if (choice == null) return;
+    if (choice == _StartChoice.resume) {
+      if (context.mounted) context.push('/session');
+      return;
+    }
+    await repo.cancelSession(active.session.id);
+  }
+  await repo.startFromTemplate(templateId, weightUnit: 'kg');
+  if (context.mounted) context.push('/session');
+}
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -16,6 +61,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summaries = ref.watch(templateSummariesProvider);
+    final active = ref.watch(activeSessionProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -49,20 +95,49 @@ class HomeScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('$e')),
         data: (rows) {
+          final resumeBanner = active.maybeWhen(
+            data: (session) => session == null
+                ? null
+                : Card(
+                    margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    child: ListTile(
+                      leading: const Icon(Icons.play_circle_outline),
+                      title: Text('Resume "${session.session.name}"'),
+                      subtitle: const Text('You have a workout in progress'),
+                      onTap: () => context.push('/session'),
+                    ),
+                  ),
+            orElse: () => null,
+          );
+
           if (rows.isEmpty) {
-            return EmptyState(
-              icon: Icons.fitness_center,
-              title: 'No workouts yet',
-              message:
-                  'Build a template with your exercises so you can start a workout in seconds.',
-              actionLabel: 'Create your first workout',
-              onAction: () => context.push('/templates/new'),
+            return Column(
+              children: [
+                ?resumeBanner,
+                Expanded(
+                  child: EmptyState(
+                    icon: Icons.fitness_center,
+                    title: 'No workouts yet',
+                    message:
+                        'Build a template with your exercises so you can start a workout in seconds.',
+                    actionLabel: 'Create your first workout',
+                    onAction: () => context.push('/templates/new'),
+                  ),
+                ),
+              ],
             );
           }
           return ListView.builder(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
-            itemCount: rows.length,
-            itemBuilder: (_, i) => _TemplateCard(summary: rows[i]),
+            itemCount: rows.length + (resumeBanner == null ? 0 : 1),
+            itemBuilder: (_, i) {
+              if (resumeBanner != null) {
+                if (i == 0) return resumeBanner;
+                return _TemplateCard(summary: rows[i - 1]);
+              }
+              return _TemplateCard(summary: rows[i]);
+            },
           );
         },
       ),
@@ -138,9 +213,9 @@ class _TemplateCard extends ConsumerWidget {
                 width: double.infinity,
                 height: 48,
                 child: FilledButton(
-                  // TODO(task-13): wire up starting a session once the
-                  // session repository exists; for now this is a no-op.
-                  onPressed: canStart ? () {} : null,
+                  onPressed: canStart
+                      ? () => _startWorkout(context, ref, template.id)
+                      : null,
                   child: const Text('Start'),
                 ),
               ),
