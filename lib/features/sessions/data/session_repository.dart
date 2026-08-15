@@ -249,12 +249,24 @@ class SessionRepository {
     return set;
   }
 
+  /// Removes [setId], unless it is the last remaining set of its exercise —
+  /// PRD FR-101 constrains target sets to 1-20, so an exercise with zero sets
+  /// was never intended and would desync [SessionExerciseWithSets.isComplete]
+  /// from the session engine's next-target logic. A no-op in that case.
   Future<void> removeSet(String setId) async {
     await _db.transaction(() async {
       final set = await (_db.select(_db.sessionSets)
             ..where((t) => t.id.equals(setId)))
           .getSingleOrNull();
       if (set == null) return;
+
+      final siblingCount = await (_db.select(_db.sessionSets)
+            ..where((t) =>
+                t.sessionExerciseId.equals(set.sessionExerciseId) &
+                t.deletedAt.isNull()))
+          .get()
+          .then((rows) => rows.length);
+      if (siblingCount <= 1) return;
 
       await (_db.delete(_db.sessionSets)..where((t) => t.id.equals(setId)))
           .go();

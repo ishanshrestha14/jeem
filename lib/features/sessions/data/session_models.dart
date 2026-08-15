@@ -6,8 +6,10 @@ class SessionExerciseWithSets {
   final SessionExercise exercise;
   final List<SessionSet> sets;
 
-  bool get isComplete =>
-      sets.isNotEmpty && sets.every((s) => s.completedAt != null);
+  /// Vacuously true for a zero-set exercise, so this agrees with
+  /// [firstPendingSet] (which is also null for an empty list) rather than
+  /// leaving a zero-set exercise permanently "pending" with nothing to do.
+  bool get isComplete => sets.every((s) => s.completedAt != null);
 
   int get completedSetCount => sets.where((s) => s.completedAt != null).length;
 

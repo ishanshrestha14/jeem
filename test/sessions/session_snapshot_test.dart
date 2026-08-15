@@ -204,6 +204,26 @@ void main() {
     expect(after, isNull);
   });
 
+  test('removeSet refuses to remove the last remaining set of an exercise',
+      () async {
+    final id = await sessions.startFromTemplate(await pushTemplate(),
+        weightUnit: 'kg');
+    var session = (await sessions.watchSession(id.id).first)!;
+    final plankSets = session.exercises[1].sets; // 2 target sets seeded.
+    expect(plankSets, hasLength(2));
+
+    await sessions.removeSet(plankSets[0].id);
+    session = (await sessions.watchSession(id.id).first)!;
+    expect(session.exercises[1].sets, hasLength(1));
+
+    // Attempting to remove the last remaining set is a no-op.
+    final lastSetId = session.exercises[1].sets.single.id;
+    await sessions.removeSet(lastSetId);
+    session = (await sessions.watchSession(id.id).first)!;
+    expect(session.exercises[1].sets, hasLength(1));
+    expect(session.exercises[1].sets.single.id, lastSetId);
+  });
+
   test(
       'a live watchSession subscription cancels cleanly instead of hanging '
       '(the Task 6 regression)', () async {

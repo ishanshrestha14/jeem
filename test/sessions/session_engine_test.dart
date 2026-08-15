@@ -163,6 +163,21 @@ void main() {
       ]);
       expect(nextTargetAfter(s, 'a'), isNull);
     });
+
+    test(
+        'picks the smallest matching setIndex even when the set list is not '
+        'sorted by setIndex', () {
+      final s = _session([
+        _ex('e1', 'Bench Press', sortOrder: 0, sets: [
+          _set('c', 2), // out of order on purpose
+          _set('a', 0, done: true),
+          _set('b', 1),
+        ]),
+      ]);
+      final target = nextTargetAfter(s, 'a')!;
+      expect(target.setId, 'b');
+      expect(target.setIndex, 1);
+    });
   });
 
   group('restSecondsAfter', () {
@@ -228,6 +243,25 @@ void main() {
       expect(reorderPending(s, 2, 0), ['e0', 'e3', 'e1', 'e2']);
     });
 
+    test(
+        'reorderPending normalises a downward drag using RAW '
+        'ReorderableListView.onReorder indices', () {
+      final s = _session([
+        _ex('e0', 'Warmup', sortOrder: 0, sets: [_set('z', 0, done: true)]),
+        _ex('e1', 'Bench Press', sortOrder: 1, sets: [_set('a', 0)]),
+        _ex('e2', 'Lat Pulldown', sortOrder: 2, sets: [_set('b', 0)]),
+        _ex('e3', 'Row', sortOrder: 3, sets: [_set('c', 0)]),
+        _ex('e4', 'Curl', sortOrder: 4, sets: [_set('d', 0)]),
+      ]);
+      // Drag "Bench Press" (pending index 0) past two items.
+      // ReorderableListView.onReorder reports newIndex BEFORE removal, i.e.
+      // oldIndex: 0, newIndex: 2 — since this doesn't land at the very end,
+      // it can only produce ['e0','e2','e1','e3','e4'] if `target -= 1` runs;
+      // without it, clamping does NOT save the result (unlike a drag-to-end),
+      // so this is the case that actually proves the normalisation fires.
+      expect(reorderPending(s, 0, 2), ['e0', 'e2', 'e1', 'e3', 'e4']);
+    });
+
     test('a partially completed exercise still counts as pending', () {
       final s = _session([
         _ex('e1', 'Bench Press', sortOrder: 0, sets: [
@@ -238,6 +272,20 @@ void main() {
       ]);
       expect(pendingExercises(s).map((e) => e.exercise.id), ['e1', 'e2']);
       expect(moveToEnd(s, 'e1'), ['e2', 'e1']);
+    });
+
+    test(
+        'a zero-set exercise is vacuously complete, so it never blocks the '
+        'finish gate or desyncs from firstPendingTarget/isLastSetOfSession',
+        () {
+      final s = _session([
+        _ex('e1', 'Bench Press', sortOrder: 0, sets: [_set('a', 0, done: true)]),
+        _ex('e2', 'Empty', sortOrder: 1, sets: []),
+      ]);
+      expect(s.exercises[1].isComplete, isTrue);
+      expect(pendingExercises(s), isEmpty);
+      expect(firstPendingTarget(s), isNull);
+      expect(isLastSetOfSession(s, 'a'), isTrue);
     });
   });
 

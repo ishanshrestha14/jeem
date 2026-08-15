@@ -66,10 +66,18 @@ SessionTarget? nextTargetAfter(ActiveSession s, String completedSetId) {
       s.exercises.indexWhere((e) => e.exercise.id == owner.exercise.id);
   final completed = owner.sets.firstWhere((x) => x.id == completedSetId);
 
+  // Order-independent: pick the smallest matching setIndex rather than the
+  // first list entry, so this is correct even if [owner.sets] isn't sorted.
+  SessionSet? nextInExercise;
   for (final set in owner.sets) {
     if (set.setIndex > completed.setIndex && set.completedAt == null) {
-      return _target(owner, set, TargetKind.sameExercise);
+      if (nextInExercise == null || set.setIndex < nextInExercise.setIndex) {
+        nextInExercise = set;
+      }
     }
+  }
+  if (nextInExercise != null) {
+    return _target(owner, nextInExercise, TargetKind.sameExercise);
   }
 
   for (var i = ownerIndex + 1; i < s.exercises.length; i++) {
