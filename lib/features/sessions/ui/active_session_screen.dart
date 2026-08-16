@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/utils/formatting.dart';
 import '../../../db/app_database.dart';
 import '../providers/active_session_controller.dart';
+import 'widgets/rest_bar.dart';
 import 'widgets/session_exercise_card.dart';
 import 'widgets/session_progress_header.dart';
 
@@ -194,8 +195,9 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> {
           ),
         ],
       ),
-      // Reserved for the rest bar — Task 14.
-      bottomNavigationBar: null,
+      bottomNavigationBar: state.rest.isActive || state.restJustFinished
+          ? const RestBar()
+          : null,
     );
   }
 

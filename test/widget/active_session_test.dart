@@ -131,7 +131,7 @@ void main() {
       findsOneWidget,
     );
 
-    await disposeAndDrainTimers(tester);
+    await disposeAndDrainTimers(tester, container: container);
   });
 
   testWidgets('a duration exercise renders duration rows, not weight/reps',
@@ -152,7 +152,7 @@ void main() {
     expect(find.byType(DurationSetRow), findsNWidgets(2));
     expect(find.byType(StrengthSetRow), findsNothing);
 
-    await disposeAndDrainTimers(tester);
+    await disposeAndDrainTimers(tester, container: container);
   });
 
   testWidgets('the progress header counts sets and exercises', (tester) async {
@@ -176,7 +176,7 @@ void main() {
     expect(find.text('0 / 6 sets'), findsOneWidget);
     expect(find.text('0 / 2 exercises'), findsOneWidget);
 
-    await disposeAndDrainTimers(tester);
+    await disposeAndDrainTimers(tester, container: container);
   });
 
   testWidgets('tapping the complete button marks the set done', (tester) async {
@@ -211,7 +211,7 @@ void main() {
     expect(rows.first.completedAt, isNotNull);
     expect(rows.last.completedAt, isNull);
 
-    await disposeAndDrainTimers(tester);
+    await disposeAndDrainTimers(tester, container: container);
   });
 
   testWidgets('typing a weight persists it to the database', (tester) async {
@@ -237,7 +237,7 @@ void main() {
     final row = await (db.select(db.sessionSets)).getSingle();
     expect(row.weight, 80);
 
-    await disposeAndDrainTimers(tester);
+    await disposeAndDrainTimers(tester, container: container);
   });
 
   testWidgets(
@@ -265,7 +265,7 @@ void main() {
     expect(row.weight, isNull);
     expect(row.reps, isNull);
 
-    await disposeAndDrainTimers(tester);
+    await disposeAndDrainTimers(tester, container: container);
   });
 
   testWidgets('a completed set stays editable, not disabled (PRD §17)',
@@ -301,6 +301,6 @@ void main() {
         .get();
     expect(rows.first.weight, 80);
 
-    await disposeAndDrainTimers(tester);
+    await disposeAndDrainTimers(tester, container: container);
   });
 }

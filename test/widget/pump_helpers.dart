@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gymflow/features/sessions/providers/active_session_controller.dart';
 
 /// Pumps frames until a Drift-backed StreamProvider has delivered its first
 /// value. Never use pumpAndSettle() on these screens: their `loading:` branch
@@ -37,7 +39,32 @@ Future<void> pumpUntilData(
 /// pumped a Drift-backed StreamProvider: it swaps in an empty widget (forcing
 /// disposal now, while we can still pump) and pumps once more so the cleanup
 /// Timer fires before the test framework's own teardown checks run.
-Future<void> disposeAndDrainTimers(WidgetTester tester) async {
+///
+/// [container]: pass the harness's `ProviderContainer` for any test that
+/// mounts `ActiveSessionScreen` (Task 14 on). `restTickerProvider` is a
+/// `StreamProvider.autoDispose` backed by an unbounded
+/// `while (true) { await Future.delayed(500ms); yield ...; }` generator —
+/// once a test has completed a set with a non-zero rest, `RestBar` watches
+/// it and it's live for the rest of the test. Merely unmounting the widget
+/// tree (the `pumpWidget(shrink)` above) does not retroactively cancel its
+/// already-scheduled `Future.delayed` Timer: that Timer fires regardless,
+/// and cancellation is only noticed by the generator at its next `yield`,
+/// by which point it has often already re-armed a further Timer. Confirmed
+/// by direct reproduction (see the Task 14 report): explicitly invalidating
+/// the provider *and* pumping fake time well past its 500ms period is what
+/// actually drains it; passing `container` opts into that. Omitting it is
+/// safe for screens/tests that never touch `restTickerProvider` — invoking
+/// `invalidate` on a provider that was never read is a no-op.
+Future<void> disposeAndDrainTimers(
+  WidgetTester tester, {
+  ProviderContainer? container,
+}) async {
   await tester.pumpWidget(const SizedBox.shrink());
   await tester.pump(const Duration(milliseconds: 1));
+  if (container != null) {
+    container.invalidate(restTickerProvider);
+    for (var i = 0; i < 3; i++) {
+      await tester.pump(const Duration(milliseconds: 600));
+    }
+  }
 }
