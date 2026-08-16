@@ -17,6 +17,12 @@ import '../providers/active_session_controller.dart';
 /// Sound-on-rest-complete and haptics toggles are intentionally omitted —
 /// they're inert until Task 18 wires the actual side effects, and the design
 /// brief is explicit that a switch here must not fake persistence.
+///
+/// "Keep screen on" (also listed in the Task 15 brief) is intentionally
+/// omitted for the same reason: there is no `keepScreenOn` column on the
+/// session row to bind it to, and Task 17 owns `WakelockService` — a switch
+/// with nothing behind it would be worse than no switch. Task 17 adds both
+/// the column and this row when it lands.
 Future<void> showSessionSettingsSheet(BuildContext context, WidgetRef ref) {
   return showModalBottomSheet<void>(
     context: context,

@@ -239,10 +239,17 @@ class _FinishedBar extends StatelessWidget {
                   ),
                 ),
                 FilledButton(
-                  onPressed: () {
-                    if (target != null) controller.focusSet(target.setId);
-                    controller.clearRestFinished();
-                  },
+                  // Task 15's `goToNextTarget()` recomputes the target from
+                  // the session's *current* order at tap time — not
+                  // `rest.nextTarget`, which was frozen the moment rest
+                  // finished. The old `focusSet(target.setId) +
+                  // clearRestFinished()` pair used that frozen value, so a
+                  // reorder made while the user was waiting on this exact
+                  // banner (PRD §18.8's machine-occupied case) would send
+                  // them to the wrong exercise. `goToNextTarget()` also
+                  // cancels rest so it reaches idle, which this pair never
+                  // did.
+                  onPressed: controller.goToNextTarget,
                   child: Text(label),
                 ),
               ],

@@ -294,4 +294,101 @@ void main() {
 
     await disposeRestScreen(tester);
   });
+
+  testWidgets(
+      'tapping "Next exercise" on the finished banner uses the recomputed '
+      'target, not the one frozen when rest finished', (tester) async {
+    // 3 exercises, 1 set each, so completing Bench Press's only set starts
+    // a rest whose next target is Lat Pulldown (the next exercise in
+    // session order at that moment).
+    final templates = TemplateRepository(db);
+    final exercises = ExerciseRepository(db);
+    final sessions = SessionRepository(db);
+    final t = await templates.createTemplate(name: 'Push');
+    for (final n in ['Bench Press', 'Lat Pulldown', 'Squat']) {
+      final e = await exercises.create(
+        name: n,
+        loggingType: LoggingType.strengthWeightRepsRir,
+      );
+      await templates.addExercise(
+        templateId: t.id,
+        exerciseId: e.id,
+        targetSets: 1,
+        restSeconds: 90,
+      );
+    }
+    await sessions.startFromTemplate(t.id, weightUnit: 'kg');
+
+    await tester.pumpWidget(harness());
+    await pumpUntilSessionData(tester);
+
+    // Auto-focus off, so the finished rest parks in the manual "REST
+    // COMPLETE" banner this test drives by hand, rather than resolving on
+    // its own.
+    unawaited(container
+        .read(activeSessionControllerProvider.notifier)
+        .setAutoFocusNextExercise(false));
+    await pumpUntilSessionData(tester);
+
+    final completeButton = find.byTooltip('Complete set').first;
+    await tester.ensureVisible(completeButton);
+    await tester.pump();
+    await tester.tap(completeButton);
+    await pumpUntilSessionData(tester);
+
+    final skipButton = find.byIcon(Icons.skip_next);
+    await tester.ensureVisible(skipButton);
+    await tester.pump();
+    await tester.tap(skipButton);
+    await pumpUntilSessionData(tester);
+    expect(find.text('Next exercise'), findsOneWidget);
+
+    // Rest stopped being active (and so stopped being watched) the moment
+    // it finished above — drain the ticker's pending timer here, while
+    // still close to that transition, rather than only at teardown. Same
+    // reasoning as the "Next set" test above: leaving this straggler
+    // untouched through the several extra real-async round trips below
+    // (reorder + another `pumpUntilSessionData`) is what left more than one
+    // `Future.delayed` Timer in flight by teardown.
+    container.invalidate(restTickerProvider);
+    for (var i = 0; i < 3; i++) {
+      await tester.pump(const Duration(milliseconds: 600));
+    }
+
+    // Reorder the still-pending exercises while the banner is up — the same
+    // PRD §18.8 "machine occupied" scenario as the controller-level
+    // "reordering during active rest" tests, just occurring after rest has
+    // already finished, in the window the app is explicitly waiting on the
+    // user. Pending order [Lat Pulldown, Squat] -> [Squat, Lat Pulldown].
+    unawaited(container
+        .read(activeSessionControllerProvider.notifier)
+        .reorder(0, 2));
+    await pumpUntilSessionData(tester);
+
+    final nextExerciseButton = find.text('Next exercise');
+    await tester.ensureVisible(nextExerciseButton);
+    await tester.pump();
+    await tester.tap(nextExerciseButton);
+    await pumpUntilSessionData(tester);
+
+    final state =
+        await container.read(activeSessionControllerProvider.future);
+    // Squat, not the frozen Lat Pulldown — proves the tap recomputes
+    // against the post-reorder session rather than trusting
+    // `rest.nextTarget`, which was captured when rest finished, before the
+    // reorder.
+    expect(state!.currentTarget!.exerciseName, 'Squat');
+    expect(find.byType(RestBar), findsNothing);
+
+    await disposeRestScreen(tester);
+    // This test's several extra real-async round trips (multiple
+    // `pumpUntilSessionData` calls layered on top of the rest ticker) can
+    // leave more than one `restTickerProvider` `Future.delayed` timer
+    // in flight by teardown — `disposeRestScreen`'s usual 3 pumps aren't
+    // always enough here, so drain a few more.
+    container.invalidate(restTickerProvider);
+    for (var i = 0; i < 3; i++) {
+      await tester.pump(const Duration(milliseconds: 600));
+    }
+  });
 }

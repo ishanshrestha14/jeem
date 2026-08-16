@@ -49,11 +49,25 @@ void main() {
     );
   }
 
-  Future<void> startSession(WidgetTester tester) async {
+  /// [autoFocusNextSet] is set on the TEMPLATE before the session is created,
+  /// so the session snapshot inherits it and the controller's one-shot
+  /// `build()` picks it up. Writing the flag to the session row afterwards
+  /// does NOT work: `ActiveSessionController.build()` is deliberately a
+  /// one-shot fetch (it fixed a race where a stale rehydration reverted a
+  /// completed rest to idle), so writes made outside the controller never
+  /// reach its state and the sheet would still render the old value.
+  Future<void> startSession(
+    WidgetTester tester, {
+    bool autoFocusNextSet = true,
+  }) async {
     final templates = TemplateRepository(db);
     final exercises = ExerciseRepository(db);
     final sessions = SessionRepository(db);
     final t = await templates.createTemplate(name: 'Push');
+    if (!autoFocusNextSet) {
+      await templates
+          .updateTemplate(t.copyWith(autoFocusNextSet: autoFocusNextSet));
+    }
     final bench = await exercises.create(
       name: 'Bench Press',
       loggingType: LoggingType.strengthWeightRepsRir,
@@ -70,25 +84,62 @@ void main() {
     await pumpUntilSessionData(tester);
   }
 
-  Future<void> openSheet(WidgetTester tester) async {
-    await tester.tap(find.byIcon(Icons.more_vert));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Session settings'));
-    await tester.pumpAndSettle();
+  /// Reads the persisted session row straight from the database.
+  ///
+  /// Do NOT assert persistence by awaiting
+  /// `container.read(activeSessionControllerProvider.future)` — inside a
+  /// `runAsync` block that hangs indefinitely, which is documented on
+  /// `pumpUntilSessionData` in `active_session_test.dart` and is what hung
+  /// this file. A direct select has no stream, no controller and no fake-clock
+  /// interaction, and it proves the stronger thing anyway: that the write
+  /// actually reached disk rather than only controller state.
+  Future<WorkoutSession> readSessionRow() async =>
+      (await db.select(db.workoutSessions).get()).single;
+
+  /// Pumps a bounded number of frames — never `pumpAndSettle`.
+  ///
+  /// The active session screen sits behind this sheet and is backed by a Drift
+  /// stream plus a 500ms rest ticker, so `pumpAndSettle` has nothing to settle
+  /// to: it spins until its 10-minute default timeout and then fails. That is
+  /// exactly what hung this file. 600ms of frames is well past any finite
+  /// menu/sheet transition and is guaranteed to terminate.
+  Future<void> pumpFiniteTransition(WidgetTester tester) async {
+    for (var i = 0; i < 12; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
   }
 
-  testWidgets('shows the persisted auto-focus switches and weight unit',
-      (tester) async {
-    await startSession(tester);
+  Future<void> openSheet(WidgetTester tester) async {
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await pumpFiniteTransition(tester);
+    await tester.tap(find.text('Session settings'));
+    await pumpFiniteTransition(tester);
+  }
+
+  testWidgets(
+      'shows the persisted auto-focus switches and weight unit, bound to '
+      'the session row rather than a hardcoded default', (tester) async {
+    // A hardcoded `value: true` in the sheet would also satisfy an
+    // all-defaults session, so start from a template whose flag is already
+    // false. This only passes if the switch genuinely reads
+    // `autoFocusNextSet` off the session rather than rendering a literal,
+    // and it proves the whole chain: template -> session snapshot -> switch.
+    await startSession(tester, autoFocusNextSet: false);
+    expect((await readSessionRow()).autoFocusNextSet, isFalse);
+
     await openSheet(tester);
 
     expect(find.byKey(const Key('autoFocusNextSetSwitch')), findsOneWidget);
     expect(
         find.byKey(const Key('autoFocusNextExerciseSwitch')), findsOneWidget);
-    // Defaults come from the template (Task 9), which defaults to true.
     final setSwitch = tester
         .widget<Switch>(find.byKey(const Key('autoFocusNextSetSwitch')));
-    expect(setSwitch.value, isTrue);
+    expect(setSwitch.value, isFalse);
+    final exerciseSwitch = tester.widget<Switch>(
+        find.byKey(const Key('autoFocusNextExerciseSwitch')));
+    // Untouched — still the template default (true) — so this also proves
+    // the two switches are bound independently rather than to one flag.
+    expect(exerciseSwitch.value, isTrue);
     expect(find.text('kg'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
@@ -109,9 +160,7 @@ void main() {
     );
     await tester.pump();
 
-    final state =
-        await container.read(activeSessionControllerProvider.future);
-    expect(state!.session.session.autoFocusNextSet, isFalse);
+    expect((await readSessionRow()).autoFocusNextSet, isFalse);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
@@ -148,9 +197,7 @@ void main() {
     );
     await tester.pump();
 
-    final state =
-        await container.read(activeSessionControllerProvider.future);
-    expect(state!.session.session.notes, 'Felt strong today');
+    expect((await readSessionRow()).notes, 'Felt strong today');
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));

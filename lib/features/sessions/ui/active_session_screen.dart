@@ -35,7 +35,27 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> {
   final Set<String> _expandedIds = {};
   bool _expandedHydrated = false;
 
+  // The exercise id the screen currently treats as "the current target" for
+  // forcing a card open (`SessionExerciseCard.expanded`) — updated only by
+  // [_applyTargetChange]/hydration, never read straight off
+  // `state.currentTarget` in `build()`. That indirection is what makes the
+  // typing guard's defer actually work: `build()` force-expands whatever
+  // this holds regardless of `_expandedIds`, so if it tracked the live
+  // controller value directly, a deferred move would still visibly expand
+  // the new target's card the moment auto-focus set it (defeating the
+  // guard entirely) even though `_expandedIds`/scroll were correctly held
+  // back.
+  String? _appliedCurrentExerciseId;
+
   Timer? _ticker;
+
+  // Catch-up state for a target-change deferred by the typing guard: the
+  // move (expand/collapse/scroll) that couldn't run because a different
+  // set's field was focused, held until that field loses focus.
+  FocusNode? _blockingFocusNode;
+  VoidCallback? _blockingFocusListener;
+  String? _pendingPreviousExerciseId;
+  String? _pendingTargetExerciseId;
 
   @override
   void initState() {
@@ -51,6 +71,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> {
   @override
   void dispose() {
     _ticker?.cancel();
+    _clearCatchUpListener();
     super.dispose();
   }
 
@@ -96,11 +117,99 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> {
 
   /// Reacts to the controller's target exercise changing (a rest finished
   /// and auto-focus moved on): expands the new current exercise's card,
-  /// collapses the previously-current one, and scrolls it into view.
+  /// collapses the previously-current one, and scrolls it into view. If the
+  /// user is typing in a different set's field, the move is deferred and
+  /// caught up once that field loses focus (see [_armCatchUp]) rather than
+  /// silently dropped — otherwise the visual reaction PRD FR-108/109
+  /// promises simply never happens for that rest-finish once the user stops
+  /// typing without triggering any further target change.
   void _handleTargetChanged(String? previousExerciseId, String newExerciseId) {
-    if (_typingElsewhere(newExerciseId)) return;
+    if (_typingElsewhere(newExerciseId)) {
+      _armCatchUp(previousExerciseId, newExerciseId);
+      return;
+    }
+    _clearCatchUp();
+    _applyTargetChange(previousExerciseId, newExerciseId);
+  }
 
+  /// Records the deferred move and, if not already listening on the field
+  /// that's currently blocking it, attaches a one-shot-in-effect listener to
+  /// that field's [FocusNode] so the move re-evaluates the moment it loses
+  /// focus. Re-arming (the target changed again while still blocked, or the
+  /// blocking field itself changed) always keeps only the *latest* pending
+  /// move and at most one live listener — attached to whichever node is
+  /// currently blocking — so this can't accumulate listeners or apply a
+  /// stale move.
+  void _armCatchUp(String? previousExerciseId, String newExerciseId) {
+    _pendingPreviousExerciseId = previousExerciseId;
+    _pendingTargetExerciseId = newExerciseId;
+
+    final node = FocusManager.instance.primaryFocus;
+    if (node == null) return;
+    if (identical(_blockingFocusNode, node)) return;
+
+    _clearCatchUpListener();
+    _blockingFocusNode = node;
+    void listener() => _onBlockingFocusChange(node);
+    _blockingFocusListener = listener;
+    node.addListener(listener);
+  }
+
+  /// Fires on every notification from the blocking node (focus gained or
+  /// lost) — bails out unless it actually lost focus, so a node re-gaining
+  /// focus mid-notification-storm can't trigger the catch-up early. Removes
+  /// itself and clears the pending fields *before* doing anything else, so
+  /// this can never run twice for the same deferred move even if the node
+  /// notifies more than once during the same blur.
+  void _onBlockingFocusChange(FocusNode node) {
+    if (node.hasFocus) return;
+    _clearCatchUpListener();
+
+    final targetId = _pendingTargetExerciseId;
+    final previousId = _pendingPreviousExerciseId;
+    _pendingTargetExerciseId = null;
+    _pendingPreviousExerciseId = null;
+    if (targetId == null || !mounted) return;
+
+    // Re-validate against the controller's latest state rather than
+    // trusting the captured ids blindly — if the target moved on again
+    // while this node held focus, whatever `_handleTargetChanged` call
+    // that produced has either already applied its own move or re-armed
+    // this same catch-up with a newer target; either way this stale one
+    // must not apply.
+    final currentId = ref
+        .read(activeSessionControllerProvider)
+        .valueOrNull
+        ?.currentTarget
+        ?.sessionExerciseId;
+    if (currentId != targetId) return;
+
+    if (_typingElsewhere(targetId)) {
+      // Focus moved straight to another set's field rather than clearing —
+      // still blocked, so re-arm against whatever node is blocking now.
+      _armCatchUp(previousId, targetId);
+      return;
+    }
+    _applyTargetChange(previousId, targetId);
+  }
+
+  void _clearCatchUpListener() {
+    if (_blockingFocusNode != null && _blockingFocusListener != null) {
+      _blockingFocusNode!.removeListener(_blockingFocusListener!);
+    }
+    _blockingFocusNode = null;
+    _blockingFocusListener = null;
+  }
+
+  void _clearCatchUp() {
+    _clearCatchUpListener();
+    _pendingPreviousExerciseId = null;
+    _pendingTargetExerciseId = null;
+  }
+
+  void _applyTargetChange(String? previousExerciseId, String newExerciseId) {
     setState(() {
+      _appliedCurrentExerciseId = newExerciseId;
       if (previousExerciseId != null && previousExerciseId != newExerciseId) {
         _expandedIds.remove(previousExerciseId);
       }
@@ -161,13 +270,20 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> {
     if (!_expandedHydrated) {
       _expandedHydrated = true;
       final current = state.currentTarget;
-      if (current != null) _expandedIds.add(current.sessionExerciseId);
+      if (current != null) {
+        _expandedIds.add(current.sessionExerciseId);
+        _appliedCurrentExerciseId = current.sessionExerciseId;
+      }
     }
 
     final completed =
         session.exercises.where((e) => e.isComplete).toList(growable: false);
     final pending = pendingExercises(session);
-    final currentExerciseId = state.currentTarget?.sessionExerciseId;
+    // Deliberately NOT `state.currentTarget?.sessionExerciseId` — see
+    // `_appliedCurrentExerciseId`'s doc comment. Using the live value here
+    // would force a card open the instant auto-focus set it, bypassing the
+    // typing guard's defer.
+    final currentExerciseId = _appliedCurrentExerciseId;
 
     return Scaffold(
       appBar: AppBar(
