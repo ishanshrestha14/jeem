@@ -3,69 +3,43 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/semantic_colors.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/empty_state.dart';
-import '../../sessions/data/session_repository.dart';
 import '../data/template_models.dart';
 import '../data/template_repository.dart';
 import '../providers/template_providers.dart';
+import 'start_workout_action.dart';
 
-enum _StartChoice { resume, discard }
-
-/// Starts a session from [templateId] and navigates to it. If a session is
-/// already running, offers to resume it or discard it in favour of the new
-/// one, rather than silently starting a second session. Goes through
-/// [sessionRepositoryProvider] directly (there is no controller yet before
-/// a session exists to drive one).
-Future<void> _startWorkout(
-  BuildContext context,
-  WidgetRef ref,
-  String templateId,
-) async {
-  final repo = ref.read(sessionRepositoryProvider);
-  final active = await repo.watchActiveSession().first;
-  if (active != null) {
-    if (!context.mounted) return;
-    final choice = await showDialog<_StartChoice>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Workout already in progress'),
-        content: Text('"${active.session.name}" is still running.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(_StartChoice.resume),
-            child: const Text('Resume the running session'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(_StartChoice.discard),
-            child: const Text('Discard it and start this one'),
-          ),
-        ],
-      ),
-    );
-    if (choice == null) return;
-    if (choice == _StartChoice.resume) {
-      if (context.mounted) context.push('/session');
-      return;
-    }
-    await repo.cancelSession(active.session.id);
-  }
-  await repo.startFromTemplate(templateId, weightUnit: 'kg');
-  if (context.mounted) context.push('/session');
-}
-
-class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key});
+/// The Workout tab: the list of workout templates a session is started
+/// from. Formerly `HomeScreen` (`home_screen.dart`) when this was the
+/// Workouts destination — renamed to reflect its place in the Home / Workout
+/// / History / Profile IA. Behaviour (template cards, FAB, overflow menu,
+/// Start button and its disabled-with-helper-text state) is unchanged; only
+/// the resume-in-progress banner moved to the Home tab (it reads
+/// `activeSessionProvider` directly there) and the exercise library moved
+/// behind the `EXERCISES` header action below rather than being a peer tab.
+class WorkoutScreen extends ConsumerWidget {
+  const WorkoutScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summaries = ref.watch(templateSummariesProvider);
-    final active = ref.watch(activeSessionProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Workouts'),
+        title: const Text('Workout'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Center(
+              child: _ExercisesAction(
+                onTap: () => context.push('/exercises'),
+              ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/templates/new'),
@@ -76,51 +50,48 @@ class HomeScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('$e')),
         data: (rows) {
-          final resumeBanner = active.maybeWhen(
-            data: (session) => session == null
-                ? null
-                : Card(
-                    margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                    color: Theme.of(context).colorScheme.primaryContainer,
-                    child: ListTile(
-                      leading: const Icon(Icons.play_circle_outline),
-                      title: Text('Resume "${session.session.name}"'),
-                      subtitle: const Text('You have a workout in progress'),
-                      onTap: () => context.push('/session'),
-                    ),
-                  ),
-            orElse: () => null,
-          );
-
           if (rows.isEmpty) {
-            return Column(
-              children: [
-                ?resumeBanner,
-                Expanded(
-                  child: EmptyState(
-                    icon: Icons.fitness_center,
-                    title: 'No workouts yet',
-                    message:
-                        'Build a template with your exercises so you can start a workout in seconds.',
-                    actionLabel: 'Create your first workout',
-                    onAction: () => context.push('/templates/new'),
-                  ),
-                ),
-              ],
+            return EmptyState(
+              icon: Icons.fitness_center,
+              title: 'No workouts yet',
+              message:
+                  'Build a template with your exercises so you can start a workout in seconds.',
+              actionLabel: 'Create your first workout',
+              onAction: () => context.push('/templates/new'),
             );
           }
           return ListView.builder(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
-            itemCount: rows.length + (resumeBanner == null ? 0 : 1),
-            itemBuilder: (_, i) {
-              if (resumeBanner != null) {
-                if (i == 0) return resumeBanner;
-                return _TemplateCard(summary: rows[i - 1]);
-              }
-              return _TemplateCard(summary: rows[i]);
-            },
+            itemCount: rows.length,
+            itemBuilder: (_, i) => _TemplateCard(summary: rows[i]),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Header micro-label action that pushes the exercise library — exercises
+/// are material for building workouts, not a peer destination, so they live
+/// one tap away from here rather than in the bottom nav (docs/design/
+/// gymflow-design-system.md micro-label style: 11px, w600, letterSpacing
+/// 1.2, uppercase, `muted`).
+class _ExercisesAction extends StatelessWidget {
+  const _ExercisesAction({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).extension<SemanticColors>()!.muted;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        child: Text(
+          'EXERCISES',
+          style: AppTheme.columnHeader.copyWith(color: muted),
+        ),
       ),
     );
   }
@@ -195,7 +166,7 @@ class _TemplateCard extends ConsumerWidget {
                 height: 48,
                 child: FilledButton(
                   onPressed: canStart
-                      ? () => _startWorkout(context, ref, template.id)
+                      ? () => startWorkout(context, ref, template.id)
                       : null,
                   child: const Text('Start'),
                 ),

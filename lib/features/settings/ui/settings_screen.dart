@@ -13,9 +13,13 @@ const String appDisplayName = 'GymFlow';
 const String appVersion = '1.0.0';
 
 /// Only an "About" section for now — the real settings (units, defaults,
-/// backup/restore, etc.) are a later task. A tab must never lead to a
-/// "coming soon" placeholder, so this renders honest, real content: what
-/// the app is, its version, and the fact that everything is local-only.
+/// backup/restore, etc.) plus notifications, measurements and profile
+/// editing are later tasks. This is the Profile tab's current screen; the
+/// class/file stay named for "settings" since that's still exactly what
+/// this content is (About), even though the tab it lives under is now
+/// called Profile. A tab must never lead to a "coming soon" placeholder, so
+/// this renders honest, real content: what the app is, its version, and
+/// the fact that everything is local-only.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -25,7 +29,7 @@ class SettingsScreen extends StatelessWidget {
     final muted = theme.extension<SemanticColors>()!.muted;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: const Text('Profile')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

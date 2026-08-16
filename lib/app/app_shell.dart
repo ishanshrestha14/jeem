@@ -4,9 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/semantic_colors.dart';
 
-/// Hosts the four primary destinations (Workouts / Exercises / History /
-/// Settings) behind a [StatefulShellRoute.indexedStack] so each tab keeps
-/// its own navigation stack and scroll position across tab switches.
+/// Hosts the four primary destinations (Home / Workout / History / Profile)
+/// behind a [StatefulShellRoute.indexedStack] so each tab keeps its own
+/// navigation stack and scroll position across tab switches.
 ///
 /// The bottom nav is hand-built rather than a Material [NavigationBar]: the
 /// design system (docs/design/gymflow-design-system.md) explicitly bans the
@@ -49,14 +49,14 @@ class _NavDestination {
 
 const _destinations = [
   _NavDestination(
-    icon: Icons.fitness_center_outlined,
-    selectedIcon: Icons.fitness_center,
-    label: 'Workouts',
+    icon: Icons.home_outlined,
+    selectedIcon: Icons.home,
+    label: 'Home',
   ),
   _NavDestination(
-    icon: Icons.list_alt_outlined,
-    selectedIcon: Icons.list_alt,
-    label: 'Exercises',
+    icon: Icons.fitness_center_outlined,
+    selectedIcon: Icons.fitness_center,
+    label: 'Workout',
   ),
   _NavDestination(
     icon: Icons.history_outlined,
@@ -64,9 +64,9 @@ const _destinations = [
     label: 'History',
   ),
   _NavDestination(
-    icon: Icons.settings_outlined,
-    selectedIcon: Icons.settings,
-    label: 'Settings',
+    icon: Icons.person_outline,
+    selectedIcon: Icons.person,
+    label: 'Profile',
   ),
 ];
 

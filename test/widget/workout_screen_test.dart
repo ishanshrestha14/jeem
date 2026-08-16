@@ -5,7 +5,7 @@ import 'package:gymflow/core/theme/app_theme.dart';
 import 'package:gymflow/db/app_database.dart';
 import 'package:gymflow/features/exercises/data/exercise_repository.dart';
 import 'package:gymflow/features/templates/data/template_repository.dart';
-import 'package:gymflow/features/templates/ui/home_screen.dart';
+import 'package:gymflow/features/templates/ui/workout_screen.dart';
 import '../db/test_database.dart';
 import 'pump_helpers.dart';
 
@@ -17,13 +17,17 @@ void main() {
 
   Widget harness() => ProviderScope(
         overrides: [databaseProvider.overrideWithValue(db)],
-        child: MaterialApp(theme: AppTheme.dark(), home: const HomeScreen()),
+        child: MaterialApp(theme: AppTheme.dark(), home: const WorkoutScreen()),
       );
 
   testWidgets('empty state invites creating the first workout', (tester) async {
     await tester.pumpWidget(harness());
     await pumpUntilData(tester);
     expect(find.text('Create your first workout'), findsOneWidget);
+    // The EXERCISES header action is present regardless of template state —
+    // the exercise library moved here (behind this action) rather than
+    // being a peer bottom-nav tab.
+    expect(find.text('EXERCISES'), findsOneWidget);
     await disposeAndDrainTimers(tester);
   });
 
