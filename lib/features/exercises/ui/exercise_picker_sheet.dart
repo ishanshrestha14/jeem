@@ -1,0 +1,128 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../db/app_database.dart';
+import '../providers/exercise_providers.dart';
+import 'exercise_editor_screen.dart';
+import 'exercise_info_sheet.dart';
+
+/// Full-height picker for adding an exercise to a template. Returns the
+/// chosen exercise's id, or null if the sheet is dismissed without a pick.
+Future<String?> showExercisePickerSheet(BuildContext context) {
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (ctx) => const _ExercisePickerSheet(),
+  );
+}
+
+class _ExercisePickerSheet extends ConsumerStatefulWidget {
+  const _ExercisePickerSheet();
+
+  @override
+  ConsumerState<_ExercisePickerSheet> createState() =>
+      _ExercisePickerSheetState();
+}
+
+class _ExercisePickerSheetState extends ConsumerState<_ExercisePickerSheet> {
+  // Deliberately local, not `exerciseSearchQueryProvider` — that provider is
+  // shared with the standalone Exercise Library screen, and mutating it from
+  // here would clobber a filter the user had already typed there.
+  String _query = '';
+
+  Future<void> _createExercise(BuildContext context) async {
+    final newId = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        builder: (_) => const ExerciseEditorScreen(),
+      ),
+    );
+    if (newId != null && context.mounted) {
+      Navigator.of(context).pop(newId);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final exercisesAsync = ref.watch(exerciseListProvider);
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.9,
+      maxChildSize: 0.95,
+      minChildSize: 0.5,
+      builder: (context, scrollController) {
+        return SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: TextField(
+                  decoration: const InputDecoration(
+                    hintText: 'Search exercises',
+                    prefixIcon: Icon(Icons.search),
+                  ),
+                  onChanged: (v) => setState(() => _query = v),
+                ),
+              ),
+              Expanded(
+                child: exercisesAsync.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text('$e')),
+                  data: (allRows) {
+                    final query = _query.trim().toLowerCase();
+                    final rows = query.isEmpty
+                        ? allRows
+                        : allRows
+                            .where((e) =>
+                                e.name.toLowerCase().contains(query))
+                            .toList();
+                    return ListView.builder(
+                      controller: scrollController,
+                      itemCount: rows.length + 1,
+                      itemBuilder: (ctx, i) {
+                        if (i == 0) {
+                          return ListTile(
+                            leading: const Icon(Icons.add),
+                            title: const Text('Create new exercise'),
+                            onTap: () => _createExercise(context),
+                          );
+                        }
+                        final exercise = rows[i - 1];
+                        return ListTile(
+                          title: Text(exercise.name),
+                          subtitle: Text([
+                            if (exercise.category != null) exercise.category!,
+                            exercise.loggingType == LoggingType.durationOnly
+                                ? 'Duration'
+                                : 'Strength',
+                          ].join(' · ')),
+                          onTap: () => Navigator.of(context).pop(exercise.id),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.info_outline),
+                            tooltip: 'Exercise info',
+                            onPressed: () => showExerciseInfoSheet(
+                              context,
+                              name: exercise.name,
+                              loggingType: exercise.loggingType,
+                              description: exercise.description,
+                              notes: exercise.notes,
+                              imagePath: exercise.imagePath,
+                              category: exercise.category,
+                              isArchived: exercise.isArchived,
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
