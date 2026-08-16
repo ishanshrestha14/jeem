@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/semantic_colors.dart';
 import '../../../../core/widgets/numeric_field.dart';
 import '../../../../db/app_database.dart';
@@ -10,8 +11,9 @@ import 'set_badge.dart';
 /// times for a duration-logged exercise itself.
 const _kDurationPresets = <int>[15, 30, 45, 60];
 
-/// A single duration-only set row: number badge, a duration field, quick-pick
-/// chips, and the same 56dp complete button as [StrengthSetRow].
+/// A single duration-only set row: number, a duration field, quick-pick
+/// chips, and the same 56dp complete control as [StrengthSetRow]. Follows
+/// the same ledger-line grammar with `SET / DURATION` columns.
 class DurationSetRow extends StatelessWidget {
   const DurationSetRow({
     super.key,
@@ -34,23 +36,29 @@ class DurationSetRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final semantic = theme.extension<SemanticColors>()!;
+    final numeralStyle = AppTheme.setNumeral.copyWith(color: theme.colorScheme.onSurface);
+
+    final underline = isCurrent
+        ? BoxDecoration(border: Border(bottom: BorderSide(color: semantic.line)))
+        : const BoxDecoration();
 
     final row = Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        SetBadge(
-          index: set.setIndex,
-          isComplete: _isComplete,
-          isCurrent: isCurrent,
-        ),
+        SetBadge(index: set.setIndex, isComplete: _isComplete, isCurrent: isCurrent),
         const SizedBox(width: 8),
         Expanded(
           flex: 3,
-          child: NumericField(
-            label: 'Duration (s)',
-            value: set.durationSeconds,
-            suffix: 's',
-            onChanged: (v) => onDurationChanged(v?.toInt()),
+          child: Container(
+            decoration: underline,
+            child: NumericField(
+              label: 'Duration (s)',
+              value: set.durationSeconds,
+              suffix: 's',
+              dense: true,
+              style: numeralStyle,
+              onChanged: (v) => onDurationChanged(v?.toInt()),
+            ),
           ),
         ),
         const SizedBox(width: 8),
@@ -68,19 +76,7 @@ class DurationSetRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        SizedBox(
-          width: 56,
-          height: 56,
-          child: IconButton(
-            iconSize: 32,
-            icon: Icon(
-              _isComplete ? Icons.check_circle : Icons.check_circle_outline,
-              color: _isComplete ? semantic.success : null,
-            ),
-            tooltip: _isComplete ? 'Mark incomplete' : 'Complete set',
-            onPressed: onToggleComplete,
-          ),
-        ),
+        _DoneControl(isComplete: _isComplete, onPressed: onToggleComplete),
       ],
     );
 
@@ -90,15 +86,61 @@ class DurationSetRow extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
         decoration: BoxDecoration(
-          color: isCurrent
-              ? theme.colorScheme.surfaceContainerHigh
-              : Colors.transparent,
+          color: isCurrent ? semantic.surfaceHigh : Colors.transparent,
           border: isCurrent
-              ? Border.all(color: theme.colorScheme.primary, width: 2)
+              ? Border(left: BorderSide(color: theme.colorScheme.onSurface, width: 3))
               : null,
-          borderRadius: BorderRadius.circular(12),
         ),
-        child: Opacity(opacity: _isComplete ? 0.6 : 1.0, child: row),
+        child: row,
+      ),
+    );
+  }
+}
+
+/// 56x56 hit area (design system): an outlined ring while pending, a filled
+/// chalk disc with an `ink` checkmark once complete. No Material checkbox.
+/// Duplicated from [StrengthSetRow]'s private `_DoneControl` — same grammar,
+/// kept private per-file to avoid growing the widgets/ export surface for a
+/// single shared 20-line leaf.
+class _DoneControl extends StatelessWidget {
+  const _DoneControl({required this.isComplete, required this.onPressed});
+
+  final bool isComplete;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final semantic = theme.extension<SemanticColors>()!;
+    return Tooltip(
+      message: isComplete ? 'Mark incomplete' : 'Complete set',
+      child: SizedBox(
+        width: 56,
+        height: 56,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onPressed,
+          child: Center(
+            child: isComplete
+                ? Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: semantic.success,
+                    ),
+                    child: const Icon(Icons.check, size: 16, color: AppTheme.ink),
+                  )
+                : Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: semantic.muted, width: 1.5),
+                    ),
+                  ),
+          ),
+        ),
       ),
     );
   }

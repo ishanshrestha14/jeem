@@ -312,6 +312,66 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     state = AsyncData(current.copyWith(restJustFinished: false));
   }
 
+  /// Moves focus to the pending target on demand — what the rest bar's
+  /// "Next set" / "Next exercise" button calls when auto-focus is off and
+  /// the rest already finished. Recomputes the target from the session's
+  /// *current* order (not whatever [RestTimerState.nextTarget] was captured
+  /// with when rest started) so a mid-rest reorder is honoured here too.
+  /// Also cancels the (already-finished) rest so the rest bar dismisses.
+  ///
+  /// Synchronous, like [focusSet]/[clearRestFinished] — this is a direct UI
+  /// action (a button tap) and the caller expects [state] to reflect the new
+  /// focus immediately, not after an awaited DB round trip. The
+  /// `saveRestState` persistence is fired without waiting on it.
+  void goToNextTarget() {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    final target = current.rest.afterSetId == null
+        ? firstPendingTarget(current.session)
+        : nextTargetAfter(current.session, current.rest.afterSetId!);
+
+    final cancelled = RestTimer.cancel();
+    unawaited(_repo.saveRestState(current.session.session.id, cancelled));
+
+    state = AsyncData(current.copyWith(
+      rest: cancelled,
+      focusedSetId: target?.setId,
+      clearFocusedSetId: target == null,
+      restJustFinished: false,
+    ));
+  }
+
+  // ---------------------------------------------------------------------
+  // Session settings
+  // ---------------------------------------------------------------------
+
+  Future<void> setAutoFocusNextSet(bool value) async {
+    final current = await _ready();
+    await _repo.updateSession(
+      current.session.session.copyWith(autoFocusNextSet: value),
+    );
+    final reloaded = await _reload(current.session.session.id);
+    _emit(reloaded, current.rest);
+  }
+
+  Future<void> setAutoFocusNextExercise(bool value) async {
+    final current = await _ready();
+    await _repo.updateSession(
+      current.session.session.copyWith(autoFocusNextExercise: value),
+    );
+    final reloaded = await _reload(current.session.session.id);
+    _emit(reloaded, current.rest);
+  }
+
+  Future<void> setSessionNotes(String notes) async {
+    final current = await _ready();
+    await _repo.updateSession(
+      current.session.session.copyWith(notes: Value(notes)),
+    );
+    final reloaded = await _reload(current.session.session.id);
+    _emit(reloaded, current.rest);
+  }
+
   // ---------------------------------------------------------------------
   // Exercise rest configuration
   // ---------------------------------------------------------------------
@@ -475,13 +535,21 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
 
     final effectiveSession = session ?? current.session;
 
+    // Recomputed against the session's *current* order, not the order
+    // captured in `settled.nextTarget` when rest started — the user can
+    // reorder mid-rest (e.g. a machine is occupied) and the auto-focus
+    // decision must reflect that (PRD §18.8).
+    final target = settled.afterSetId == null
+        ? firstPendingTarget(effectiveSession)
+        : nextTargetAfter(effectiveSession, settled.afterSetId!);
+
     String? focusedSetId;
     var clearFocusedSetId = false;
-    final target = settled.nextTarget;
+    var autoFocus = false;
     if (target == null) {
       clearFocusedSetId = true;
     } else {
-      final autoFocus = target.kind == TargetKind.sameExercise
+      autoFocus = target.kind == TargetKind.sameExercise
           ? effectiveSession.session.autoFocusNextSet
           : effectiveSession.session.autoFocusNextExercise;
       if (autoFocus) {
@@ -489,12 +557,31 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
       }
     }
 
+    // Keep the emitted rest's `nextTarget` in sync with the recomputed
+    // target rather than the (possibly stale, pre-reorder) one it was
+    // carrying, so the rest bar's "NEXT" label agrees with where focus goes.
+    // Built explicitly rather than via `copyWith` because `copyWith`'s
+    // `nextTarget` param can't express "clear it to null" (a null target —
+    // end of session — falls back to whatever was already there).
+    final resolvedRest = RestTimerState(
+      status: settled.status,
+      totalSeconds: settled.totalSeconds,
+      endsAt: settled.endsAt,
+      remainingSeconds: settled.remainingSeconds,
+      afterSetId: settled.afterSetId,
+      nextTarget: target,
+    );
+
+    // Consumed by the auto-focus (not "just finished" for the UI's purposes)
+    // whenever the governing toggle actually moved focus. When there's no
+    // target left (end of session) there's nothing to auto-focus into
+    // either, so that's not a "rest complete, waiting on you" state.
     _emit(
       effectiveSession,
-      settled,
+      resolvedRest,
       focusedSetId: focusedSetId,
       clearFocusedSetId: clearFocusedSetId,
-      restJustFinished: true,
+      restJustFinished: !autoFocus && target != null,
     );
   }
 

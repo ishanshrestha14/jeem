@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/semantic_colors.dart';
 
-/// The 32dp circular set-number badge shared by [StrengthSetRow] and
-/// [DurationSetRow]: filled with `success` when complete, outlined with
-/// `primary` when current, outlined with `muted` otherwise. All colours are
-/// sourced from the theme (never literal) since this is the most-looked-at
-/// element on the most-used screen in the app.
+/// The 28dp set-number cell shared by [StrengthSetRow] and [DurationSetRow].
+///
+/// Ledger-line grammar (docs/design/gymflow-design-system.md): this is plain
+/// condensed digits, not a Material badge/chip. The *row* carries the
+/// "current" treatment (surfaceHigh background + leading chalk bar); this
+/// cell only dims once the set is complete, per "dim only the set-number
+/// cell, not the values."
 class SetBadge extends StatelessWidget {
   const SetBadge({
     super.key,
@@ -23,27 +26,14 @@ class SetBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final semantic = theme.extension<SemanticColors>()!;
-    final borderColor = isComplete
-        ? semantic.success
-        : (isCurrent ? theme.colorScheme.primary : semantic.muted);
-    // `surface` (the app's near-black background) reads clearly against the
-    // light `success` fill; `onSurface` is the normal body-text colour
-    // against the transparent/unfilled badge.
-    final digitColor =
-        isComplete ? theme.colorScheme.surface : theme.colorScheme.onSurface;
+    final color = isComplete ? semantic.muted : theme.colorScheme.onSurface;
 
-    return Container(
-      width: 32,
-      height: 32,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: isComplete ? semantic.success : Colors.transparent,
-        border: Border.all(color: borderColor, width: 2),
-      ),
+    return SizedBox(
+      width: 28,
       child: Text(
         '${index + 1}',
-        style: TextStyle(fontWeight: FontWeight.bold, color: digitColor),
+        textAlign: TextAlign.center,
+        style: AppTheme.setNumber.copyWith(color: color),
       ),
     );
   }

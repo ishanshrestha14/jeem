@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/semantic_colors.dart';
 import '../../../core/utils/formatting.dart';
@@ -11,56 +10,11 @@ import '../../../core/widgets/numeric_field.dart';
 import '../../../db/app_database.dart';
 import '../../exercises/ui/exercise_info_sheet.dart';
 import '../../exercises/ui/exercise_picker_sheet.dart';
-import '../../sessions/data/session_repository.dart';
 import '../data/template_models.dart';
 import '../data/template_repository.dart';
 import '../providers/template_providers.dart';
+import 'start_workout_action.dart';
 import 'template_exercise_settings_sheet.dart';
-
-enum _StartChoice { resume, discard }
-
-/// Starts a session from [templateId] and navigates to it. If a session is
-/// already running, offers to resume it or discard it in favour of the new
-/// one, rather than silently starting a second session. Duplicated (rather
-/// than shared) with the equivalent helper in `home_screen.dart` — both
-/// call sites are small `ConsumerWidget`/`ConsumerState`s and this keeps the
-/// two screens independent of a new cross-feature import.
-Future<void> _startWorkout(
-  BuildContext context,
-  WidgetRef ref,
-  String templateId,
-) async {
-  final repo = ref.read(sessionRepositoryProvider);
-  final active = await repo.watchActiveSession().first;
-  if (active != null) {
-    if (!context.mounted) return;
-    final choice = await showDialog<_StartChoice>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Workout already in progress'),
-        content: Text('"${active.session.name}" is still running.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(_StartChoice.resume),
-            child: const Text('Resume the running session'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(_StartChoice.discard),
-            child: const Text('Discard it and start this one'),
-          ),
-        ],
-      ),
-    );
-    if (choice == null) return;
-    if (choice == _StartChoice.resume) {
-      if (context.mounted) context.push('/session');
-      return;
-    }
-    await repo.cancelSession(active.session.id);
-  }
-  await repo.startFromTemplate(templateId, weightUnit: 'kg');
-  if (context.mounted) context.push('/session');
-}
 
 /// Assembles a workout template: name, notes, defaults, and the ordered
 /// list of exercises. When [templateId] is null, a draft template is
@@ -294,7 +248,7 @@ class _TemplateEditorScreenState extends ConsumerState<TemplateEditorScreen> {
             padding: const EdgeInsets.only(right: 12),
             child: FilledButton(
               onPressed: exercises.isNotEmpty
-                  ? () => _startWorkout(context, ref, data.template.id)
+                  ? () => startWorkout(context, ref, data.template.id)
                   : null,
               child: const Text('Start workout'),
             ),

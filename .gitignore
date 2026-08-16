@@ -62,5 +62,5 @@ app.*.map.json
 **/ios/Runner/GeneratedPluginRegistrant.*
 **/ios/Pods/
 
-# Project-specific
+# Project-specific / Superpowers SDD workspace (scratch)
 .superpowers/
