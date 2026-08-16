@@ -62,14 +62,24 @@ class StrengthSetRow extends StatelessWidget {
           flex: 3,
           child: Container(
             decoration: underline,
-            child: NumericField(
-              label: 'Weight',
-              value: set.weight,
-              allowDecimal: true,
-              suffix: weightUnit,
-              dense: true,
-              style: numeralStyle,
-              onChanged: (v) => onWeightChanged(v?.toDouble()),
+            // `weightUnit` isn't rendered visually in the row itself — the
+            // column header above already carries it once per exercise —
+            // but it still belongs on the field's semantics so a screen
+            // reader announces "Weight in kg" rather than just "Weight".
+            child: Semantics(
+              label: 'Weight in $weightUnit',
+              child: NumericField(
+                label: 'Weight',
+                value: set.weight,
+                allowDecimal: true,
+                // No `suffix` here: `dense: true` drops `suffixText`
+                // entirely (design system — "no box chrome" in set rows),
+                // so passing it would be a parameter silently ignored by
+                // the field.
+                dense: true,
+                style: numeralStyle,
+                onChanged: (v) => onWeightChanged(v?.toDouble()),
+              ),
             ),
           ),
         ),
@@ -117,6 +127,21 @@ class StrengthSetRow extends StatelessWidget {
   }
 }
 
+/// A non-null wrapper around a menu selection, so `showMenu`'s `null`
+/// return (dismissal) can be distinguished from a genuine pick of the `—`
+/// entry, whose underlying value is itself `null`.
+class _RirChoice {
+  const _RirChoice(this.value);
+
+  final double? value;
+
+  @override
+  bool operator ==(Object other) => other is _RirChoice && other.value == value;
+
+  @override
+  int get hashCode => value.hashCode;
+}
+
 /// RIR must not use `DropdownButtonFormField` — its internal decoration is
 /// what overflows the row at ~7px of remaining width. This renders only the
 /// value text (`2`, `1.5`, `—`), no arrow chrome, no border, and opens a
@@ -136,15 +161,24 @@ class _RirControl extends StatelessWidget {
       topLeft & box.size,
       Offset.zero & overlay.size,
     );
-    final selected = await showMenu<double?>(
+    // `showMenu` returns `null` both when the user explicitly picks the
+    // `—` entry (`kRirValues[0]` is itself `null`) and when the menu is
+    // dismissed without a selection (tap outside / back button). Those are
+    // not the same thing — a dismissal must leave the logged RIR untouched,
+    // while picking `—` must clear it — so the item values are wrapped in
+    // a non-null sentinel that only a genuine selection produces.
+    final selected = await showMenu<_RirChoice>(
       context: context,
       position: position,
       items: [
         for (final rir in kRirValues)
-          PopupMenuItem<double?>(value: rir, child: Text(formatRir(rir))),
+          PopupMenuItem<_RirChoice>(
+            value: _RirChoice(rir),
+            child: Text(formatRir(rir)),
+          ),
       ],
     );
-    if (selected != value) onChanged(selected);
+    if (selected != null && selected.value != value) onChanged(selected.value);
   }
 
   @override

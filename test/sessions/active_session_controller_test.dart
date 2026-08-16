@@ -346,10 +346,21 @@ void main() {
 
   test('auto-focus next exercise applies only across an exercise boundary',
       () async {
+    // sets: 1 means completing Bench Press's only set makes Lat Pulldown's
+    // first set the next pending target regardless of auto-focus — that's
+    // just `firstPendingTarget`. The original assertion here
+    // (`currentTarget.exerciseName == 'Lat Pulldown'`) passed even with
+    // auto-focus deleted entirely, since `currentTarget` falls back to
+    // `firstPendingTarget` whenever `focusedSetId` is unset. Assert
+    // `focusedSetId` directly instead — that field is only ever set by the
+    // auto-focus path — so this genuinely proves it ran.
     await seedAndStart(restSeconds: 1, sets: 1);
     final controller = container.read(activeSessionControllerProvider.notifier);
     await controller.setAutoFocusNextSet(false);
     await controller.setAutoFocusNextExercise(true);
+
+    final latPulldownFirstSetId =
+        (await state()).session.exercises[1].sets.first.id;
 
     await controller.completeSet(
         (await state()).session.exercises.first.sets.single.id);
@@ -357,7 +368,36 @@ void main() {
     await controller.settle();
 
     final s = await state();
+    expect(s.focusedSetId, latPulldownFirstSetId);
     expect(s.currentTarget!.exerciseName, 'Lat Pulldown');
+    expect(s.restJustFinished, isFalse); // consumed by the auto-focus
+  });
+
+  test(
+      'auto-focus next exercise does NOT apply within the same exercise '
+      '("only across an exercise boundary")', () async {
+    // Same toggle configuration as the test above (autoFocusNextExercise:
+    // true, autoFocusNextSet: false) but sets: 2, so the target after the
+    // first set's rest finishes is the *same* exercise's next set — a
+    // same-exercise boundary, which only `autoFocusNextSet` governs.
+    // `autoFocusNextExercise` must have no effect here: focus must stay
+    // unset and the rest must park in the finished state waiting on the
+    // user, exactly like "with auto-focus off, rest completion parks in a
+    // finished state" above.
+    await seedAndStart(restSeconds: 1, sets: 2);
+    final controller = container.read(activeSessionControllerProvider.notifier);
+    await controller.setAutoFocusNextSet(false);
+    await controller.setAutoFocusNextExercise(true);
+    final sets = (await state()).session.exercises.first.sets;
+
+    await controller.completeSet(sets[0].id);
+    await controller.skipRest();
+    await controller.settle();
+
+    final s = await state();
+    expect(s.focusedSetId, isNull);
+    expect(s.restJustFinished, isTrue);
+    expect(s.currentTarget!.setId, sets[1].id);
   });
 
   test('neither toggle auto-completes anything', () async {
@@ -372,19 +412,18 @@ void main() {
     expect((await state()).session.setById(sets[1].id)!.completedAt, isNull);
   });
 
-  test(
-      'reordering during active rest does not cancel it, and the next '
-      'target is recomputed from the new order', () async {
-    await seedAndStart(restSeconds: 300, sets: 1);
-    final controller = container.read(activeSessionControllerProvider.notifier);
-    final exercises = (await state()).session.exercises;
-
-    await controller.completeSet(exercises[0].sets.single.id);
-    expect((await state()).rest.nextTarget!.exerciseName, 'Lat Pulldown');
-
-    await controller.reorder(0, 0); // no-op reorder of the single pending item
-    expect((await state()).rest.status, RestTimerStatus.running);
-  });
+  // The old "reordering during active rest does not cancel it, and the next
+  // target is recomputed from the new order" test is deleted rather than
+  // fixed: it seeded a single pending exercise and called
+  // `controller.reorder(0, 0)` (a no-op — nothing was reordered) and never
+  // actually asserted a recomputed target, so it passed vacuously even with
+  // that recompute logic deleted. The very next test below,
+  // "reordering during active rest changes which exercise the finished rest
+  // auto-focuses into", already does everything this one claimed to: a
+  // genuine multi-exercise reorder mid-rest, plus an assertion
+  // (`currentTarget.sessionExerciseId == squatId` after the rest finishes)
+  // that depends on the reorder having actually taken effect. Keeping both
+  // would just be a second, weaker copy of the same coverage.
 
   test(
       'reordering during active rest changes which exercise the finished '

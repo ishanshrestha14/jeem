@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/semantic_colors.dart';
-import '../../../core/utils/formatting.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../history/providers/history_providers.dart';
 import '../../sessions/data/session_models.dart';
@@ -47,13 +46,19 @@ class HomeScreen extends ConsumerWidget {
         error: (e, _) => Center(child: Text('$e')),
         data: (rows) {
           if (rows.isEmpty) {
-            return EmptyState(
-              icon: Icons.fitness_center,
-              title: 'No workouts yet',
-              message:
-                  'Build a template in the Workout tab so you can start a workout in seconds.',
-              actionLabel: 'Go to Workout',
-              onAction: () => context.go('/workout'),
+            // A running session must stay reachable even with zero
+            // templates left (e.g. the last template was deleted mid-
+            // workout) — `/session` is only reachable from this resume
+            // card, `startWorkout`, or the template editor, so the empty
+            // state alone would strand the session with no way back.
+            return active.maybeWhen(
+              data: (session) => session == null
+                  ? _buildEmptyState(context)
+                  : ListView(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
+                      children: [_ResumeCard(session: session)],
+                    ),
+              orElse: () => _buildEmptyState(context),
             );
           }
 
@@ -101,6 +106,17 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildEmptyState(BuildContext context) {
+    return EmptyState(
+      icon: Icons.fitness_center,
+      title: 'No workouts yet',
+      message:
+          'Build a template in the Workout tab so you can start a workout in seconds.',
+      actionLabel: 'Go to Workout',
+      onAction: () => context.go('/workout'),
+    );
+  }
+
   /// The 2-3 most recently performed templates, most recent first. A
   /// template that has never been performed (`lastPerformedAt == null`)
   /// sorts after every performed one.
@@ -143,7 +159,12 @@ class _ResumeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final semantic = Theme.of(context).extension<SemanticColors>()!;
-    final elapsed = session.elapsed(DateTime.now());
+    // Not a live elapsed-time countup: Home is a `ConsumerWidget` with no
+    // ticker (unlike `ActiveSessionScreen`, which owns a 1s `Timer.periodic`
+    // for exactly this reason), so a duration computed once at build would
+    // sit frozen on screen — worse than not showing a number at all. The
+    // start time itself doesn't need a ticker to stay correct.
+    final startedAt = session.session.startedAt;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 20),
@@ -169,7 +190,7 @@ class _ResumeCard extends StatelessWidget {
                     )),
                     const SizedBox(height: 4),
                     Text(
-                      mmss(elapsed),
+                      'Started ${DateFormat.jm().format(startedAt)}',
                       style: AppTheme.elapsedTime.copyWith(color: semantic.muted),
                     ),
                   ],

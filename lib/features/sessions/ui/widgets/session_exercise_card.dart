@@ -17,9 +17,14 @@ import 'strength_set_row.dart';
 /// system). Mirrors the `[28][flex 3][flex 2][flex 3][56]` grammar the rows
 /// themselves use so the labels land directly above their column.
 class _ColumnHeaders extends StatelessWidget {
-  const _ColumnHeaders({required this.isDuration});
+  const _ColumnHeaders({required this.isDuration, required this.weightUnit});
 
   final bool isDuration;
+
+  /// Read from `session.weightUnit` rather than hardcoded — this header
+  /// otherwise lies outright the moment a session is started with anything
+  /// other than 'kg' (e.g. 'lb').
+  final String weightUnit;
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +42,7 @@ class _ColumnHeaders extends StatelessWidget {
             Expanded(flex: 3, child: Center(child: label('DURATION'))),
             const Expanded(flex: 4, child: SizedBox.shrink()),
           ] else ...[
-            Expanded(flex: 3, child: Center(child: label('KG'))),
+            Expanded(flex: 3, child: Center(child: label(weightUnit.toUpperCase()))),
             const SizedBox(width: 8),
             Expanded(flex: 2, child: Center(child: label('REPS'))),
             const SizedBox(width: 8),
@@ -160,6 +165,7 @@ class SessionExerciseCard extends ConsumerWidget {
                 const SizedBox(height: 8),
                 _ColumnHeaders(
                   isDuration: exercise.loggingType != LoggingType.strengthWeightRepsRir,
+                  weightUnit: weightUnit,
                 ),
                 for (var i = 0; i < entry.sets.length; i++) ...[
                   if (i > 0) const _RowSeparator(),

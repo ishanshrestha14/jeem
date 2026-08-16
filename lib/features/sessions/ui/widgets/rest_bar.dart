@@ -73,9 +73,27 @@ class RestBar extends ConsumerWidget {
                       children: [
                         Row(
                           children: [
-                            Text(
-                              'NEXT',
-                              style: AppTheme.columnHeader.copyWith(color: colors.muted),
+                            // `Flexible` (not a fixed `Text`) so the label
+                            // can shrink instead of forcing an overflow on
+                            // narrow phones (~320dp), where the outer Row's
+                            // fixed controls (countdown, two `±15s` buttons,
+                            // two icon buttons) already leave this whole
+                            // inner Row only a few dp of budget. `flex: 1`
+                            // matters here, not just wrapping in `Flexible`
+                            // — flex 0 is laid out at its natural size like
+                            // a bare `Text` and still overflows; flex 1 lets
+                            // it genuinely shrink, sharing the remaining
+                            // space with the target-name `Expanded` beside
+                            // it.
+                            Flexible(
+                              child: Text(
+                                'NEXT',
+                                style: AppTheme.columnHeader
+                                    .copyWith(color: colors.muted),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                softWrap: false,
+                              ),
                             ),
                             const SizedBox(width: 6),
                             Expanded(
@@ -100,13 +118,28 @@ class RestBar extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 4),
+                  // Tight, explicit padding (rather than the default M3
+                  // TextButton padding) keeps these at close to their
+                  // 48x48dp minimum footprint instead of padding out
+                  // further — every dp matters once the countdown, both of
+                  // these, and both icon buttons are competing for a
+                  // 320dp-wide bar's leftover width alongside the
+                  // `Expanded` "NEXT ..." column.
                   TextButton(
-                    style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                     onPressed: () => controller.adjustRest(const Duration(seconds: -15)),
                     child: Text('-15s', style: AppTheme.setNumber.copyWith(fontSize: 17)),
                   ),
                   TextButton(
-                    style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                     onPressed: () => controller.adjustRest(const Duration(seconds: 15)),
                     child: Text('+15s', style: AppTheme.setNumber.copyWith(fontSize: 17)),
                   ),

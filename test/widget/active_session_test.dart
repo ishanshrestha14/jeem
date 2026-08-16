@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:drift/drift.dart' show OrderingTerm;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gymflow/core/theme/app_theme.dart';
@@ -10,6 +11,7 @@ import 'package:gymflow/features/exercises/data/exercise_repository.dart';
 import 'package:gymflow/features/sessions/providers/active_session_controller.dart';
 import 'package:gymflow/features/sessions/ui/active_session_screen.dart';
 import 'package:gymflow/features/sessions/ui/widgets/duration_set_row.dart';
+import 'package:gymflow/features/sessions/ui/widgets/rest_bar.dart';
 import 'package:gymflow/features/sessions/ui/widgets/strength_set_row.dart';
 import 'package:gymflow/features/templates/data/template_repository.dart';
 import '../db/test_database.dart';
@@ -84,10 +86,29 @@ Future<void> pumpUntilSessionData(
   }
 }
 
+/// `flutter test` never loads the app's real fonts by default — text
+/// measures against a generic fallback instead, which for this design
+/// system's condensed/tabular styles renders noticeably *wider* than the
+/// real 'Barlow'/'BarlowCondensed' faces do on-device. That's normally
+/// harmless, but it means a 320dp overflow test built against the fallback
+/// font can fail (or "pass") for reasons that have nothing to do with the
+/// real layout at real sizes. Loading the actual asset files (no new
+/// package — `dart:ui`'s `FontLoader` plus `rootBundle`, both already
+/// available) keeps the "does not overflow at 320dp" test honest.
+Future<void> _loadRealFonts() async {
+  final barlow = FontLoader('Barlow')
+    ..addFont(rootBundle.load('assets/fonts/Barlow-SemiBold.ttf'));
+  await barlow.load();
+  final condensed = FontLoader('BarlowCondensed')
+    ..addFont(rootBundle.load('assets/fonts/BarlowCondensed-Bold.ttf'));
+  await condensed.load();
+}
+
 void main() {
   late AppDatabase db;
   late ProviderContainer container;
 
+  setUpAll(_loadRealFonts);
   setUp(() => db = testDatabase());
   tearDown(() async {
     container.dispose();
@@ -346,6 +367,59 @@ void main() {
     await pumpUntilSessionData(tester);
 
     expect(find.byType(StrengthSetRow), findsNWidgets(3));
+    final ex = tester.takeException();
+    expect(ex, isNull);
+
+    await disposeAndDrainTimers(tester, container: container);
+  });
+
+  testWidgets(
+      'the rest bar does not overflow at a 320dp-wide surface',
+      (tester) async {
+    // Regression test: the outer Row's fixed children (countdown, two
+    // `±15s` TextButtons, two IconButtons, gaps, padding) consume ~294dp of
+    // a 320dp viewport, leaving the `Expanded` inner column only ~26dp —
+    // less than the "NEXT" label alone needed at its natural size, so it
+    // overflowed by ~11dp before `NEXT` was wrapped in a shrinkable
+    // `Flexible`. `_loadRealFonts()` (see `setUpAll` above) matters here:
+    // without the real 'BarlowCondensed'/'Barlow' faces, `flutter test`'s
+    // fallback font renders every fixed element wide enough to overflow
+    // the *outer* Row too — which very nearly produced a "fix" that wrapped
+    // every child of the outer Row in `Flexible`, breaking the "tapping the
+    // bar opens the expanded sheet" test in `rest_ui_test.dart` (`Expanded`
+    // no longer claimed all the leftover width once its siblings had flex
+    // too, which shifted the sheet's own tap target out from under the
+    // point `tester.tap(find.byType(RestBar))` uses). Real fonts make this
+    // test exercise the actual production-sized overflow instead. Mirrors
+    // the "set row layout does not overflow at a 320dp-wide surface" test
+    // above for viewport setup/teardown.
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    tester.view.physicalSize = const Size(320, 800);
+    tester.view.devicePixelRatio = 1.0;
+
+    final templates = TemplateRepository(db);
+    final exercises = ExerciseRepository(db);
+    final sessions = SessionRepository(db);
+    final t = await templates.createTemplate(name: 'Legs A');
+    final squat = await exercises.create(
+        name: 'Back Squat', loggingType: LoggingType.strengthWeightRepsRir);
+    await templates.addExercise(
+        templateId: t.id, exerciseId: squat.id, targetSets: 2, restSeconds: 90);
+    await sessions.startFromTemplate(t.id, weightUnit: 'kg');
+
+    await tester.pumpWidget(harness());
+    await pumpUntilSessionData(tester);
+
+    // Complete the first set to start a genuinely running rest, so the
+    // `RestBar` (mounted in `bottomNavigationBar` only while rest is
+    // active) actually renders.
+    await tester.tap(find.byTooltip('Complete set').first);
+    await pumpUntilSessionData(tester);
+
+    expect(find.byType(RestBar), findsOneWidget);
     final ex = tester.takeException();
     expect(ex, isNull);
 
