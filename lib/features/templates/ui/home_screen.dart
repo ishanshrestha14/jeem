@@ -66,25 +66,6 @@ class HomeScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Workouts'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.fitness_center),
-            tooltip: 'Exercises',
-            onPressed: () => context.push('/exercises'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: 'History',
-            // TODO(task-?): /history route does not exist yet.
-            onPressed: null,
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: 'Settings',
-            // TODO(task-?): /settings route does not exist yet.
-            onPressed: null,
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/templates/new'),
