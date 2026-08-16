@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -168,6 +170,16 @@ void main() {
       'skip ends rest and replaces the bar with the rest-complete banner',
       (tester) async {
     await startRestingSession(tester);
+    // Auto-focus defaults to on (Task 15) and would otherwise consume the
+    // finished state instantly, moving focus and dismissing the bar before
+    // this test can observe the banner it's asserting on. Fired inside
+    // `runAsync` and settled via `pumpUntilSessionData` for the same reason
+    // documented on that helper: this mutator's DB reload needs a real
+    // event-loop turn that plain pumps under the fake clock never provide.
+    unawaited(container
+        .read(activeSessionControllerProvider.notifier)
+        .setAutoFocusNextSet(false));
+    await pumpUntilSessionData(tester);
 
     await tester.tap(find.byIcon(Icons.skip_next));
     await pumpUntilSessionData(tester);
@@ -191,6 +203,12 @@ void main() {
       'tapping "Next set" on the finished banner focuses the target and '
       'hides the bar', (tester) async {
     await startRestingSession(tester);
+    // Same reasoning as the previous test: turn off auto-focus so the
+    // finished banner actually renders for this test to tap through.
+    unawaited(container
+        .read(activeSessionControllerProvider.notifier)
+        .setAutoFocusNextSet(false));
+    await pumpUntilSessionData(tester);
     await tester.tap(find.byIcon(Icons.skip_next));
     await pumpUntilSessionData(tester);
     expect(find.byType(RestBar), findsOneWidget);

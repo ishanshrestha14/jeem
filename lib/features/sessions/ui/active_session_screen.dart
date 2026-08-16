@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatting.dart';
 import '../../../db/app_database.dart';
 import '../providers/active_session_controller.dart';
+import 'session_settings_sheet.dart';
 import 'widgets/rest_bar.dart';
 import 'widgets/session_exercise_card.dart';
 import 'widgets/session_progress_header.dart';
@@ -56,8 +57,80 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> {
   GlobalKey _keyFor(String exerciseId) =>
       _cardKeys.putIfAbsent(exerciseId, GlobalKey.new);
 
+  /// Whether [focusContext] sits anywhere inside the subtree rooted at
+  /// [cardContext] — used to tell whether the currently focused text field
+  /// belongs to a particular exercise card.
+  bool _cardContains(BuildContext cardContext, BuildContext focusContext) {
+    if (identical(cardContext, focusContext)) return true;
+    var found = false;
+    void visit(Element e) {
+      if (found) return;
+      if (identical(e, focusContext)) {
+        found = true;
+        return;
+      }
+      e.visitChildren(visit);
+    }
+
+    (cardContext as Element).visitChildren(visit);
+    return found;
+  }
+
+  /// True if the currently focused widget is a field that belongs to a
+  /// *different* exercise card than [targetExerciseId]. Auto-focus must
+  /// never steal focus/scroll away from whatever the user is actively
+  /// typing into elsewhere — losing mid-set input is worse than a delayed
+  /// scroll (PRD FR-108/109).
+  bool _typingElsewhere(String targetExerciseId) {
+    final focusContext = FocusManager.instance.primaryFocus?.context;
+    if (focusContext == null) return false;
+    for (final entry in _cardKeys.entries) {
+      if (entry.key == targetExerciseId) continue;
+      final cardContext = entry.value.currentContext;
+      if (cardContext != null && _cardContains(cardContext, focusContext)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Reacts to the controller's target exercise changing (a rest finished
+  /// and auto-focus moved on): expands the new current exercise's card,
+  /// collapses the previously-current one, and scrolls it into view.
+  void _handleTargetChanged(String? previousExerciseId, String newExerciseId) {
+    if (_typingElsewhere(newExerciseId)) return;
+
+    setState(() {
+      if (previousExerciseId != null && previousExerciseId != newExerciseId) {
+        _expandedIds.remove(previousExerciseId);
+      }
+      _expandedIds.add(newExerciseId);
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final cardContext = _cardKeys[newExerciseId]?.currentContext;
+      if (cardContext == null) return;
+      final reduceMotion =
+          MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+      Scrollable.ensureVisible(
+        cardContext,
+        duration:
+            reduceMotion ? Duration.zero : const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen(activeSessionControllerProvider, (previous, next) {
+      final previousId = previous?.valueOrNull?.currentTarget?.sessionExerciseId;
+      final nextId = next.valueOrNull?.currentTarget?.sessionExerciseId;
+      if (nextId == null || nextId == previousId) return;
+      _handleTargetChanged(previousId, nextId);
+    });
+
     final async = ref.watch(activeSessionControllerProvider);
     return PopScope(
       canPop: true,
@@ -210,9 +283,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> {
     final controller = ref.read(activeSessionControllerProvider.notifier);
     switch (action) {
       case _SessionMenuAction.settings:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Session settings coming soon')),
-        );
+        await showSessionSettingsSheet(context, ref);
       case _SessionMenuAction.reorder:
         await _showReorderSheet(context, state.session);
       case _SessionMenuAction.pauseResume:

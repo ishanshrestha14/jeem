@@ -120,6 +120,12 @@ void main() {
       () async {
     await seedAndStart(restSeconds: 90);
     final controller = container.read(activeSessionControllerProvider.notifier);
+    // Auto-focus off so `skipRest` below actually leaves a stale
+    // `restJustFinished: true` to clear — with it on (the default), Task
+    // 15's auto-focus consumes the flag itself, which would make this
+    // assertion pass vacuously regardless of whether `completeSet` clears
+    // anything.
+    await controller.setAutoFocusNextSet(false);
     final sets = (await state()).session.exercises.first.sets;
 
     await controller.completeSet(sets[0].id);
@@ -274,6 +280,10 @@ void main() {
       'same path as skipRest/settle', () async {
     await seedAndStart(restSeconds: 60);
     final controller = container.read(activeSessionControllerProvider.notifier);
+    // Auto-focus off, so Task 15's auto-focus doesn't consume
+    // `restJustFinished` and this test can assert the finish path fired at
+    // all, independent of the toggle.
+    await controller.setAutoFocusNextSet(false);
     final exId = (await state()).session.exercises.first.exercise.id;
     await controller.completeSet((await state()).session.exercises.first.sets.first.id);
     await Future<void>.delayed(const Duration(milliseconds: 1100));
@@ -296,5 +306,131 @@ void main() {
     await controller.finish(notes: 'Done');
 
     expect(await container.read(activeSessionControllerProvider.future), isNull);
+  });
+
+  test('auto-focus next set moves focus when rest finishes mid-exercise',
+      () async {
+    await seedAndStart(restSeconds: 1, sets: 3);
+    final controller = container.read(activeSessionControllerProvider.notifier);
+    final sets = (await state()).session.exercises.first.sets;
+
+    await controller.completeSet(sets[0].id);
+    await controller.skipRest(); // finishes rest immediately
+    await controller.settle();
+
+    final s = await state();
+    expect(s.currentTarget!.setId, sets[1].id);
+    expect(s.restJustFinished, isFalse); // consumed by the auto-focus
+  });
+
+  test('with auto-focus off, rest completion parks in a finished state',
+      () async {
+    await seedAndStart(restSeconds: 1, sets: 3);
+    final controller = container.read(activeSessionControllerProvider.notifier);
+    await controller.setAutoFocusNextSet(false);
+    final sets = (await state()).session.exercises.first.sets;
+
+    await controller.completeSet(sets[0].id);
+    await controller.skipRest();
+    await controller.settle();
+
+    final s = await state();
+    expect(s.restJustFinished, isTrue);
+    expect(s.rest.status, RestTimerStatus.finished);
+
+    controller.goToNextTarget();
+    final after = await state();
+    expect(after.currentTarget!.setId, sets[1].id);
+    expect(after.restJustFinished, isFalse);
+  });
+
+  test('auto-focus next exercise applies only across an exercise boundary',
+      () async {
+    await seedAndStart(restSeconds: 1, sets: 1);
+    final controller = container.read(activeSessionControllerProvider.notifier);
+    await controller.setAutoFocusNextSet(false);
+    await controller.setAutoFocusNextExercise(true);
+
+    await controller.completeSet(
+        (await state()).session.exercises.first.sets.single.id);
+    await controller.skipRest();
+    await controller.settle();
+
+    final s = await state();
+    expect(s.currentTarget!.exerciseName, 'Lat Pulldown');
+  });
+
+  test('neither toggle auto-completes anything', () async {
+    await seedAndStart(restSeconds: 1, sets: 3);
+    final controller = container.read(activeSessionControllerProvider.notifier);
+    final sets = (await state()).session.exercises.first.sets;
+
+    await controller.completeSet(sets[0].id);
+    await controller.skipRest();
+    await controller.settle();
+
+    expect((await state()).session.setById(sets[1].id)!.completedAt, isNull);
+  });
+
+  test(
+      'reordering during active rest does not cancel it, and the next '
+      'target is recomputed from the new order', () async {
+    await seedAndStart(restSeconds: 300, sets: 1);
+    final controller = container.read(activeSessionControllerProvider.notifier);
+    final exercises = (await state()).session.exercises;
+
+    await controller.completeSet(exercises[0].sets.single.id);
+    expect((await state()).rest.nextTarget!.exerciseName, 'Lat Pulldown');
+
+    await controller.reorder(0, 0); // no-op reorder of the single pending item
+    expect((await state()).rest.status, RestTimerStatus.running);
+  });
+
+  test(
+      'reordering during active rest changes which exercise the finished '
+      'rest auto-focuses into', () async {
+    // A 3-exercise session so a mid-rest reorder actually changes what
+    // "next" resolves to: [Bench Press, Lat Pulldown, Squat]. Completing
+    // Bench Press's only set targets Lat Pulldown next; reordering Lat
+    // Pulldown behind Squat mid-rest must redirect the finished rest's
+    // auto-focus to Squat instead — proving `_handleRestFinished` recomputes
+    // from current order rather than the target captured when rest started.
+    final exercisesRepo = ExerciseRepository(db);
+    final templates = TemplateRepository(db);
+    final t = await templates.createTemplate(name: 'Push');
+    for (final n in ['Bench Press', 'Lat Pulldown', 'Squat']) {
+      final e = await exercisesRepo.create(
+          name: n, loggingType: LoggingType.strengthWeightRepsRir);
+      await templates.addExercise(
+          templateId: t.id, exerciseId: e.id, targetSets: 1, restSeconds: 1);
+    }
+    await container
+        .read(sessionRepositoryProvider)
+        .startFromTemplate(t.id, weightUnit: 'kg');
+    container.listen(activeSessionControllerProvider, (_, _) {});
+
+    final controller = container.read(activeSessionControllerProvider.notifier);
+    await controller.setAutoFocusNextExercise(true);
+
+    final exercises = (await state()).session.exercises;
+    final latId = exercises[1].exercise.id;
+    final squatId = exercises[2].exercise.id;
+
+    await controller.completeSet(exercises[0].sets.single.id);
+    expect((await state()).rest.nextTarget!.sessionExerciseId, latId);
+
+    // Reorder pending exercises [Lat Pulldown, Squat] -> [Squat, Lat
+    // Pulldown] while the rest for Bench Press is still running.
+    // `reorderPending`'s `newIndex` follows `ReorderableListView` semantics
+    // (pre-removal index), so moving index 0 to the end of a 2-item list is
+    // `reorder(0, 2)`, not `reorder(0, 1)` (which is a no-op here).
+    await controller.reorder(0, 2);
+    expect((await state()).rest.status, RestTimerStatus.running);
+
+    await controller.skipRest();
+    await controller.settle();
+
+    final s = await state();
+    expect(s.currentTarget!.sessionExerciseId, squatId);
   });
 }
