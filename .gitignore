@@ -64,3 +64,6 @@ app.*.map.json
 
 # Project-specific
 .superpowers/
+
+# Superpowers SDD workspace (scratch)
+.superpowers/
