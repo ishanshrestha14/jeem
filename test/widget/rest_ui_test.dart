@@ -107,7 +107,7 @@ void main() {
     await tester.pumpWidget(harness());
     await pumpUntilSessionData(tester);
 
-    await tester.tap(find.byIcon(Icons.check_circle_outline).first);
+    await tester.tap(find.byTooltip('Complete set').first);
     await pumpUntilSessionData(tester);
   }
 
@@ -116,7 +116,11 @@ void main() {
     await startRestingSession(tester);
 
     expect(find.byType(RestBar), findsOneWidget);
-    expect(find.textContaining('Next: Bench Press — Set 2'), findsOneWidget);
+    // "NEXT" micro-label and the target label are now separate Text widgets
+    // (design system: "NEXT as an 11px muted micro-label, then the label in
+    // Barlow 15/400") rather than one concatenated "Next: ..." string.
+    expect(find.text('NEXT'), findsOneWidget);
+    expect(find.text('Bench Press — Set 2'), findsOneWidget);
     // The DB round-trip in completeSet() consumes a little real wall-clock
     // time before this assertion runs, so the exact second can legitimately
     // read 90 or (rarely) one tick below it — assert a tight band around
@@ -174,7 +178,10 @@ void main() {
     // ...replaced by the finished banner (PRD FR-108/109): still inside
     // RestBar (restJustFinished keeps the bar mounted), not hidden outright.
     expect(find.byType(RestBar), findsOneWidget);
-    expect(find.text('Rest complete'), findsOneWidget);
+    // Design system: the finished state's micro-label is "REST COMPLETE"
+    // (uppercase, 11px letterspaced), not the old sentence-case "Rest
+    // complete".
+    expect(find.text('REST COMPLETE'), findsOneWidget);
     expect(find.text('Next set'), findsOneWidget);
 
     await disposeRestScreen(tester);
@@ -238,9 +245,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pump(const Duration(milliseconds: 300));
 
-    // The sheet's own 220dp CircularProgressIndicator, plus the "Undo last
+    // The sheet's own 240px ring (a `CustomPaint`, not a
+    // `CircularProgressIndicator` — design system), plus the "Undo last
     // set" control that isn't present on the compact bar.
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byKey(const Key('restRing')), findsOneWidget);
     expect(find.text('Undo last set'), findsOneWidget);
     expect(find.text('Cancel rest'), findsOneWidget);
 
@@ -261,7 +269,10 @@ void main() {
     // Rest was anchored on the undone set, so it's cancelled outright, and
     // the bar disappears.
     expect(find.byType(RestBar), findsNothing);
-    expect(find.byIcon(Icons.check_circle), findsNothing);
+    // No set is marked complete any more — the done control's tooltip
+    // flips back to "Complete set" (its completed-state tooltip is "Mark
+    // incomplete"; see StrengthSetRow/DurationSetRow).
+    expect(find.byTooltip('Mark incomplete'), findsNothing);
 
     await disposeRestScreen(tester);
   });

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -52,6 +54,7 @@ class _RestSheetContent extends ConsumerWidget {
     final isFinished = rest.status == RestTimerStatus.finished;
     final color =
         isFinished ? colors.success : (isPaused ? colors.warning : colors.rest);
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
     return SafeArea(
       child: Padding(
@@ -60,38 +63,56 @@ class _RestSheetContent extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
-              width: 220,
-              height: 220,
+              width: 240,
+              height: 240,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
                   SizedBox(
-                    width: 220,
-                    height: 220,
-                    child: CircularProgressIndicator(
-                      value: rest.progressAt(now),
-                      strokeWidth: 10,
-                      color: color,
+                    key: const Key('restRing'),
+                    width: 240,
+                    height: 240,
+                    child: CustomPaint(
+                      painter: _RestRingPainter(
+                        progress: rest.progressAt(now).clamp(0.0, 1.0),
+                        color: color,
+                        track: colors.line,
+                        animated: !reduceMotion,
+                      ),
                     ),
                   ),
-                  Text(
-                    mmss(rest.remainingAt(now)),
-                    key: const Key('restSheetCountdownText'),
-                    style: Theme.of(context)
-                        .textTheme
-                        .displayMedium
-                        ?.merge(AppTheme.tabularFigures)
-                        .copyWith(color: color),
-                  ),
+                  if (isFinished)
+                    Text(
+                      'REST COMPLETE',
+                      key: const Key('restSheetCountdownText'),
+                      style: AppTheme.columnHeader.copyWith(color: color),
+                    )
+                  else
+                    Text(
+                      mmss(rest.remainingAt(now)),
+                      key: const Key('restSheetCountdownText'),
+                      style: AppTheme.restCountdownSheet.copyWith(color: color),
+                    ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
-            Text(
-              'Next: ${rest.nextTarget?.label ?? "Finish workout"}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleMedium,
+            Row(
+              children: [
+                Text(
+                  'NEXT',
+                  style: AppTheme.columnHeader.copyWith(color: colors.muted),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    rest.nextTarget?.label ?? 'Finish workout',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTheme.exerciseName.copyWith(color: AppTheme.chalk),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 24),
             _ButtonRow(children: [
@@ -141,6 +162,56 @@ class _RestSheetContent extends ConsumerWidget {
   }
 }
 
+/// A 240px ring (design system): `line` track, progress in the running/
+/// paused/finished tint, 2px stroke, round cap, starting at 12 o'clock —
+/// replaces the default `CircularProgressIndicator`.
+class _RestRingPainter extends CustomPainter {
+  _RestRingPainter({
+    required this.progress,
+    required this.color,
+    required this.track,
+    required this.animated,
+  });
+
+  final double progress;
+  final Color color;
+  final Color track;
+  final bool animated;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final radius = (size.shortestSide - 2) / 2;
+
+    final trackPaint = Paint()
+      ..color = track
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    canvas.drawCircle(center, radius, trackPaint);
+
+    if (progress <= 0) return;
+    final progressPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    const start = -math.pi / 2; // 12 o'clock
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      start,
+      2 * math.pi * progress,
+      false,
+      progressPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _RestRingPainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.color != color ||
+      oldDelegate.track != track;
+}
+
 class _ButtonRow extends StatelessWidget {
   const _ButtonRow({required this.children});
 
@@ -167,9 +238,11 @@ class _SheetButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final semantic = Theme.of(context).extension<SemanticColors>()!;
     return SizedBox(
       height: 56,
       child: OutlinedButton(
+        style: OutlinedButton.styleFrom(side: BorderSide(color: semantic.line)),
         onPressed: onPressed,
         child: Text(label),
       ),

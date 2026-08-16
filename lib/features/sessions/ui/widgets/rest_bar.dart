@@ -11,8 +11,9 @@ import 'rest_sheet.dart';
 /// Compact, always-tappable rest indicator that lives in the active session
 /// screen's `bottomNavigationBar` slot. Visible whenever a rest is running,
 /// paused, or has just finished (PRD §9.5) — must be readable at a glance,
-/// mid-set, from arm's length, so the countdown uses tabular figures and a
-/// large text style.
+/// mid-set, from arm's length, so the countdown uses tabular condensed
+/// figures at 34/700 (design system "scoreboard clock", not a Material
+/// progress bar).
 ///
 /// Mounted only when `rest.isActive || restJustFinished` (see
 /// `ActiveSessionScreen._buildScaffold`), so this widget doesn't need to
@@ -45,9 +46,10 @@ class RestBar extends ConsumerWidget {
     final now = DateTime.now();
     final isPaused = rest.status == RestTimerStatus.paused;
     final color = isPaused ? colors.warning : colors.rest;
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
     return Material(
-      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+      color: AppTheme.surface,
       child: InkWell(
         onTap: () => showRestSheet(context, ref),
         child: SizedBox(
@@ -61,11 +63,7 @@ class RestBar extends ConsumerWidget {
                   Text(
                     mmss(rest.remainingAt(now)),
                     key: const Key('restCountdownText'),
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineMedium
-                        ?.merge(AppTheme.tabularFigures)
-                        .copyWith(color: color),
+                    style: AppTheme.restCountdownBar.copyWith(color: color),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -73,41 +71,49 @@ class RestBar extends ConsumerWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Next: ${rest.nextTarget?.label ?? "Finish workout"}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Text(
+                              'NEXT',
+                              style: AppTheme.columnHeader.copyWith(color: colors.muted),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                rest.nextTarget?.label ?? 'Finish workout',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTheme.body
+                                    .copyWith(color: AppTheme.chalk),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 4),
-                        LinearProgressIndicator(
-                          value: rest.progressAt(now),
+                        const SizedBox(height: 6),
+                        _DrainRule(
+                          progress: rest.progressAt(now),
                           color: color,
+                          track: colors.line,
+                          animated: !reduceMotion,
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(width: 4),
                   TextButton(
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                    ),
-                    onPressed: () => controller
-                        .adjustRest(const Duration(seconds: -15)),
-                    child: const Text('-15s'),
+                    style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                    onPressed: () => controller.adjustRest(const Duration(seconds: -15)),
+                    child: Text('-15s', style: AppTheme.setNumber.copyWith(fontSize: 17)),
                   ),
                   TextButton(
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                    ),
-                    onPressed: () =>
-                        controller.adjustRest(const Duration(seconds: 15)),
-                    child: const Text('+15s'),
+                    style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                    onPressed: () => controller.adjustRest(const Duration(seconds: 15)),
+                    child: Text('+15s', style: AppTheme.setNumber.copyWith(fontSize: 17)),
                   ),
                   IconButton(
                     iconSize: 28,
-                    onPressed: () => isPaused
-                        ? controller.resumeRest()
-                        : controller.pauseRest(),
+                    onPressed: () =>
+                        isPaused ? controller.resumeRest() : controller.pauseRest(),
                     icon: Icon(isPaused ? Icons.play_arrow : Icons.pause),
                   ),
                   IconButton(
@@ -125,10 +131,79 @@ class RestBar extends ConsumerWidget {
   }
 }
 
+/// A 1px hairline rule spanning full width that drains left-to-right, with a
+/// 6px round cap at the leading edge — not a `LinearProgressIndicator` with
+/// a track. Respects `MediaQuery.disableAnimations`.
+class _DrainRule extends StatelessWidget {
+  const _DrainRule({
+    required this.progress,
+    required this.color,
+    required this.track,
+    required this.animated,
+  });
+
+  final double progress;
+  final Color color;
+  final Color track;
+  final bool animated;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = SizedBox(
+      height: 6,
+      child: CustomPaint(
+        painter: _DrainPainter(progress: progress.clamp(0.0, 1.0), color: color, track: track),
+      ),
+    );
+    if (!animated) return child;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: progress, end: progress),
+      duration: const Duration(milliseconds: 200),
+      builder: (context, value, _) => SizedBox(
+        height: 6,
+        child: CustomPaint(
+          painter: _DrainPainter(progress: value.clamp(0.0, 1.0), color: color, track: track),
+        ),
+      ),
+    );
+  }
+}
+
+class _DrainPainter extends CustomPainter {
+  _DrainPainter({required this.progress, required this.color, required this.track});
+
+  final double progress;
+  final Color color;
+  final Color track;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final y = size.height / 2;
+    final trackPaint = Paint()
+      ..color = track
+      ..strokeWidth = 1;
+    canvas.drawLine(Offset(0, y), Offset(size.width, y), trackPaint);
+
+    final traveled = size.width * progress;
+    if (traveled <= 0) return;
+    final fillPaint = Paint()
+      ..color = color
+      ..strokeWidth = 1;
+    canvas.drawLine(Offset(0, y), Offset(traveled, y), fillPaint);
+    canvas.drawCircle(Offset(traveled, y), 3, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(covariant _DrainPainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.color != color ||
+      oldDelegate.track != track;
+}
+
 /// Rendered once rest has reached [RestTimerStatus.finished] and
 /// `restJustFinished` is still set. Task 15 owns auto-focus; this widget
-/// only supplies the manual fallback: a single button that focuses the next
-/// target and clears the flag.
+/// only supplies the manual fallback: `REST COMPLETE` as an 11px
+/// letterspaced micro-label above a single full-width primary action.
 class _FinishedBar extends StatelessWidget {
   const _FinishedBar({
     required this.colors,
@@ -145,12 +220,10 @@ class _FinishedBar extends StatelessWidget {
     final target = rest.nextTarget;
     final label = target == null
         ? 'Continue'
-        : (target.kind == TargetKind.sameExercise
-            ? 'Next set'
-            : 'Next exercise');
+        : (target.kind == TargetKind.sameExercise ? 'Next set' : 'Next exercise');
 
     return Material(
-      color: colors.success.withValues(alpha: 0.18),
+      color: AppTheme.surface,
       child: SizedBox(
         height: 72,
         child: SafeArea(
@@ -159,15 +232,10 @@ class _FinishedBar extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: [
-                Icon(Icons.check_circle, color: colors.success),
-                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Rest complete',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(color: colors.success),
+                    'REST COMPLETE',
+                    style: AppTheme.columnHeader.copyWith(color: AppTheme.chalk),
                   ),
                 ),
                 FilledButton(

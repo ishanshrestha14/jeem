@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/semantic_colors.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/formatting.dart';
@@ -10,6 +11,60 @@ import '../../../exercises/ui/exercise_info_sheet.dart';
 import '../../providers/active_session_controller.dart';
 import 'duration_set_row.dart';
 import 'strength_set_row.dart';
+
+/// `SET / KG / REPS / RIR` (or `SET / DURATION`) column headers, rendered
+/// once per exercise above its rows — never repeated per row (design
+/// system). Mirrors the `[28][flex 3][flex 2][flex 3][56]` grammar the rows
+/// themselves use so the labels land directly above their column.
+class _ColumnHeaders extends StatelessWidget {
+  const _ColumnHeaders({required this.isDuration});
+
+  final bool isDuration;
+
+  @override
+  Widget build(BuildContext context) {
+    final semantic = Theme.of(context).extension<SemanticColors>()!;
+    final style = AppTheme.columnHeader.copyWith(color: semantic.muted);
+    Widget label(String text) => Text(text, style: style);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+      child: Row(
+        children: [
+          SizedBox(width: 28, child: label('SET')),
+          const SizedBox(width: 8),
+          if (isDuration) ...[
+            Expanded(flex: 3, child: Center(child: label('DURATION'))),
+            const Expanded(flex: 4, child: SizedBox.shrink()),
+          ] else ...[
+            Expanded(flex: 3, child: Center(child: label('KG'))),
+            const SizedBox(width: 8),
+            Expanded(flex: 2, child: Center(child: label('REPS'))),
+            const SizedBox(width: 8),
+            Expanded(flex: 3, child: Center(child: label('RIR'))),
+          ],
+          const SizedBox(width: 8),
+          const SizedBox(width: 56),
+        ],
+      ),
+    );
+  }
+}
+
+/// 1px hairline separator between set rows, inset to start at the KG column
+/// so the set-number gutter stays visually open (design system).
+class _RowSeparator extends StatelessWidget {
+  const _RowSeparator();
+
+  @override
+  Widget build(BuildContext context) {
+    final semantic = Theme.of(context).extension<SemanticColors>()!;
+    return Padding(
+      padding: const EdgeInsets.only(left: 40),
+      child: Container(height: 1, color: semantic.line),
+    );
+  }
+}
 
 /// One exercise within the active session: header (name, info, rest chip,
 /// expand toggle), then either an expanded body of set rows plus "Add set"
@@ -62,7 +117,8 @@ class SessionExerciseCard extends ConsumerWidget {
                   Expanded(
                     child: Text(
                       exercise.name,
-                      style: theme.textTheme.titleMedium,
+                      style: AppTheme.exerciseName
+                          .copyWith(color: theme.colorScheme.onSurface),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -92,56 +148,65 @@ class SessionExerciseCard extends ConsumerWidget {
               ),
               if (expanded) ...[
                 const SizedBox(height: 8),
-                for (final set in entry.sets)
+                _ColumnHeaders(
+                  isDuration: exercise.loggingType != LoggingType.strengthWeightRepsRir,
+                ),
+                for (var i = 0; i < entry.sets.length; i++) ...[
+                  if (i > 0) const _RowSeparator(),
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: exercise.loggingType ==
-                            LoggingType.strengthWeightRepsRir
-                        ? StrengthSetRow(
-                            set: set,
-                            isCurrent: set.id == currentSetId,
-                            weightUnit: weightUnit,
-                            onToggleComplete: () => set.completedAt == null
-                                ? controller.completeSet(set.id)
-                                : controller.uncompleteSet(set.id),
-                            onWeightChanged: (v) => controller.updateSetValues(
-                              set.id,
-                              weight: v,
-                              clearWeight: v == null,
-                            ),
-                            onRepsChanged: (v) => controller.updateSetValues(
-                              set.id,
-                              reps: v,
-                              clearReps: v == null,
-                            ),
-                            onRirChanged: (v) => controller.updateSetValues(
-                              set.id,
-                              rir: v,
-                              clearRir: v == null,
-                            ),
-                            onLongPress: set.completedAt == null
-                                ? () => _handleLongPress(
-                                    context, controller, set.id)
-                                : null,
-                          )
-                        : DurationSetRow(
-                            set: set,
-                            isCurrent: set.id == currentSetId,
-                            onToggleComplete: () => set.completedAt == null
-                                ? controller.completeSet(set.id)
-                                : controller.uncompleteSet(set.id),
-                            onDurationChanged: (v) =>
-                                controller.updateSetValues(
-                              set.id,
-                              durationSeconds: v,
-                              clearDuration: v == null,
-                            ),
-                            onLongPress: set.completedAt == null
-                                ? () => _handleLongPress(
-                                    context, controller, set.id)
-                                : null,
-                          ),
+                    child: Builder(builder: (context) {
+                      final set = entry.sets[i];
+                      return exercise.loggingType ==
+                              LoggingType.strengthWeightRepsRir
+                          ? StrengthSetRow(
+                              set: set,
+                              isCurrent: set.id == currentSetId,
+                              weightUnit: weightUnit,
+                              onToggleComplete: () => set.completedAt == null
+                                  ? controller.completeSet(set.id)
+                                  : controller.uncompleteSet(set.id),
+                              onWeightChanged: (v) =>
+                                  controller.updateSetValues(
+                                set.id,
+                                weight: v,
+                                clearWeight: v == null,
+                              ),
+                              onRepsChanged: (v) => controller.updateSetValues(
+                                set.id,
+                                reps: v,
+                                clearReps: v == null,
+                              ),
+                              onRirChanged: (v) => controller.updateSetValues(
+                                set.id,
+                                rir: v,
+                                clearRir: v == null,
+                              ),
+                              onLongPress: set.completedAt == null
+                                  ? () => _handleLongPress(
+                                      context, controller, set.id)
+                                  : null,
+                            )
+                          : DurationSetRow(
+                              set: set,
+                              isCurrent: set.id == currentSetId,
+                              onToggleComplete: () => set.completedAt == null
+                                  ? controller.completeSet(set.id)
+                                  : controller.uncompleteSet(set.id),
+                              onDurationChanged: (v) =>
+                                  controller.updateSetValues(
+                                set.id,
+                                durationSeconds: v,
+                                clearDuration: v == null,
+                              ),
+                              onLongPress: set.completedAt == null
+                                  ? () => _handleLongPress(
+                                      context, controller, set.id)
+                                  : null,
+                            );
+                    }),
                   ),
+                ],
                 Row(
                   children: [
                     TextButton.icon(

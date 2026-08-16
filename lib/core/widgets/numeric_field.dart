@@ -12,6 +12,8 @@ class NumericField extends StatefulWidget {
     this.max,
     this.suffix,
     this.autofocus = false,
+    this.dense = false,
+    this.style,
   });
 
   final String label;
@@ -22,6 +24,15 @@ class NumericField extends StatefulWidget {
   final num? max;
   final String? suffix;
   final bool autofocus;
+
+  /// Set-row mode (design system: "no box chrome"): no floating label, no
+  /// border, zero content padding. The column header supplies the label
+  /// once per exercise instead of once per row.
+  final bool dense;
+
+  /// Overrides the default 18/tabular style — set rows pass the condensed
+  /// numeral style.
+  final TextStyle? style;
 
   @override
   State<NumericField> createState() => _NumericFieldState();
@@ -74,20 +85,29 @@ class _NumericFieldState extends State<NumericField> {
       controller: _controller,
       autofocus: widget.autofocus,
       textAlign: TextAlign.center,
-      style: const TextStyle(
-        fontSize: 18,
-        fontFeatures: [FontFeature.tabularFigures()],
-      ),
+      style: widget.style ??
+          const TextStyle(
+            fontSize: 18,
+            fontFeatures: [FontFeature.tabularFigures()],
+          ),
       keyboardType: TextInputType.numberWithOptions(decimal: widget.allowDecimal),
       inputFormatters: [
         FilteringTextInputFormatter.allow(
           widget.allowDecimal ? RegExp(r'[0-9.]') : RegExp(r'[0-9]'),
         ),
       ],
-      decoration: InputDecoration(
-        labelText: widget.label,
-        suffixText: widget.suffix,
-      ),
+      decoration: widget.dense
+          ? const InputDecoration(
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+            )
+          : InputDecoration(
+              labelText: widget.label,
+              suffixText: widget.suffix,
+            ),
       onChanged: _emit,
     );
   }

@@ -196,14 +196,17 @@ void main() {
     await tester.pumpWidget(harness());
     await pumpUntilSessionData(tester);
 
-    expect(find.byIcon(Icons.check_circle_outline), findsNWidgets(2));
-    expect(find.byIcon(Icons.check_circle), findsNothing);
+    // The done control is a bare InkWell ring/disc, not a Material checkbox
+    // (design system) — pending vs. complete is distinguished by its
+    // tooltip, same text the old IconButton carried.
+    expect(find.byTooltip('Complete set'), findsNWidgets(2));
+    expect(find.byTooltip('Mark incomplete'), findsNothing);
 
-    await tester.tap(find.byIcon(Icons.check_circle_outline).first);
+    await tester.tap(find.byTooltip('Complete set').first);
     await pumpUntilSessionData(tester);
 
-    expect(find.byIcon(Icons.check_circle), findsOneWidget);
-    expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
+    expect(find.byTooltip('Mark incomplete'), findsOneWidget);
+    expect(find.byTooltip('Complete set'), findsOneWidget);
 
     final rows = await (db.select(db.sessionSets)
           ..orderBy([(t) => OrderingTerm(expression: t.setIndex)]))
@@ -257,7 +260,7 @@ void main() {
     await pumpUntilSessionData(tester);
 
     // Nothing typed into weight/reps/RIR — complete must still be enabled.
-    await tester.tap(find.byIcon(Icons.check_circle_outline));
+    await tester.tap(find.byTooltip('Complete set'));
     await pumpUntilSessionData(tester);
 
     final row = await (db.select(db.sessionSets)).getSingle();
@@ -286,7 +289,7 @@ void main() {
     await tester.pumpWidget(harness());
     await pumpUntilSessionData(tester);
 
-    await tester.tap(find.byIcon(Icons.check_circle_outline).first);
+    await tester.tap(find.byTooltip('Complete set').first);
     await pumpUntilSessionData(tester);
 
     final weightField = find.widgetWithText(TextField, '').first;
@@ -300,6 +303,50 @@ void main() {
           ..orderBy([(t) => OrderingTerm(expression: t.setIndex)]))
         .get();
     expect(rows.first.weight, 80);
+
+    await disposeAndDrainTimers(tester, container: container);
+  });
+
+  testWidgets(
+      'the set row layout does not overflow at a 320dp-wide surface',
+      (tester) async {
+    // Regression test for the RenderFlex overflow this reskin also fixes:
+    // `DropdownButtonFormField<double?>` in the RIR column laid out with
+    // `BoxConstraints(w=7.4)` on a narrow phone. A `RenderFlex` overflow
+    // raises a `FlutterError` during layout, which `tester.takeException()`
+    // surfaces — it does NOT throw synchronously from `pumpWidget`, so the
+    // only reliable check is asserting the exception queue is empty after
+    // pumping.
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    tester.view.physicalSize = const Size(320, 800);
+    tester.view.devicePixelRatio = 1.0;
+
+    final templates = TemplateRepository(db);
+    final exercises = ExerciseRepository(db);
+    final sessions = SessionRepository(db);
+    final t = await templates.createTemplate(name: 'Legs A');
+    final squat = await exercises.create(
+        name: 'Back Squat', loggingType: LoggingType.strengthWeightRepsRir);
+    await templates.addExercise(
+        templateId: t.id, exerciseId: squat.id, targetSets: 3);
+    await sessions.startFromTemplate(t.id, weightUnit: 'kg');
+
+    await tester.pumpWidget(harness());
+    await pumpUntilSessionData(tester);
+
+    // Give the RIR control (and weight/reps) real values, matching a
+    // mid-workout row rather than an all-empty one, so any column that
+    // would overflow with real digits in it is actually exercised.
+    final weightField = find.widgetWithText(TextField, '').first;
+    await tester.enterText(weightField, '102.5');
+    await pumpUntilSessionData(tester);
+
+    expect(find.byType(StrengthSetRow), findsNWidgets(3));
+    final ex = tester.takeException();
+    expect(ex, isNull);
 
     await disposeAndDrainTimers(tester, container: container);
   });

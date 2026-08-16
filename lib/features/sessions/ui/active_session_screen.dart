@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatting.dart';
 import '../../../db/app_database.dart';
 import '../providers/active_session_controller.dart';
@@ -107,8 +108,8 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> {
             ),
             Text(
               mmss(session.elapsed(DateTime.now())),
-              style: const TextStyle(
-                fontFeatures: [FontFeature.tabularFigures()],
+              style: AppTheme.elapsedTime.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ],

@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/semantic_colors.dart';
 import '../../data/session_models.dart';
 
 /// Pinned strip under the app bar: sets and exercises completed, plus a
-/// progress bar on the set ratio.
+/// hairline progress rule on the set ratio. No `LinearProgressIndicator`
+/// track — the untravelled portion is `line`, the travelled portion is
+/// `chalk` (this header tracks overall completion, not a running rest
+/// timer, so it stays quiet rather than using the one saturated `rest`
+/// colour).
 class SessionProgressHeader extends StatelessWidget {
   const SessionProgressHeader({super.key, required this.session});
 
@@ -12,8 +18,10 @@ class SessionProgressHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final semantic = theme.extension<SemanticColors>()!;
     final totalSets = session.totalSets;
     final ratio = totalSets == 0 ? 0.0 : session.completedSets / totalSets;
+    final labelStyle = AppTheme.body.copyWith(color: theme.colorScheme.onSurface);
 
     return Container(
       color: theme.colorScheme.surface,
@@ -24,20 +32,38 @@ class SessionProgressHeader extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '${session.completedSets} / $totalSets sets',
-                style: theme.textTheme.bodyMedium,
+              Flexible(
+                child: Text(
+                  '${session.completedSets} / $totalSets sets',
+                  style: labelStyle,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              Text(
-                '${session.completedExercises} / ${session.totalExercises} exercises',
-                style: theme.textTheme.bodyMedium,
+              Flexible(
+                child: Text(
+                  '${session.completedExercises} / ${session.totalExercises} exercises',
+                  style: labelStyle,
+                  textAlign: TextAlign.end,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(value: ratio, minHeight: 6),
+          const SizedBox(height: 8),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              return Stack(
+                children: [
+                  Container(height: 1, width: width, color: semantic.line),
+                  Container(
+                    height: 1,
+                    width: width * ratio.clamp(0.0, 1.0),
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
