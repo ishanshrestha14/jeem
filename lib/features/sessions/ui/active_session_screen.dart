@@ -266,6 +266,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> {
     final session = state.session;
     final weightUnit = session.session.weightUnit;
     final currentSetId = state.currentTarget?.setId;
+    final controller = ref.read(activeSessionControllerProvider.notifier);
 
     if (!_expandedHydrated) {
       _expandedHydrated = true;
@@ -364,19 +365,26 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> {
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
             sliver: SliverList.list(
               children: [
-                for (final entry in pending)
+                for (var i = 0; i < pending.length; i++)
                   SessionExerciseCard(
-                    key: ValueKey(entry.exercise.id),
-                    cardKey: _keyFor(entry.exercise.id),
-                    entry: entry,
-                    expanded: _expandedIds.contains(entry.exercise.id) ||
-                        entry.exercise.id == currentExerciseId,
+                    key: ValueKey(pending[i].exercise.id),
+                    cardKey: _keyFor(pending[i].exercise.id),
+                    entry: pending[i],
+                    expanded: _expandedIds.contains(pending[i].exercise.id) ||
+                        pending[i].exercise.id == currentExerciseId,
                     weightUnit: weightUnit,
                     currentSetId: currentSetId,
-                    canDoLater: entry.exercise.id != pending.last.exercise.id,
+                    // Only the current (pending index 0) exercise gets "Do
+                    // later" — everything else already sits behind it.
+                    onDoLater: (i == 0 && pending.length > 1)
+                        ? () => _handleDoLater(context, state)
+                        : null,
+                    // Every other pending exercise can jump straight to the
+                    // front with "Do next".
+                    onDoNext: i > 0 ? () => controller.reorder(i, 0) : null,
                     onToggleExpand: () => setState(() {
-                      if (!_expandedIds.remove(entry.exercise.id)) {
-                        _expandedIds.add(entry.exercise.id);
+                      if (!_expandedIds.remove(pending[i].exercise.id)) {
+                        _expandedIds.add(pending[i].exercise.id);
                       }
                     }),
                   ),
@@ -401,7 +409,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> {
       case _SessionMenuAction.settings:
         await showSessionSettingsSheet(context, ref);
       case _SessionMenuAction.reorder:
-        await _showReorderSheet(context, state.session);
+        await context.push('/session/reorder');
       case _SessionMenuAction.pauseResume:
         if (state.session.session.status == SessionStatus.paused) {
           await controller.resumeSession();
@@ -451,29 +459,32 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> {
     }
   }
 
-  Future<void> _showReorderSheet(
+  /// "Do later" on the current exercise: send it behind every other pending
+  /// exercise, then offer an inline undo. Because "Do later" is only ever
+  /// wired to the pending-index-0 card, undoing it is always "send whatever
+  /// is now last back to the front" — no need to track the exercise id
+  /// through the round trip.
+  Future<void> _handleDoLater(
     BuildContext context,
-    ActiveSession session,
-  ) {
+    ActiveSessionState state,
+  ) async {
     final controller = ref.read(activeSessionControllerProvider.notifier);
-    final pending = pendingExercises(session);
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: SizedBox(
-          height: MediaQuery.of(ctx).size.height * 0.6,
-          child: ReorderableListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: pending.length,
-            onReorder: (oldIndex, newIndex) =>
-                controller.reorder(oldIndex, newIndex),
-            itemBuilder: (_, i) => ListTile(
-              key: ValueKey(pending[i].exercise.id),
-              title: Text(pending[i].exercise.name),
-            ),
-          ),
+    final pending = pendingExercises(state.session);
+    if (pending.isEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+
+    await controller.doLater(pending.first.exercise.id);
+
+    final after = ref.read(activeSessionControllerProvider).valueOrNull?.session;
+    final newPendingCount = after == null ? 0 : pendingExercises(after).length;
+    if (newPendingCount == 0) return;
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text('Moved to the end'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => controller.reorder(newPendingCount - 1, 0),
         ),
       ),
     );

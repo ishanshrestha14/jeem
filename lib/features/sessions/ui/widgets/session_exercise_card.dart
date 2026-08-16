@@ -78,7 +78,8 @@ class SessionExerciseCard extends ConsumerWidget {
     required this.weightUnit,
     required this.currentSetId,
     required this.onToggleExpand,
-    this.canDoLater = false,
+    this.onDoLater,
+    this.onDoNext,
   });
 
   final GlobalKey? cardKey;
@@ -87,7 +88,16 @@ class SessionExerciseCard extends ConsumerWidget {
   final String weightUnit;
   final String? currentSetId;
   final VoidCallback onToggleExpand;
-  final bool canDoLater;
+
+  /// Non-null (and rendered as a "Do later" button) only on the current
+  /// exercise card — sends it behind every other pending exercise in one
+  /// tap (PRD §11.3).
+  final VoidCallback? onDoLater;
+
+  /// Non-null (and rendered as a "Do next" button) on upcoming, non-current
+  /// pending cards — jumps that exercise straight to the front of the
+  /// pending queue.
+  final VoidCallback? onDoNext;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -214,11 +224,17 @@ class SessionExerciseCard extends ConsumerWidget {
                       icon: const Icon(Icons.add),
                       label: const Text('Add set'),
                     ),
-                    if (!entry.isComplete && canDoLater)
+                    if (!entry.isComplete && onDoLater != null)
                       TextButton.icon(
-                        onPressed: () => controller.doLater(exercise.id),
+                        onPressed: onDoLater,
                         icon: const Icon(Icons.schedule),
                         label: const Text('Do later'),
+                      ),
+                    if (!entry.isComplete && onDoNext != null)
+                      TextButton.icon(
+                        onPressed: onDoNext,
+                        icon: const Icon(Icons.fast_forward),
+                        label: const Text('Do next'),
                       ),
                   ],
                 ),

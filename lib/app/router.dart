@@ -5,6 +5,7 @@ import '../features/exercises/ui/exercise_editor_screen.dart';
 import '../features/exercises/ui/exercise_list_screen.dart';
 import '../features/history/ui/history_screen.dart';
 import '../features/sessions/ui/active_session_screen.dart';
+import '../features/sessions/ui/session_reorder_screen.dart';
 import '../features/settings/ui/settings_screen.dart';
 import '../features/templates/ui/template_editor_screen.dart';
 import '../features/templates/ui/workout_screen.dart';
@@ -28,7 +29,9 @@ import 'app_shell.dart';
 /// material for building workouts rather than a peer destination. `/session`
 /// in particular must never show the bottom nav (its `bottomNavigationBar`
 /// slot is already the rest timer bar, and mid-workout the user needs the
-/// fewest possible ways to accidentally tap away).
+/// fewest possible ways to accidentally tap away). `/session/reorder` is
+/// pushed from `/session` for the "machine is occupied" drag-reorder flow
+/// and inherits the same no-bottom-nav rule.
 GoRouter createAppRouter() => GoRouter(
       initialLocation: '/',
       routes: [
@@ -91,6 +94,10 @@ GoRouter createAppRouter() => GoRouter(
         GoRoute(
           path: '/session',
           builder: (_, _) => const ActiveSessionScreen(),
+        ),
+        GoRoute(
+          path: '/session/reorder',
+          builder: (_, _) => const SessionReorderScreen(),
         ),
       ],
     );
