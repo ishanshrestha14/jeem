@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/services/keep_screen_on_setting.dart';
+import '../../../core/services/wakelock_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatting.dart';
 import '../../../db/app_database.dart';
@@ -27,7 +29,8 @@ class ActiveSessionScreen extends ConsumerStatefulWidget {
       _ActiveSessionScreenState();
 }
 
-class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> {
+class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen>
+    with WidgetsBindingObserver {
   // One GlobalKey per exercise so a later task can
   // `Scrollable.ensureVisible` the focused target.
   final Map<String, GlobalKey> _cardKeys = {};
@@ -57,21 +60,85 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen> {
   String? _pendingPreviousExerciseId;
   String? _pendingTargetExerciseId;
 
+  // Cached in `initState` for the same reason `session_settings_sheet.dart`
+  // caches its controller reference: `ConsumerStatefulElement.unmount` marks
+  // the element defunct before `State.dispose()` runs, so `ref.read(...)`
+  // inside `dispose()` throws. A plain Dart reference sidesteps that.
+  late final WakelockService _wakelock;
+
   @override
   void initState() {
     super.initState();
-    // Repaints the elapsed-time chip in the app bar once a second. Purely a
-    // repaint signal — elapsed time is always recomputed from
-    // `session.elapsed(now)`, never stored in state.
+    WidgetsBinding.instance.addObserver(this);
+    _wakelock = ref.read(wakelockServiceProvider);
+    // `ref.listen` (used elsewhere in this file, inside `build`) has no
+    // `fireImmediately` in this riverpod version — it only reacts to
+    // changes made *after* the listener is registered, so it would miss a
+    // `keepScreenOnSettingProvider` value that resolved before this screen
+    // ever mounted (a very live possibility: it's a device-wide setting,
+    // not scoped to this session). `ref.listenManual`, meant for exactly
+    // this — registering a listener from `initState` — does support it, and
+    // auto-closes when this State is disposed.
+    ref.listenManual<AsyncValue<bool>>(keepScreenOnSettingProvider, (
+      previous,
+      next,
+    ) {
+      final value = next.valueOrNull;
+      if (value == null) return;
+      if (value) {
+        _wakelock.enable();
+      } else {
+        _wakelock.disable();
+      }
+    }, fireImmediately: true);
+    // Repaints the elapsed-time chip in the app bar once a second (elapsed
+    // time is always recomputed from `session.elapsed(now)`, never stored in
+    // state) and re-runs `RestTimer.settle` against the wall clock — the
+    // ticker that turns "rest deadline quietly passed while this screen sat
+    // idle" into a finished state without waiting for the next user action.
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      setState(() {});
+      ref.read(activeSessionControllerProvider.notifier).settle();
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_handleResume());
+    }
+  }
+
+  /// Recomputes rest from the wall clock on resume rather than trusting
+  /// ticks that never fired while backgrounded (PRD §10.4, §18.3).
+  ///
+  /// Per Ruling 35, `ActiveSessionController.build()` is a deliberate
+  /// one-shot fetch with no live DB subscription, so it will not have
+  /// noticed anything that happened to the session/rest row while this
+  /// screen was backgrounded (including the process having been killed and
+  /// restarted). `ref.invalidate` is what forces a fresh `build()` — but the
+  /// invalidate must be awaited via `.future` *before* calling `settle()`:
+  /// calling `settle()` immediately after `invalidate()` targets whatever
+  /// notifier instance existed a moment ago, which Riverpod has already
+  /// discarded — a no-op, since the freshly-rebuilt notifier only becomes
+  /// current once its `build()` future resolves. (In practice `build()`
+  /// already runs the rest through `RestTimer.settle` itself, so this
+  /// `settle()` call is a belt-and-braces no-op in the common case; it's the
+  /// ordering that matters, not double-settling.)
+  Future<void> _handleResume() async {
+    ref.invalidate(activeSessionControllerProvider);
+    await ref.read(activeSessionControllerProvider.future);
+    if (!mounted) return;
+    await ref.read(activeSessionControllerProvider.notifier).settle();
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
     _clearCatchUpListener();
+    WidgetsBinding.instance.removeObserver(this);
+    _wakelock.disable();
     super.dispose();
   }
 

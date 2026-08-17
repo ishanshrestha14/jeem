@@ -73,6 +73,36 @@ class ActiveSessionState {
 class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionState?> {
   SessionRepository get _repo => ref.read(sessionRepositoryProvider);
 
+  /// Set by a [Ref.onDispose] hook registered in [build]. Guards every
+  /// `state =` write below against a pre-existing race: a mutator (e.g.
+  /// [completeSet]) awaits `_reload`'s `SessionRepository.watchSession(id)
+  /// .first` mid-write, and the user can back out of the session screen
+  /// fast enough that this `AutoDisposeAsyncNotifier` is torn down (last
+  /// listener dropped, `autoDispose` fires) *before* that await resolves.
+  ///
+  /// Today, on riverpod 2.6.1, writing `state = ...` on an already-disposed
+  /// notifier is harmless — `AsyncNotifierBase`'s `state` setter
+  /// (`async_notifier/base.dart`) has a literal `// TODO assert Notifier
+  /// isn't disposed` and currently does nothing else defensive, so the
+  /// write is simply inert: no listener observes it, and the next time this
+  /// provider is read it gets a brand-new notifier whose `build()` re-reads
+  /// the DB from scratch anyway. So nothing was ever silently corrupted by
+  /// this race. But relying on an upstream TODO staying un-implemented
+  /// forever is fragile — a future riverpod upgrade could turn that comment
+  /// into a thrown assertion. This flag makes the guard explicit and
+  /// independent of that implementation detail.
+  ///
+  /// Deliberately does NOT skip the underlying DB write (`_repo.updateSet`,
+  /// `_repo.saveRestState`, etc.) — those don't depend on this notifier's
+  /// liveness, and letting an in-flight mutation actually persist is
+  /// correct even if nothing is left mounted to display the result.
+  bool _disposed = false;
+
+  void _setState(AsyncValue<ActiveSessionState?> value) {
+    if (_disposed) return;
+    state = value;
+  }
+
   /// Awaits the controller's own [future] before reading state, so a
   /// mutation called immediately after `container.read(provider.notifier)`
   /// (before anyone has awaited the initial build) doesn't race the still-
@@ -107,6 +137,19 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
   /// controller rebuild" test, and appropriate for e.g. app resume).
   @override
   Future<ActiveSessionState?> build() async {
+    // `ref.onDispose` fires before every rebuild of this element — not only
+    // at final teardown. With an active listener (e.g. the screen still
+    // mounted, or a test's `container.listen`), `ref.invalidate` reruns
+    // `build()` on this SAME notifier instance rather than replacing it, so
+    // the dispose hook from the *previous* build fires and then `build()`
+    // runs again immediately after — confirmed by logging `hashCode`
+    // through both. Resetting the flag here (rather than only in the field
+    // initializer) is what keeps `_disposed` meaning "this notifier is
+    // truly gone" instead of "a rebuild happened once" — the "TODO assert
+    // Notifier isn't disposed" this guards against is specifically the
+    // notifier's actual final teardown, not a mid-lifetime rebuild.
+    _disposed = false;
+    ref.onDispose(() => _disposed = true);
     final repo = ref.watch(sessionRepositoryProvider);
     final active = await repo.watchActiveSession().first;
     if (active == null) return null;
@@ -149,21 +192,21 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
   }) {
     final prev = state.valueOrNull;
     if (prev == null) {
-      state = AsyncData(ActiveSessionState(
+      _setState(AsyncData(ActiveSessionState(
         session: session,
         rest: rest,
         focusedSetId: clearFocusedSetId ? null : focusedSetId,
         restJustFinished: restJustFinished ?? false,
-      ));
+      )));
       return;
     }
-    state = AsyncData(prev.copyWith(
+    _setState(AsyncData(prev.copyWith(
       session: session,
       rest: rest,
       focusedSetId: focusedSetId,
       clearFocusedSetId: clearFocusedSetId,
       restJustFinished: restJustFinished,
-    ));
+    )));
   }
 
   // ---------------------------------------------------------------------
@@ -641,13 +684,13 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
   Future<void> finish({String? notes}) async {
     final current = await _ready();
     await _repo.finishSession(current.session.session.id, notes: notes);
-    state = const AsyncData(null);
+    _setState(const AsyncData(null));
   }
 
   Future<void> cancelSession() async {
     final current = await _ready();
     await _repo.cancelSession(current.session.session.id);
-    state = const AsyncData(null);
+    _setState(const AsyncData(null));
   }
 }
 

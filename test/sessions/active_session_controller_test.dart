@@ -252,6 +252,7 @@ void main() {
     final controller = container.read(activeSessionControllerProvider.notifier);
 
     await controller.pauseSession();
+    // ignore: avoid_print
     await Future<void>.delayed(const Duration(milliseconds: 700));
     // An unrelated write to the session row while paused (any call that
     // goes through `saveRestState`, e.g. `cancelRest`) restamps
@@ -265,12 +266,15 @@ void main() {
     container.invalidate(activeSessionControllerProvider);
     await state();
     final controller2 = container.read(activeSessionControllerProvider.notifier);
+    // ignore: avoid_print
     await Future<void>.delayed(const Duration(milliseconds: 700));
+    // ignore: avoid_print
 
     await controller2.resumeSession();
     final s = await state();
     // ~1.4s really elapsed since pauseSession; the `updatedAt`-based bug
     // would only see the ~0.7s since the mid-pause write and round to 0.
+    // ignore: avoid_print
     expect(s.session.session.pausedSeconds, greaterThanOrEqualTo(1));
     expect(s.session.session.pausedAt, isNull);
   });

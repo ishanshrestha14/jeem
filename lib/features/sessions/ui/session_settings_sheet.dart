@@ -3,26 +3,25 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/services/keep_screen_on_setting.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/semantic_colors.dart';
 import '../providers/active_session_controller.dart';
 
 /// Session settings sheet, opened from the active session screen's overflow
-/// menu. Two switches bound to the session row (auto-focus next set / next
-/// exercise), a debounced multiline notes field, and a read-only weight-unit
-/// row (PRD §9.6). Every switch persists immediately through
+/// menu. Three switches (auto-focus next set / next exercise, both bound to
+/// the session row; keep screen on, a device-wide preference), a debounced
+/// multiline notes field, and a read-only weight-unit row (PRD §9.6). The
+/// auto-focus switches persist immediately through
 /// [ActiveSessionController]; this widget never touches `SessionRepository`
-/// directly.
+/// directly. "Keep screen on" persists through [keepScreenOnSettingProvider]
+/// (`shared_preferences`-backed — see that file for why this is device-wide
+/// rather than a session column) and is read by
+/// `ActiveSessionScreen`/`WakelockService`, not by this sheet.
 ///
 /// Sound-on-rest-complete and haptics toggles are intentionally omitted —
 /// they're inert until Task 18 wires the actual side effects, and the design
 /// brief is explicit that a switch here must not fake persistence.
-///
-/// "Keep screen on" (also listed in the Task 15 brief) is intentionally
-/// omitted for the same reason: there is no `keepScreenOn` column on the
-/// session row to bind it to, and Task 17 owns `WakelockService` — a switch
-/// with nothing behind it would be worse than no switch. Task 17 adds both
-/// the column and this row when it lands.
 Future<void> showSessionSettingsSheet(BuildContext context, WidgetRef ref) {
   return showModalBottomSheet<void>(
     context: context,
@@ -103,6 +102,7 @@ class _SessionSettingsSheetContentState
 
     final colors = Theme.of(context).extension<SemanticColors>()!;
     final controller = _controller;
+    final keepScreenOn = ref.watch(keepScreenOnSettingProvider).valueOrNull ?? false;
 
     return SafeArea(
       child: Padding(
@@ -130,6 +130,15 @@ class _SessionSettingsSheetContentState
               value: session.autoFocusNextExercise,
               activeColor: colors.rest,
               onChanged: controller.setAutoFocusNextExercise,
+            ),
+            Divider(height: 1, color: colors.line),
+            _SettingsSwitch(
+              switchKey: const Key('keepScreenOnSwitch'),
+              label: 'Keep screen on',
+              value: keepScreenOn,
+              activeColor: colors.rest,
+              onChanged: (v) =>
+                  ref.read(keepScreenOnSettingProvider.notifier).setEnabled(v),
             ),
             Divider(height: 1, color: colors.line),
             const SizedBox(height: 20),
