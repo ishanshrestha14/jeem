@@ -11,7 +11,9 @@ import 'package:gymflow/features/sessions/providers/active_session_controller.da
 import 'package:gymflow/features/sessions/ui/active_session_screen.dart';
 import 'package:gymflow/features/sessions/ui/session_reorder_screen.dart';
 import 'package:gymflow/features/templates/data/template_repository.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../db/test_database.dart';
+import '../session_feedback_fakes.dart';
 import 'pump_helpers.dart';
 
 /// Copied verbatim from `active_session_test.dart` (see that file's long
@@ -76,7 +78,10 @@ void main() {
   late AppDatabase db;
   late ProviderContainer container;
 
-  setUp(() => db = testDatabase());
+  setUp(() {
+    db = testDatabase();
+    SharedPreferences.setMockInitialValues({});
+  });
   tearDown(() async {
     container.dispose();
     await db.close();
@@ -84,7 +89,10 @@ void main() {
 
   void buildContainer() {
     container = ProviderContainer(
-      overrides: [databaseProvider.overrideWithValue(db)],
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        ...sessionFeedbackOverrides(),
+      ],
     );
     // Keeps the autoDispose controller alive across the gap between seeding
     // and the eventual `pumpWidget` — mirrors

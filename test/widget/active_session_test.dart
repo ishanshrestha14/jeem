@@ -14,7 +14,9 @@ import 'package:gymflow/features/sessions/ui/widgets/duration_set_row.dart';
 import 'package:gymflow/features/sessions/ui/widgets/rest_bar.dart';
 import 'package:gymflow/features/sessions/ui/widgets/strength_set_row.dart';
 import 'package:gymflow/features/templates/data/template_repository.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../db/test_database.dart';
+import '../session_feedback_fakes.dart';
 import 'pump_helpers.dart';
 
 /// Both `ActiveSessionController.build()` and every one of its mutators
@@ -109,7 +111,10 @@ void main() {
   late ProviderContainer container;
 
   setUpAll(_loadRealFonts);
-  setUp(() => db = testDatabase());
+  setUp(() {
+    db = testDatabase();
+    SharedPreferences.setMockInitialValues({});
+  });
   tearDown(() async {
     container.dispose();
     await db.close();
@@ -117,7 +122,10 @@ void main() {
 
   Widget harness() {
     container = ProviderContainer(
-      overrides: [databaseProvider.overrideWithValue(db)],
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        ...sessionFeedbackOverrides(),
+      ],
     );
     return UncontrolledProviderScope(
       container: container,

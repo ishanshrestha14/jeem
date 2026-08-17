@@ -9,19 +9,20 @@ import '../../../core/theme/semantic_colors.dart';
 import '../providers/active_session_controller.dart';
 
 /// Session settings sheet, opened from the active session screen's overflow
-/// menu. Three switches (auto-focus next set / next exercise, both bound to
-/// the session row; keep screen on, a device-wide preference), a debounced
-/// multiline notes field, and a read-only weight-unit row (PRD §9.6). The
-/// auto-focus switches persist immediately through
-/// [ActiveSessionController]; this widget never touches `SessionRepository`
-/// directly. "Keep screen on" persists through [keepScreenOnSettingProvider]
-/// (`shared_preferences`-backed — see that file for why this is device-wide
-/// rather than a session column) and is read by
-/// `ActiveSessionScreen`/`WakelockService`, not by this sheet.
-///
-/// Sound-on-rest-complete and haptics toggles are intentionally omitted —
-/// they're inert until Task 18 wires the actual side effects, and the design
-/// brief is explicit that a switch here must not fake persistence.
+/// menu. Five switches (auto-focus next set / next exercise, both bound to
+/// the session row; keep screen on, sound on rest complete, and haptics —
+/// all device-wide preferences), a debounced multiline notes field, and a
+/// read-only weight-unit row (PRD §9.6). The auto-focus switches persist
+/// immediately through [ActiveSessionController]; this widget never touches
+/// `SessionRepository` directly. "Keep screen on" persists through
+/// [keepScreenOnSettingProvider] (`shared_preferences`-backed — see that
+/// file for why this is device-wide rather than a session column) and is
+/// read by `ActiveSessionScreen`/`WakelockService`, not by this sheet.
+/// "Sound on rest complete" and "Haptics" follow the identical
+/// `shared_preferences` pattern via [soundEnabledSettingProvider] and
+/// [hapticsEnabledSettingProvider] (`session_feedback_settings.dart`) and
+/// are read by [ActiveSessionController]'s rest-finish/set-complete side
+/// effects (Task 18).
 Future<void> showSessionSettingsSheet(BuildContext context, WidgetRef ref) {
   return showModalBottomSheet<void>(
     context: context,
@@ -103,6 +104,8 @@ class _SessionSettingsSheetContentState
     final colors = Theme.of(context).extension<SemanticColors>()!;
     final controller = _controller;
     final keepScreenOn = ref.watch(keepScreenOnSettingProvider).valueOrNull ?? false;
+    final soundEnabled = ref.watch(soundEnabledSettingProvider).valueOrNull ?? true;
+    final hapticsEnabled = ref.watch(hapticsEnabledSettingProvider).valueOrNull ?? true;
 
     return SafeArea(
       child: Padding(
@@ -139,6 +142,25 @@ class _SessionSettingsSheetContentState
               activeColor: colors.rest,
               onChanged: (v) =>
                   ref.read(keepScreenOnSettingProvider.notifier).setEnabled(v),
+            ),
+            Divider(height: 1, color: colors.line),
+            _SettingsSwitch(
+              switchKey: const Key('soundOnRestCompleteSwitch'),
+              label: 'Sound on rest complete',
+              value: soundEnabled,
+              activeColor: colors.rest,
+              onChanged: (v) =>
+                  ref.read(soundEnabledSettingProvider.notifier).setEnabled(v),
+            ),
+            Divider(height: 1, color: colors.line),
+            _SettingsSwitch(
+              switchKey: const Key('hapticsSwitch'),
+              label: 'Haptics',
+              value: hapticsEnabled,
+              activeColor: colors.rest,
+              onChanged: (v) => ref
+                  .read(hapticsEnabledSettingProvider.notifier)
+                  .setEnabled(v),
             ),
             Divider(height: 1, color: colors.line),
             const SizedBox(height: 20),

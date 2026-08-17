@@ -3,12 +3,20 @@ import 'dart:async';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/services/haptics_service.dart';
+import '../../../core/services/notification_service.dart';
+import '../../../core/services/session_feedback_settings.dart';
+import '../../../core/services/sound_service.dart';
 import '../../../db/app_database.dart';
 import '../data/session_models.dart';
 import '../data/session_repository.dart';
 import '../domain/rest_timer.dart';
 import '../domain/session_engine.dart';
 
+export '../../../core/services/haptics_service.dart';
+export '../../../core/services/notification_service.dart';
+export '../../../core/services/session_feedback_settings.dart';
+export '../../../core/services/sound_service.dart';
 export '../data/session_models.dart';
 export '../data/session_repository.dart';
 export '../domain/rest_timer.dart';
@@ -228,6 +236,15 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
 
     await repo.updateSet(set.copyWith(completedAt: Value(now)));
 
+    // Awaits the setting's own resolved value rather than
+    // `.valueOrNull ?? true` — the `AsyncNotifier` backing it may still be
+    // mid-`build()` (its first read of `shared_preferences`) this early in
+    // a session, and a synchronous read in that window would silently fall
+    // back to "on" regardless of what's actually persisted.
+    if (await ref.read(hapticsEnabledSettingProvider.future)) {
+      await ref.read(hapticsServiceProvider).setCompleted();
+    }
+
     final reloaded = await _reload(current.session.session.id);
     final restSeconds = restSecondsAfter(reloaded, setId);
     final next = nextTargetAfter(reloaded, setId);
@@ -252,6 +269,25 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     }
 
     await repo.saveRestState(reloaded.session.id, rest);
+
+    // Schedule when rest STARTS, for the moment it's due — not fired from a
+    // timer when rest ends (a scheduled OS notification survives the
+    // process being killed; a Dart timer does not). `scheduleRestComplete`
+    // cancels any previously-pending one first, which is what makes
+    // completing a set while already resting correctly replace the old
+    // notification with one for the new rest. No new rest (end of session,
+    // or a zero-second exercise) means any stale pending notification from
+    // the just-finished exercise must be explicitly cancelled instead.
+    final notifications = ref.read(notificationServiceProvider);
+    if (rest.status == RestTimerStatus.running && rest.endsAt != null) {
+      await notifications.scheduleRestComplete(
+        at: rest.endsAt!,
+        nextLabel: next?.label ?? 'Session complete',
+      );
+    } else {
+      await notifications.cancelRestComplete();
+    }
+
     // A fresh rest (or a fresh idle state) supersedes any stale "just
     // finished" flag from a previous rest — otherwise it could coexist with
     // a newly running timer and misfire Task 14's "rest complete" banner.
@@ -494,13 +530,27 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     final current = await _ready();
     final rest = RestTimer.pause(current.rest, DateTime.now());
     await _repo.saveRestState(current.session.session.id, rest);
+    await ref.read(notificationServiceProvider).cancelRestComplete();
     _emit(current.session, rest);
   }
 
+  /// Resuming hands the timer a fresh `endsAt`, so — like [completeSet]
+  /// starting a fresh rest — the pending notification is rescheduled to
+  /// match rather than left pointing at the (cancelled, on pause) original
+  /// deadline.
   Future<void> resumeRest() async {
     final current = await _ready();
     final rest = RestTimer.resume(current.rest, DateTime.now());
     await _repo.saveRestState(current.session.session.id, rest);
+    final notifications = ref.read(notificationServiceProvider);
+    if (rest.status == RestTimerStatus.running && rest.endsAt != null) {
+      await notifications.scheduleRestComplete(
+        at: rest.endsAt!,
+        nextLabel: rest.nextTarget?.label ?? 'Session complete',
+      );
+    } else {
+      await notifications.cancelRestComplete();
+    }
     _emit(current.session, rest);
   }
 
@@ -515,6 +565,7 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     final current = await _ready();
     final cancelled = RestTimer.cancel();
     await _repo.saveRestState(current.session.session.id, cancelled);
+    await ref.read(notificationServiceProvider).cancelRestComplete();
     _emit(current.session, cancelled);
   }
 
@@ -574,7 +625,7 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
       return;
     }
 
-    _onRestFinished();
+    await _onRestFinished();
 
     final effectiveSession = session ?? current.session;
 
@@ -628,9 +679,35 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     );
   }
 
-  /// Haptics / sound / notification wiring lands in Task 18. Intentionally
-  /// a no-op for now.
-  void _onRestFinished() {}
+  /// Fires the three "notice this" side effects for a rest that just
+  /// finished: cancel the pending notification (it either already fired, or
+  /// the user was in-app the whole time and never needed it —
+  /// `cancelRestComplete` is harmless either way, so it's fired without
+  /// waiting on it, same as [goToNextTarget]'s persistence write), then
+  /// haptics and sound, each only when its settings toggle is on. `await`ed
+  /// by its one call site in [_handleRestFinished] — that's a small,
+  /// necessary widening of this method's signature from the `void` no-op
+  /// Task 18 inherited, not a restructure of the caller: haptics/sound must
+  /// be awaited here (see below), and the caller needs the toggle decisions
+  /// to have actually landed before it returns.
+  Future<void> _onRestFinished() async {
+    // Cancel first without waiting on it (nothing downstream depends on the
+    // cancel actually landing before haptics/sound fire), but DO await
+    // haptics/sound — [_handleRestFinished]'s caller (and this file's
+    // tests) reasonably expect them to have fired by the time this
+    // returns, and each `...SettingProvider.future` below may still be
+    // mid-`build()` (its first read of `shared_preferences`) this early in
+    // a session, so a synchronous `.valueOrNull ?? true` read would risk
+    // silently falling back to "on" regardless of what's persisted.
+    unawaited(ref.read(notificationServiceProvider).cancelRestComplete());
+
+    if (await ref.read(hapticsEnabledSettingProvider.future)) {
+      await ref.read(hapticsServiceProvider).restFinished();
+    }
+    if (await ref.read(soundEnabledSettingProvider.future)) {
+      await ref.read(soundServiceProvider).restComplete();
+    }
+  }
 
   // ---------------------------------------------------------------------
   // Session lifecycle

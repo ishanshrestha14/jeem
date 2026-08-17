@@ -7,7 +7,9 @@ import 'package:gymflow/features/exercises/data/exercise_repository.dart';
 import 'package:gymflow/features/sessions/providers/active_session_controller.dart';
 import 'package:gymflow/features/sessions/ui/active_session_screen.dart';
 import 'package:gymflow/features/templates/data/template_repository.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../db/test_database.dart';
+import '../session_feedback_fakes.dart';
 
 /// See the doc comment above `pumpUntilSessionData` in
 /// `active_session_test.dart` for the full reproduction evidence of why
@@ -30,7 +32,10 @@ void main() {
   late AppDatabase db;
   late ProviderContainer container;
 
-  setUp(() => db = testDatabase());
+  setUp(() {
+    db = testDatabase();
+    SharedPreferences.setMockInitialValues({});
+  });
   tearDown(() async {
     container.dispose();
     await db.close();
@@ -38,7 +43,10 @@ void main() {
 
   Widget harness() {
     container = ProviderContainer(
-      overrides: [databaseProvider.overrideWithValue(db)],
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        ...sessionFeedbackOverrides(),
+      ],
     );
     return UncontrolledProviderScope(
       container: container,
@@ -161,6 +169,42 @@ void main() {
     await tester.pump();
 
     expect((await readSessionRow()).autoFocusNextSet, isFalse);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets(
+      'sound and haptics switches default ON and persist to '
+      'shared_preferences independently of each other', (tester) async {
+    await startSession(tester);
+    await openSheet(tester);
+
+    expect(find.byKey(const Key('soundOnRestCompleteSwitch')), findsOneWidget);
+    expect(find.byKey(const Key('hapticsSwitch')), findsOneWidget);
+    final soundSwitch = tester
+        .widget<Switch>(find.byKey(const Key('soundOnRestCompleteSwitch')));
+    final hapticsSwitch =
+        tester.widget<Switch>(find.byKey(const Key('hapticsSwitch')));
+    // A silent/unfelt rest timer defeats the point of Task 18, so an MVP
+    // user who never opens this sheet must still get both by default.
+    expect(soundSwitch.value, isTrue);
+    expect(hapticsSwitch.value, isTrue);
+
+    await tester.tap(find.byKey(const Key('soundOnRestCompleteSwitch')));
+    // Same real event-loop turn as the auto-focus switch above — these
+    // write through an `AsyncNotifier`'s own `shared_preferences` round
+    // trip, not a synchronous pump.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pump();
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(soundEnabledPrefsKey), isFalse);
+    // Untouched — still true — proves the two switches persist
+    // independently rather than sharing one flag.
+    expect(prefs.getBool(hapticsEnabledPrefsKey), isNot(false));
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));

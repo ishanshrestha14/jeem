@@ -4,11 +4,24 @@ import 'package:gymflow/db/app_database.dart';
 import 'package:gymflow/features/exercises/data/exercise_repository.dart';
 import 'package:gymflow/features/sessions/providers/active_session_controller.dart';
 import 'package:gymflow/features/templates/data/template_repository.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../db/test_database.dart';
+import '../session_feedback_fakes.dart';
 
 void main() {
+  // `hapticsEnabledSettingProvider`/`soundEnabledSettingProvider` read
+  // `shared_preferences`, which needs a live `ServicesBinding` — this file
+  // uses bare `test()`, not `testWidgets()`, so nothing initialises one
+  // automatically. Without this, `SharedPreferences.getInstance()` fails
+  // with "Binding has not yet been initialized", and every awaited
+  // `...SettingProvider.future` read inside the controller (Task 18) throws.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late AppDatabase db;
   late ProviderContainer container;
+  late RecordingNotificationService notifications;
+  late RecordingHapticsService haptics;
+  late RecordingSoundService sound;
 
   Future<void> seedAndStart({int restSeconds = 90, int sets = 2}) async {
     final exercises = ExerciseRepository(db);
@@ -40,8 +53,21 @@ void main() {
 
   setUp(() {
     db = testDatabase();
+    // Installs the mock method-channel handler `shared_preferences`'s
+    // legacy `getInstance()` needs — without it, every awaited
+    // `...SettingProvider.future` read inside the controller (Task 18)
+    // throws `MissingPluginException` rather than resolving to a value.
+    SharedPreferences.setMockInitialValues({});
+    notifications = RecordingNotificationService();
+    haptics = RecordingHapticsService();
+    sound = RecordingSoundService();
     container = ProviderContainer(
-      overrides: [databaseProvider.overrideWithValue(db)],
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        notificationServiceProvider.overrideWithValue(notifications),
+        hapticsServiceProvider.overrideWithValue(haptics),
+        soundServiceProvider.overrideWithValue(sound),
+      ],
     );
   });
   tearDown(() {
@@ -53,6 +79,30 @@ void main() {
     final ActiveSessionState? value =
         await container.read(activeSessionControllerProvider.future);
     return value!;
+  }
+
+  /// Disposes the current container and builds a fresh one with
+  /// [prefs] as the `shared_preferences` backing store — needed by the
+  /// haptics/sound-toggle tests below, which must control
+  /// `hapticsEnabledSettingProvider`/`soundEnabledSettingProvider` from
+  /// before the controller (and those `AsyncNotifier`s) first build, since
+  /// they read `shared_preferences` exactly once in their own `build()`.
+  /// Reassigns `container`/`notifications`/`haptics`/`sound` so the rest of
+  /// a test (and `tearDown`) keep working against the fresh instances.
+  void rebuildContainerWithPrefs(Map<String, Object> prefs) {
+    container.dispose();
+    SharedPreferences.setMockInitialValues(prefs);
+    notifications = RecordingNotificationService();
+    haptics = RecordingHapticsService();
+    sound = RecordingSoundService();
+    container = ProviderContainer(
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        notificationServiceProvider.overrideWithValue(notifications),
+        hapticsServiceProvider.overrideWithValue(haptics),
+        soundServiceProvider.overrideWithValue(sound),
+      ],
+    );
   }
 
   test('completing a set stamps it and starts rest for that exercise', () async {
@@ -475,5 +525,154 @@ void main() {
 
     final s = await state();
     expect(s.currentTarget!.sessionExerciseId, squatId);
+  });
+
+  group('Task 18: rest-complete notification, haptics and sound', () {
+    test(
+        'completing a set schedules a rest-complete notification for the '
+        'exact moment rest is due', () async {
+      await seedAndStart(restSeconds: 90);
+      final controller =
+          container.read(activeSessionControllerProvider.notifier);
+      final before = DateTime.now();
+
+      await controller.completeSet(
+        (await state()).session.exercises.first.sets.first.id,
+      );
+
+      final s = await state();
+      expect(notifications.scheduled, hasLength(1));
+      final scheduledAt = notifications.scheduled.single.at;
+      // Scheduled for the SAME instant the rest timer itself is anchored to
+      // — not merely "some time in the future" — which is what proves this
+      // is timestamp-scheduled (survives process death) rather than a Dart
+      // timer fired later.
+      expect(scheduledAt, s.rest.endsAt);
+      final deltaSeconds = scheduledAt.difference(before).inSeconds;
+      expect(deltaSeconds, inInclusiveRange(89, 91));
+      expect(notifications.scheduled.single.nextLabel, contains('Set 2'));
+    });
+
+    test('skipping rest cancels the pending notification', () async {
+      await seedAndStart(restSeconds: 90);
+      final controller =
+          container.read(activeSessionControllerProvider.notifier);
+      await controller.completeSet(
+        (await state()).session.exercises.first.sets.first.id,
+      );
+      expect(notifications.scheduled, hasLength(1));
+      // `completeSet`'s own `scheduleRestComplete` already cancels-then-
+      // schedules internally, so `cancelCalls` is already 1 before
+      // `skipRest` runs — asserting the DELTA (not a bare `>= 1`) is what
+      // actually proves `skipRest` itself calls `cancelRestComplete`,
+      // rather than passing vacuously off that earlier call.
+      final before = notifications.cancelCalls;
+
+      await controller.skipRest();
+
+      expect(notifications.cancelCalls, greaterThan(before));
+    });
+
+    test('cancelling rest cancels the pending notification', () async {
+      await seedAndStart(restSeconds: 90);
+      final controller =
+          container.read(activeSessionControllerProvider.notifier);
+      await controller.completeSet(
+        (await state()).session.exercises.first.sets.first.id,
+      );
+      final before = notifications.cancelCalls;
+
+      await controller.cancelRest();
+
+      expect(notifications.cancelCalls, greaterThan(before));
+    });
+
+    test('pausing rest cancels the pending notification', () async {
+      await seedAndStart(restSeconds: 90);
+      final controller =
+          container.read(activeSessionControllerProvider.notifier);
+      await controller.completeSet(
+        (await state()).session.exercises.first.sets.first.id,
+      );
+      final before = notifications.cancelCalls;
+
+      await controller.pauseRest();
+
+      expect(notifications.cancelCalls, greaterThan(before));
+    });
+
+    test(
+        'completing another set while resting cancels the old notification '
+        'and schedules a new one', () async {
+      await seedAndStart(restSeconds: 90);
+      final controller =
+          container.read(activeSessionControllerProvider.notifier);
+      final sets = (await state()).session.exercises.first.sets;
+
+      await controller.completeSet(sets[0].id);
+      expect(notifications.scheduled, hasLength(1));
+      final cancelsAfterFirst = notifications.cancelCalls;
+      final firstAt = notifications.scheduled.single.at;
+
+      await controller.completeSet(sets[1].id);
+
+      expect(notifications.scheduled, hasLength(2));
+      expect(notifications.cancelCalls, greaterThan(cancelsAfterFirst));
+      expect(notifications.scheduled.last.at, isNot(firstAt));
+    });
+
+    test(
+        '_onRestFinished fires haptics and sound when their settings toggles '
+        'are on', () async {
+      rebuildContainerWithPrefs(const {
+        hapticsEnabledPrefsKey: true,
+        soundEnabledPrefsKey: true,
+      });
+      await seedAndStart(restSeconds: 5);
+      final controller =
+          container.read(activeSessionControllerProvider.notifier);
+      await controller.completeSet(
+        (await state()).session.exercises.first.sets.first.id,
+      );
+
+      await controller.skipRest();
+
+      expect(haptics.restFinishedCalls, 1);
+      expect(sound.restCompleteCalls, 1);
+    });
+
+    test(
+        '_onRestFinished does NOT fire haptics or sound when their settings '
+        'toggles are off', () async {
+      rebuildContainerWithPrefs(const {
+        hapticsEnabledPrefsKey: false,
+        soundEnabledPrefsKey: false,
+      });
+      await seedAndStart(restSeconds: 5);
+      final controller =
+          container.read(activeSessionControllerProvider.notifier);
+      await controller.completeSet(
+        (await state()).session.exercises.first.sets.first.id,
+      );
+
+      await controller.skipRest();
+
+      expect(haptics.restFinishedCalls, 0);
+      expect(sound.restCompleteCalls, 0);
+    });
+
+    test('completeSet fires the set-completed haptic only when its toggle is on',
+        () async {
+      rebuildContainerWithPrefs(const {hapticsEnabledPrefsKey: false});
+      await seedAndStart(restSeconds: 90);
+      final controller =
+          container.read(activeSessionControllerProvider.notifier);
+
+      await controller.completeSet(
+        (await state()).session.exercises.first.sets.first.id,
+      );
+
+      expect(haptics.setCompletedCalls, 0);
+    });
   });
 }

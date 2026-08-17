@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../sessions/data/session_repository.dart';
+import '../../sessions/ui/notification_permission_prompt.dart';
 
 enum _StartChoice { resume, discard }
 
@@ -50,5 +51,8 @@ Future<void> startWorkout(
     await repo.cancelSession(active.session.id);
   }
   await repo.startFromTemplate(templateId, weightUnit: 'kg');
+  if (context.mounted) {
+    await maybeRequestNotificationPermission(context, ref);
+  }
   if (context.mounted) context.push('/session');
 }

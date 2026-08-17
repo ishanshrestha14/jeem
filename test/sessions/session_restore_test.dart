@@ -11,6 +11,7 @@ import 'package:gymflow/features/sessions/ui/active_session_screen.dart';
 import 'package:gymflow/features/templates/data/template_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../db/test_database.dart';
+import '../session_feedback_fakes.dart';
 import '../widget/pump_helpers.dart';
 
 /// Records every call rather than driving the real `wakelock_plus` platform
@@ -50,8 +51,30 @@ Future<void> pumpUntilSessionData(
 }
 
 void main() {
+  // The "rest timer restore" and "carried-forward" groups below use bare
+  // `test()`, not `testWidgets()`, so nothing initialises a `ServicesBinding`
+  // automatically. `hapticsEnabledSettingProvider`/`soundEnabledSettingProvider`
+  // (Task 18) read `shared_preferences`, which needs one — without this,
+  // every `completeSet`/`skipRest`/etc. call in those groups throws "Binding
+  // has not yet been initialized" the moment it awaits that setting.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late AppDatabase db;
   late ProviderContainer container;
+  late RecordingNotificationService notifications;
+  late RecordingHapticsService haptics;
+  late RecordingSoundService sound;
+
+  List<Override> feedbackOverrides() {
+    notifications = RecordingNotificationService();
+    haptics = RecordingHapticsService();
+    sound = RecordingSoundService();
+    return [
+      notificationServiceProvider.overrideWithValue(notifications),
+      hapticsServiceProvider.overrideWithValue(haptics),
+      soundServiceProvider.overrideWithValue(sound),
+    ];
+  }
 
   Future<void> seedAndStart({int restSeconds = 90, int sets = 2}) async {
     final exercises = ExerciseRepository(db);
@@ -75,8 +98,12 @@ void main() {
 
   setUp(() {
     db = testDatabase();
+    SharedPreferences.setMockInitialValues({});
     container = ProviderContainer(
-      overrides: [databaseProvider.overrideWithValue(db)],
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        ...feedbackOverrides(),
+      ],
     );
   });
   tearDown(() async {
@@ -98,7 +125,10 @@ void main() {
   void simulateColdStart() {
     container.dispose();
     container = ProviderContainer(
-      overrides: [databaseProvider.overrideWithValue(db)],
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        ...feedbackOverrides(),
+      ],
     );
   }
 
@@ -259,6 +289,7 @@ void main() {
         overrides: [
           databaseProvider.overrideWithValue(db),
           wakelockServiceProvider.overrideWithValue(wakelock),
+          ...feedbackOverrides(),
         ],
       );
       return UncontrolledProviderScope(

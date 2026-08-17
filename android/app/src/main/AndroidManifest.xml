@@ -1,4 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Task 18: local notification when a rest period ends while
+         backgrounded, plus the vibration that ships with it. Deliberately
+         no foreground-service and no exact-alarm permission — the MVP PRD
+         (§10.5) stays out of that; scheduling uses
+         AndroidScheduleMode.inexactAllowWhileIdle instead. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
     <application
         android:label="gymflow"
         android:name="${applicationName}"
