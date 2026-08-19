@@ -720,6 +720,38 @@ void main() {
       expect(s.rest.status, RestTimerStatus.running);
     });
 
+    test(
+        'skipRest still reaches _emit even when haptics/sound throw during '
+        '_onRestFinished', () async {
+      container.dispose();
+      SharedPreferences.setMockInitialValues(
+        const {hapticsEnabledPrefsKey: true, soundEnabledPrefsKey: true},
+      );
+      container = ProviderContainer(
+        overrides: [
+          databaseProvider.overrideWithValue(db),
+          notificationServiceProvider
+              .overrideWithValue(ThrowingNotificationService()),
+          hapticsServiceProvider.overrideWithValue(ThrowingHapticsService()),
+          soundServiceProvider.overrideWithValue(ThrowingSoundService()),
+        ],
+      );
+      await seedAndStart(restSeconds: 90);
+      final controller =
+          container.read(activeSessionControllerProvider.notifier);
+      await controller.completeSet(
+        (await state()).session.exercises.first.sets.first.id,
+      );
+
+      // Must not throw out of `skipRest` despite notification, haptics AND
+      // sound all throwing on every call — `_onRestFinished`'s side effects
+      // must never strand the rest-finished transition before `_emit`.
+      await controller.skipRest();
+
+      final s = await state();
+      expect(s.rest.status, RestTimerStatus.finished);
+    });
+
     test('adjustRest reschedules the pending notification to the new endsAt',
         () async {
       await seedAndStart(restSeconds: 90);

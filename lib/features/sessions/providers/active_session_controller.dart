@@ -736,13 +736,20 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     // mid-`build()` (its first read of `shared_preferences`) this early in
     // a session, so a synchronous `.valueOrNull ?? true` read would risk
     // silently falling back to "on" regardless of what's persisted.
-    unawaited(ref.read(notificationServiceProvider).cancelRestComplete());
+    //
+    // Every platform-channel call here is wrapped in [_safe] — same
+    // reasoning as [completeSet]'s C1 fix: a throw from `HapticFeedback` or
+    // `SystemSound` on-device must not escape and abort
+    // [_handleRestFinished] before its own `_emit`, which would strand
+    // skipRest/adjustRest/settle/setExerciseRest's rest-finished transition
+    // after `saveRestState` already persisted it.
+    unawaited(_cancelRestNotification());
 
     if (await ref.read(hapticsEnabledSettingProvider.future)) {
-      await ref.read(hapticsServiceProvider).restFinished();
+      await _safe(() => ref.read(hapticsServiceProvider).restFinished());
     }
     if (await ref.read(soundEnabledSettingProvider.future)) {
-      await ref.read(soundServiceProvider).restComplete();
+      await _safe(() => ref.read(soundServiceProvider).restComplete());
     }
   }
 

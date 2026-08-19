@@ -91,6 +91,15 @@ class ThrowingHapticsService implements HapticsService {
   Future<void> restFinished() async => throw Exception('boom: restFinished');
 }
 
+/// Throws on every call — the sound counterpart of [ThrowingHapticsService],
+/// for the `_onRestFinished` regression test (same C1-class defect, fixed
+/// alongside it: `_onRestFinished`'s haptics/sound calls now route through
+/// `_safe` too).
+class ThrowingSoundService implements SoundService {
+  @override
+  Future<void> restComplete() async => throw Exception('boom: restComplete');
+}
+
 class RecordingHapticsService implements HapticsService {
   int setCompletedCalls = 0;
   int restFinishedCalls = 0;
