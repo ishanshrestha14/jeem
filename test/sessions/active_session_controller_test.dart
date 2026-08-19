@@ -674,5 +674,84 @@ void main() {
 
       expect(haptics.setCompletedCalls, 0);
     });
+
+    test('completeSet fires the set-completed haptic when its toggle is on',
+        () async {
+      rebuildContainerWithPrefs(const {hapticsEnabledPrefsKey: true});
+      await seedAndStart(restSeconds: 90);
+      final controller =
+          container.read(activeSessionControllerProvider.notifier);
+
+      await controller.completeSet(
+        (await state()).session.exercises.first.sets.first.id,
+      );
+
+      expect(haptics.setCompletedCalls, 1);
+    });
+
+    test(
+        'completeSet still reloads, persists rest and reaches _emit even '
+        'when a side-effect service throws', () async {
+      container.dispose();
+      SharedPreferences.setMockInitialValues(
+        const {hapticsEnabledPrefsKey: true},
+      );
+      container = ProviderContainer(
+        overrides: [
+          databaseProvider.overrideWithValue(db),
+          notificationServiceProvider
+              .overrideWithValue(ThrowingNotificationService()),
+          hapticsServiceProvider.overrideWithValue(ThrowingHapticsService()),
+          soundServiceProvider.overrideWithValue(RecordingSoundService()),
+        ],
+      );
+      await seedAndStart(restSeconds: 90);
+      final controller =
+          container.read(activeSessionControllerProvider.notifier);
+      final firstSetId = (await state()).session.exercises.first.sets.first.id;
+
+      // Must not throw out of `completeSet` despite both the haptics and
+      // notification services throwing on every call — see C1: a
+      // side-effect throw must never strand the mutation before `_emit`.
+      await controller.completeSet(firstSetId);
+
+      final s = await state();
+      expect(s.session.setById(firstSetId)!.completedAt, isNotNull);
+      expect(s.rest.status, RestTimerStatus.running);
+    });
+
+    test('adjustRest reschedules the pending notification to the new endsAt',
+        () async {
+      await seedAndStart(restSeconds: 90);
+      final controller =
+          container.read(activeSessionControllerProvider.notifier);
+      await controller.completeSet(
+        (await state()).session.exercises.first.sets.first.id,
+      );
+      final firstAt = notifications.scheduled.single.at;
+      final before = notifications.cancelCalls;
+
+      await controller.adjustRest(const Duration(seconds: 30));
+
+      final s = await state();
+      expect(notifications.scheduled.last.at, s.rest.endsAt);
+      expect(notifications.scheduled.last.at, isNot(firstAt));
+      expect(notifications.cancelCalls, greaterThan(before));
+    });
+
+    test('finishing a session mid-rest cancels the pending notification',
+        () async {
+      await seedAndStart(restSeconds: 90);
+      final controller =
+          container.read(activeSessionControllerProvider.notifier);
+      await controller.completeSet(
+        (await state()).session.exercises.first.sets.first.id,
+      );
+      final before = notifications.cancelCalls;
+
+      await controller.finish();
+
+      expect(notifications.cancelCalls, greaterThan(before));
+    });
   });
 }

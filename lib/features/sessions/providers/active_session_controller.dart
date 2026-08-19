@@ -191,6 +191,53 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     return session;
   }
 
+  /// Runs a side-effect [action] (haptics, sound, or a notification-channel
+  /// call) and swallows anything it throws. `flutter_local_notifications`
+  /// and `shared_preferences` can both throw a real `PlatformException` /
+  /// `MissingPluginException` on-device — this is what stops such a throw
+  /// from escaping into a mutator's caller and stranding the mutation before
+  /// it reaches `_reload`/`saveRestState`/`_emit` (PRD §18.7/§24.5: never
+  /// block a set/rest mutation on a side effect).
+  Future<void> _safe(Future<void> Function() action) async {
+    try {
+      await action();
+    } catch (_) {
+      // Deliberately swallowed — see doc comment above.
+    }
+  }
+
+  /// Schedules the pending "rest complete" notification to match [rest] if
+  /// it's running with a deadline, else cancels it — the schedule-or-cancel
+  /// rule [completeSet] and [resumeRest] originally duplicated inline.
+  /// [next] lets a caller that already computed a fresher target (e.g.
+  /// [completeSet]'s `nextTargetAfter`) supply its label directly; other
+  /// callers fall back to [rest]'s own carried `nextTarget`. Wrapped via
+  /// [_safe] so a platform-channel throw here can never abort the mutation
+  /// that called it.
+  Future<void> _syncRestNotification(
+    RestTimerState rest, {
+    SessionTarget? next,
+  }) {
+    return _safe(() async {
+      final notifications = ref.read(notificationServiceProvider);
+      if (rest.status == RestTimerStatus.running && rest.endsAt != null) {
+        await notifications.scheduleRestComplete(
+          at: rest.endsAt!,
+          nextLabel: next?.label ?? rest.nextTarget?.label ?? 'Session complete',
+        );
+      } else {
+        await notifications.cancelRestComplete();
+      }
+    });
+  }
+
+  /// Cancels the pending "rest complete" notification, swallowing any
+  /// platform-channel throw via [_safe] — used by callers that only ever
+  /// need to cancel (never reschedule), e.g. ending a session mid-rest.
+  Future<void> _cancelRestNotification() {
+    return _safe(() => ref.read(notificationServiceProvider).cancelRestComplete());
+  }
+
   void _emit(
     ActiveSession session,
     RestTimerState rest, {
@@ -242,7 +289,7 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     // a session, and a synchronous read in that window would silently fall
     // back to "on" regardless of what's actually persisted.
     if (await ref.read(hapticsEnabledSettingProvider.future)) {
-      await ref.read(hapticsServiceProvider).setCompleted();
+      await _safe(() => ref.read(hapticsServiceProvider).setCompleted());
     }
 
     final reloaded = await _reload(current.session.session.id);
@@ -278,15 +325,7 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     // notification with one for the new rest. No new rest (end of session,
     // or a zero-second exercise) means any stale pending notification from
     // the just-finished exercise must be explicitly cancelled instead.
-    final notifications = ref.read(notificationServiceProvider);
-    if (rest.status == RestTimerStatus.running && rest.endsAt != null) {
-      await notifications.scheduleRestComplete(
-        at: rest.endsAt!,
-        nextLabel: next?.label ?? 'Session complete',
-      );
-    } else {
-      await notifications.cancelRestComplete();
-    }
+    await _syncRestNotification(rest, next: next);
 
     // A fresh rest (or a fresh idle state) supersedes any stale "just
     // finished" flag from a previous rest — otherwise it could coexist with
@@ -316,6 +355,7 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     if (current.rest.afterSetId == setId) {
       final cancelled = RestTimer.cancel();
       await repo.saveRestState(reloaded.session.id, cancelled);
+      await _cancelRestNotification();
       _emit(reloaded, cancelled);
     } else {
       _emit(reloaded, current.rest);
@@ -496,6 +536,7 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
           endsAt: now.add(Duration(seconds: newRemaining)),
         );
         await repo.saveRestState(reloaded.session.id, rest);
+        await _syncRestNotification(rest);
       }
     }
 
@@ -530,7 +571,7 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     final current = await _ready();
     final rest = RestTimer.pause(current.rest, DateTime.now());
     await _repo.saveRestState(current.session.session.id, rest);
-    await ref.read(notificationServiceProvider).cancelRestComplete();
+    await _cancelRestNotification();
     _emit(current.session, rest);
   }
 
@@ -542,15 +583,7 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     final current = await _ready();
     final rest = RestTimer.resume(current.rest, DateTime.now());
     await _repo.saveRestState(current.session.session.id, rest);
-    final notifications = ref.read(notificationServiceProvider);
-    if (rest.status == RestTimerStatus.running && rest.endsAt != null) {
-      await notifications.scheduleRestComplete(
-        at: rest.endsAt!,
-        nextLabel: rest.nextTarget?.label ?? 'Session complete',
-      );
-    } else {
-      await notifications.cancelRestComplete();
-    }
+    await _syncRestNotification(rest);
     _emit(current.session, rest);
   }
 
@@ -565,7 +598,7 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     final current = await _ready();
     final cancelled = RestTimer.cancel();
     await _repo.saveRestState(current.session.session.id, cancelled);
-    await ref.read(notificationServiceProvider).cancelRestComplete();
+    await _cancelRestNotification();
     _emit(current.session, cancelled);
   }
 
@@ -578,6 +611,10 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
         rest.status == RestTimerStatus.finished) {
       await _handleRestFinished(rest);
     } else {
+      // Covers both the still-running case (e.g. `+30s`, whose `endsAt`
+      // just moved — the pending notification must move with it or it
+      // fires early) and paused, which cancels.
+      await _syncRestNotification(rest);
       _emit(current.session, rest);
     }
   }
@@ -726,6 +763,7 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     );
     final rest = RestTimer.pause(current.rest, now);
     await repo.saveRestState(current.session.session.id, rest);
+    await _cancelRestNotification();
 
     final reloaded = await _reload(current.session.session.id);
     _emit(reloaded, rest);
@@ -753,6 +791,7 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     ));
     final rest = RestTimer.resume(current.rest, now);
     await repo.saveRestState(current.session.session.id, rest);
+    await _syncRestNotification(rest);
 
     final reloaded = await _reload(current.session.session.id);
     _emit(reloaded, rest);
@@ -760,12 +799,14 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
 
   Future<void> finish({String? notes}) async {
     final current = await _ready();
+    await _cancelRestNotification();
     await _repo.finishSession(current.session.session.id, notes: notes);
     _setState(const AsyncData(null));
   }
 
   Future<void> cancelSession() async {
     final current = await _ready();
+    await _cancelRestNotification();
     await _repo.cancelSession(current.session.session.id);
     _setState(const AsyncData(null));
   }

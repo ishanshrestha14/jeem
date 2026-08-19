@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gymflow/core/services/notification_service.dart';
 import 'package:gymflow/core/services/session_feedback_settings.dart';
+import 'package:gymflow/core/theme/app_theme.dart';
 import 'package:gymflow/features/sessions/ui/notification_permission_prompt.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../session_feedback_fakes.dart';
@@ -31,6 +32,7 @@ void main() {
     return UncontrolledProviderScope(
       container: container,
       child: MaterialApp(
+        theme: AppTheme.dark(),
         home: Consumer(
           builder: (context, ref, _) => Scaffold(
             body: ElevatedButton(

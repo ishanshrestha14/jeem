@@ -52,6 +52,45 @@ class RecordingNotificationService implements NotificationService {
   Future<bool> hasPermission() async => true;
 }
 
+/// Throws from every method — used by the C1 regression test proving a
+/// platform-channel failure in [NotificationService] can't strand
+/// `ActiveSessionController.completeSet` (or its siblings) before they reach
+/// `_reload`/`saveRestState`/`_emit`. Real `flutter_local_notifications`
+/// calls can throw a `PlatformException`/`MissingPluginException` on-device;
+/// this simulates that.
+class ThrowingNotificationService implements NotificationService {
+  @override
+  Future<void> scheduleRestComplete({
+    required DateTime at,
+    required String nextLabel,
+  }) async =>
+      throw Exception('boom: scheduleRestComplete');
+
+  @override
+  Future<void> cancelRestComplete() async =>
+      throw Exception('boom: cancelRestComplete');
+
+  @override
+  Future<void> init() async {}
+
+  @override
+  Future<bool> requestPermission() async =>
+      throw Exception('boom: requestPermission');
+
+  @override
+  Future<bool> hasPermission() async => throw Exception('boom: hasPermission');
+}
+
+/// Throws from every method — the haptics counterpart of
+/// [ThrowingNotificationService], for the same C1 regression test.
+class ThrowingHapticsService implements HapticsService {
+  @override
+  Future<void> setCompleted() async => throw Exception('boom: setCompleted');
+
+  @override
+  Future<void> restFinished() async => throw Exception('boom: restFinished');
+}
+
 class RecordingHapticsService implements HapticsService {
   int setCompletedCalls = 0;
   int restFinishedCalls = 0;
