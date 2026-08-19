@@ -14,8 +14,19 @@ Future<void> main() async {
   // pulls in timezone data for `zonedSchedule`) rather than lazily on first
   // use — by the time a session starts and might schedule a rest
   // notification, the plugin must already be ready.
+  //
+  // Guarded: a plugin/timezone-init failure must degrade to "no rest
+  // notifications" rather than prevent the app from launching at all. The
+  // service is still handed to the ProviderScope — every call site routes
+  // through `ActiveSessionController._safe`, so an uninitialised plugin
+  // throwing later is already contained.
   final notificationService = NotificationService();
-  await notificationService.init();
+  try {
+    await notificationService.init();
+  } catch (e) {
+    debugPrint('NotificationService.init() failed; continuing without '
+        'rest notifications: $e');
+  }
 
   runApp(
     ProviderScope(

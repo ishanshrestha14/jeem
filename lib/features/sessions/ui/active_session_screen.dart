@@ -123,7 +123,9 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen>
   /// notifier instance existed a moment ago, which Riverpod has already
   /// discarded — a no-op, since the freshly-rebuilt notifier only becomes
   /// current once its `build()` future resolves. (In practice `build()`
-  /// already runs the rest through `RestTimer.settle` itself, so this
+  /// already runs the rest through `RestTimer.settle` itself — and, when that
+  /// settle flips a lapsed rest to finished, resolves the same auto-focus /
+  /// `restJustFinished` outcome `_handleRestFinished` would have — so this
   /// `settle()` call is a belt-and-braces no-op in the common case; it's the
   /// ordering that matters, not double-settling.)
   Future<void> _handleResume() async {

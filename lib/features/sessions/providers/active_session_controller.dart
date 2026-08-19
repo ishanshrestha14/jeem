@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/services/haptics_service.dart';
@@ -161,26 +162,55 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     final repo = ref.watch(sessionRepositoryProvider);
     final active = await repo.watchActiveSession().first;
     if (active == null) return null;
-    final rest = await _settledRest(repo, active);
-    return ActiveSessionState(session: active, rest: rest);
+    final (rest: rest, lapsed: lapsed) = await _settledRest(repo, active);
+    if (!lapsed) {
+      return ActiveSessionState(session: active, rest: rest);
+    }
+
+    // The rest's deadline passed while nobody was watching (app backgrounded,
+    // or the process killed and relaunched). Settling it to `finished` in
+    // isolation is not enough: without the auto-focus decision and the
+    // `restJustFinished` flag, the screen comes back looking exactly as the
+    // user left it minus the countdown — no rest bar, no auto-advance — even
+    // though their phone buzzed when rest was up (Task 18's scheduled
+    // notification). Route the restore through the same resolution
+    // [_handleRestFinished] uses so the user-visible outcome matches a rest
+    // that finished with the app open (PRD FR-108/109).
+    //
+    // Deliberately WITHOUT [_onRestFinished]'s side effects: the notification
+    // already fired (or is moot), and haptics/sound for a moment the user
+    // wasn't present for would be noise.
+    final outcome = _resolveRestFinished(rest, active);
+    return ActiveSessionState(
+      session: active,
+      rest: outcome.rest,
+      focusedSetId: outcome.focusedSetId,
+      restJustFinished: outcome.restJustFinished,
+    );
   }
 
   /// Rehydrates rest state from the DB row (recomputing `nextTarget`, which
   /// isn't persisted) and runs it through [RestTimer.settle] so a deadline
   /// that passed while unobserved (backgrounded, process death) is reflected
   /// immediately. Persists only if settling actually changed the status.
-  Future<RestTimerState> _settledRest(
+  ///
+  /// `lapsed` reports whether settling actually flipped a running rest to
+  /// finished during *this* rehydration — the signal [build] needs to tell
+  /// "rest ran out while we weren't looking" apart from "rest was already
+  /// finished (or idle/paused) when it was persisted".
+  Future<({RestTimerState rest, bool lapsed})> _settledRest(
     SessionRepository repo,
     ActiveSession active,
   ) async {
     final now = DateTime.now();
     var rest = repo.restStateFrom(active);
     final settled = RestTimer.settle(rest, now);
-    if (settled.status != rest.status) {
+    final lapsed = settled.status != rest.status;
+    if (lapsed) {
       await repo.saveRestState(active.session.id, settled);
       rest = settled;
     }
-    return rest;
+    return (rest: rest, lapsed: lapsed);
   }
 
   Future<ActiveSession> _reload(String sessionId) async {
@@ -201,8 +231,36 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
   Future<void> _safe(Future<void> Function() action) async {
     try {
       await action();
-    } catch (_) {
-      // Deliberately swallowed — see doc comment above.
+    } catch (e) {
+      // Deliberately swallowed — see doc comment above — but not silently:
+      // a genuine programming bug in a side effect would otherwise leave no
+      // trace at all. `debugPrint` is compiled out of release builds.
+      debugPrint('ActiveSessionController: side effect failed: $e');
+    }
+  }
+
+  /// Reads a `shared_preferences`-backed boolean setting, falling back to
+  /// [fallback] if the read itself throws.
+  ///
+  /// The read — not just the service call it gates — has to sit inside a
+  /// guarded boundary. These settings resolve through
+  /// `sharedPreferencesProvider` -> `SharedPreferences.getInstance()`, which
+  /// can throw a `MissingPluginException`/`PlatformException` on-device, and
+  /// because they're backed by an `AsyncNotifier` that error is *cached for
+  /// the container's lifetime*: one failure would otherwise strand every
+  /// subsequent `completeSet`/`_onRestFinished` for the rest of the app run
+  /// — exactly the C1-class defect [_safe] exists to prevent, just one call
+  /// frame further out. Falling back to "on" matches these settings' own
+  /// defaults (see `session_feedback_settings.dart`).
+  Future<bool> _settingOrDefault(
+    ProviderListenable<Future<bool>> setting, {
+    bool fallback = true,
+  }) async {
+    try {
+      return await ref.read(setting);
+    } catch (e) {
+      debugPrint('ActiveSessionController: setting read failed: $e');
+      return fallback;
     }
   }
 
@@ -287,8 +345,10 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     // `.valueOrNull ?? true` — the `AsyncNotifier` backing it may still be
     // mid-`build()` (its first read of `shared_preferences`) this early in
     // a session, and a synchronous read in that window would silently fall
-    // back to "on" regardless of what's actually persisted.
-    if (await ref.read(hapticsEnabledSettingProvider.future)) {
+    // back to "on" regardless of what's actually persisted. Read through
+    // [_settingOrDefault] so a throw from `shared_preferences` itself can't
+    // strand this mutation before `_emit`.
+    if (await _settingOrDefault(hapticsEnabledSettingProvider.future)) {
       await _safe(() => ref.read(hapticsServiceProvider).setCompleted());
     }
 
@@ -422,13 +482,13 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
   void focusSet(String setId) {
     final current = state.valueOrNull;
     if (current == null) return;
-    state = AsyncData(current.copyWith(focusedSetId: setId));
+    _setState(AsyncData(current.copyWith(focusedSetId: setId)));
   }
 
   void clearRestFinished() {
     final current = state.valueOrNull;
     if (current == null) return;
-    state = AsyncData(current.copyWith(restJustFinished: false));
+    _setState(AsyncData(current.copyWith(restJustFinished: false)));
   }
 
   /// Moves focus to the pending target on demand — what the rest bar's
@@ -452,12 +512,12 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     final cancelled = RestTimer.cancel();
     unawaited(_repo.saveRestState(current.session.session.id, cancelled));
 
-    state = AsyncData(current.copyWith(
+    _setState(AsyncData(current.copyWith(
       rest: cancelled,
       focusedSetId: target?.setId,
       clearFocusedSetId: target == null,
       restJustFinished: false,
-    ));
+    )));
   }
 
   // ---------------------------------------------------------------------
@@ -665,14 +725,36 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     await _onRestFinished();
 
     final effectiveSession = session ?? current.session;
+    final outcome = _resolveRestFinished(settled, effectiveSession);
 
+    _emit(
+      effectiveSession,
+      outcome.rest,
+      focusedSetId: outcome.focusedSetId,
+      clearFocusedSetId: outcome.clearFocusedSetId,
+      restJustFinished: outcome.restJustFinished,
+    );
+  }
+
+  /// The pure half of "a rest just finished": which target comes next,
+  /// whether the governing auto-focus toggle moves focus there, and the rest
+  /// state to emit. Shared by [_handleRestFinished] (a rest that finished
+  /// with the app open) and [build]'s restore path (a rest whose deadline
+  /// lapsed while backgrounded), so both produce the same user-visible
+  /// outcome — the restore path just skips the side effects.
+  ({
+    RestTimerState rest,
+    String? focusedSetId,
+    bool clearFocusedSetId,
+    bool restJustFinished,
+  }) _resolveRestFinished(RestTimerState settled, ActiveSession session) {
     // Recomputed against the session's *current* order, not the order
     // captured in `settled.nextTarget` when rest started — the user can
     // reorder mid-rest (e.g. a machine is occupied) and the auto-focus
     // decision must reflect that (PRD §18.8).
     final target = settled.afterSetId == null
-        ? firstPendingTarget(effectiveSession)
-        : nextTargetAfter(effectiveSession, settled.afterSetId!);
+        ? firstPendingTarget(session)
+        : nextTargetAfter(session, settled.afterSetId!);
 
     String? focusedSetId;
     var clearFocusedSetId = false;
@@ -681,8 +763,8 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
       clearFocusedSetId = true;
     } else {
       autoFocus = target.kind == TargetKind.sameExercise
-          ? effectiveSession.session.autoFocusNextSet
-          : effectiveSession.session.autoFocusNextExercise;
+          ? session.session.autoFocusNextSet
+          : session.session.autoFocusNextExercise;
       if (autoFocus) {
         focusedSetId = target.setId;
       }
@@ -703,13 +785,13 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
       nextTarget: target,
     );
 
-    // Consumed by the auto-focus (not "just finished" for the UI's purposes)
-    // whenever the governing toggle actually moved focus. When there's no
-    // target left (end of session) there's nothing to auto-focus into
-    // either, so that's not a "rest complete, waiting on you" state.
-    _emit(
-      effectiveSession,
-      resolvedRest,
+    // `restJustFinished` is consumed by the auto-focus (not "just finished"
+    // for the UI's purposes) whenever the governing toggle actually moved
+    // focus. When there's no target left (end of session) there's nothing to
+    // auto-focus into either, so that's not a "rest complete, waiting on
+    // you" state.
+    return (
+      rest: resolvedRest,
       focusedSetId: focusedSetId,
       clearFocusedSetId: clearFocusedSetId,
       restJustFinished: !autoFocus && target != null,
@@ -719,8 +801,7 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
   /// Fires the three "notice this" side effects for a rest that just
   /// finished: cancel the pending notification (it either already fired, or
   /// the user was in-app the whole time and never needed it —
-  /// `cancelRestComplete` is harmless either way, so it's fired without
-  /// waiting on it, same as [goToNextTarget]'s persistence write), then
+  /// `cancelRestComplete` is harmless either way), then
   /// haptics and sound, each only when its settings toggle is on. `await`ed
   /// by its one call site in [_handleRestFinished] — that's a small,
   /// necessary widening of this method's signature from the `void` no-op
@@ -728,27 +809,32 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
   /// be awaited here (see below), and the caller needs the toggle decisions
   /// to have actually landed before it returns.
   Future<void> _onRestFinished() async {
-    // Cancel first without waiting on it (nothing downstream depends on the
-    // cancel actually landing before haptics/sound fire), but DO await
-    // haptics/sound — [_handleRestFinished]'s caller (and this file's
-    // tests) reasonably expect them to have fired by the time this
-    // returns, and each `...SettingProvider.future` below may still be
-    // mid-`build()` (its first read of `shared_preferences`) this early in
-    // a session, so a synchronous `.valueOrNull ?? true` read would risk
-    // silently falling back to "on" regardless of what's persisted.
+    // The cancel is awaited rather than fired-and-forgotten: it can no
+    // longer throw (it's wrapped in [_safe]), and awaiting closes a narrow
+    // race where a fast next-set completion's `scheduleRestComplete` could
+    // be overwritten by a stale in-flight cancel sharing the same
+    // notification id.
     //
-    // Every platform-channel call here is wrapped in [_safe] — same
-    // reasoning as [completeSet]'s C1 fix: a throw from `HapticFeedback` or
-    // `SystemSound` on-device must not escape and abort
+    // Haptics/sound are awaited too — [_handleRestFinished]'s caller (and
+    // this file's tests) reasonably expect them to have fired by the time
+    // this returns, and each setting read below may still be mid-`build()`
+    // (its first read of `shared_preferences`) this early in a session, so a
+    // synchronous `.valueOrNull ?? true` read would risk silently falling
+    // back to "on" regardless of what's persisted.
+    //
+    // Every platform-channel call here is wrapped in [_safe], and every
+    // setting read in [_settingOrDefault] — same reasoning as [completeSet]'s
+    // C1 fix: a throw from `HapticFeedback`, `SystemSound` or
+    // `shared_preferences` on-device must not escape and abort
     // [_handleRestFinished] before its own `_emit`, which would strand
     // skipRest/adjustRest/settle/setExerciseRest's rest-finished transition
     // after `saveRestState` already persisted it.
-    unawaited(_cancelRestNotification());
+    await _cancelRestNotification();
 
-    if (await ref.read(hapticsEnabledSettingProvider.future)) {
+    if (await _settingOrDefault(hapticsEnabledSettingProvider.future)) {
       await _safe(() => ref.read(hapticsServiceProvider).restFinished());
     }
-    if (await ref.read(soundEnabledSettingProvider.future)) {
+    if (await _settingOrDefault(soundEnabledSettingProvider.future)) {
       await _safe(() => ref.read(soundServiceProvider).restComplete());
     }
   }

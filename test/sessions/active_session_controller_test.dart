@@ -1,5 +1,8 @@
+import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gymflow/core/services/keep_screen_on_setting.dart'
+    show sharedPreferencesProvider;
 import 'package:gymflow/db/app_database.dart';
 import 'package:gymflow/features/exercises/data/exercise_repository.dart';
 import 'package:gymflow/features/sessions/providers/active_session_controller.dart';
@@ -750,6 +753,78 @@ void main() {
 
       final s = await state();
       expect(s.rest.status, RestTimerStatus.finished);
+    });
+
+    /// Rebuilds the container with `sharedPreferencesProvider` throwing, so
+    /// every `hapticsEnabledSettingProvider`/`soundEnabledSettingProvider`
+    /// read inside the controller fails the way it can on-device when the
+    /// `shared_preferences` platform channel is unavailable.
+    void rebuildContainerWithBrokenPrefs() {
+      container.dispose();
+      notifications = RecordingNotificationService();
+      haptics = RecordingHapticsService();
+      sound = RecordingSoundService();
+      container = ProviderContainer(
+        overrides: [
+          databaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWith(
+            (ref) => throw MissingPluginException(
+              'No implementation found for shared_preferences',
+            ),
+          ),
+          notificationServiceProvider.overrideWithValue(notifications),
+          hapticsServiceProvider.overrideWithValue(haptics),
+          soundServiceProvider.overrideWithValue(sound),
+        ],
+      );
+    }
+
+    test(
+        'completeSet still reaches _emit when the settings read itself throws '
+        '— on the first call and every one after it', () async {
+      // The settings read sits *outside* the service call `_safe` wraps, and
+      // an `AsyncNotifier`'s error is cached for the container's lifetime —
+      // so before the fix one `shared_preferences` failure stranded every
+      // subsequent `completeSet` for the rest of the app run, not just the
+      // one that hit it. Both calls below are asserted for that reason.
+      rebuildContainerWithBrokenPrefs();
+      await seedAndStart(restSeconds: 90);
+      final controller =
+          container.read(activeSessionControllerProvider.notifier);
+      final sets = (await state()).session.exercises.first.sets;
+
+      await controller.completeSet(sets[0].id);
+
+      var s = await state();
+      expect(s.session.setById(sets[0].id)!.completedAt, isNotNull);
+      expect(s.rest.status, RestTimerStatus.running);
+
+      await controller.completeSet(sets[1].id);
+
+      s = await state();
+      expect(s.session.setById(sets[1].id)!.completedAt, isNotNull);
+      expect(s.rest.status, RestTimerStatus.running);
+      // The fallback for an unreadable toggle is the setting's own default
+      // (on), so the feedback still happens rather than being silently lost.
+      expect(haptics.setCompletedCalls, 2);
+    });
+
+    test(
+        'skipRest still reaches _emit when the settings read itself throws',
+        () async {
+      rebuildContainerWithBrokenPrefs();
+      await seedAndStart(restSeconds: 90);
+      final controller =
+          container.read(activeSessionControllerProvider.notifier);
+      await controller.completeSet(
+        (await state()).session.exercises.first.sets.first.id,
+      );
+
+      await controller.skipRest();
+
+      expect((await state()).rest.status, RestTimerStatus.finished);
+      expect(haptics.restFinishedCalls, 1);
+      expect(sound.restCompleteCalls, 1);
     });
 
     test('adjustRest reschedules the pending notification to the new endsAt',

@@ -193,6 +193,112 @@ void main() {
           closeTo(30, 2));
     });
 
+    /// Writes a `running` rest whose deadline is already in the past, the
+    /// same way the test above does — the on-disk shape left behind by "the
+    /// app was backgrounded/killed while resting and the deadline passed
+    /// before it came back".
+    Future<void> writeLapsedRest(String sessionId, String afterSetId) {
+      return container.read(sessionRepositoryProvider).saveRestState(
+            sessionId,
+            RestTimerState(
+              status: RestTimerStatus.running,
+              totalSeconds: 90,
+              endsAt: DateTime.now().subtract(const Duration(minutes: 5)),
+              afterSetId: afterSetId,
+            ),
+          );
+    }
+
+    // The three tests below cover the resume/cold-start path for a rest that
+    // lapsed unobserved. Settling it to `finished` is not on its own enough:
+    // the user's phone buzzed (Task 18's scheduled notification) while they
+    // were away, so when they come back the screen must be in the same
+    // user-visible state a rest finishing in-app would have produced —
+    // auto-focus applied, or the rest bar showing "rest complete" — rather
+    // than looking untouched minus the countdown (PRD FR-108/109).
+    //
+    // Tested at the controller/build level rather than by driving
+    // `AppLifecycleState.resumed` through the widget: `_handleResume` is
+    // `invalidate` + `await .future` + `settle()`, so the state it lands on
+    // is exactly what a fresh `build()` over the same DB produces — which is
+    // what `simulateColdStart` reproduces — and this project has repeatedly
+    // failed to drive lifecycle events against this Drift-stream screen
+    // without hanging (see `pumpUntilSessionData`'s doc comment).
+    test(
+        'a rest that lapsed while the app was closed auto-focuses the next '
+        'set on restore', () async {
+      await seedAndStart(restSeconds: 90);
+      final controller = container.read(activeSessionControllerProvider.notifier);
+      final sets = (await state()).session.exercises.first.sets;
+      await controller.completeSet(sets[0].id);
+      await writeLapsedRest((await state()).session.session.id, sets[0].id);
+
+      simulateColdStart();
+      final restored = await state();
+
+      // autoFocusNextSet defaults to true, and the next target is another set
+      // of the same exercise — so the restore must land focus on it, exactly
+      // as a live `skipRest`/`settle` transition would.
+      expect(restored.rest.status, RestTimerStatus.finished);
+      expect(restored.focusedSetId, sets[1].id);
+      expect(restored.currentTarget!.setId, sets[1].id);
+      // Auto-focus consumed the finish, so there's no "waiting on you" bar —
+      // same as the live path.
+      expect(restored.restJustFinished, isFalse);
+      // The `nextTarget` label the rest bar reads is recomputed on restore,
+      // not left null from the persisted row (which doesn't store it).
+      expect(restored.rest.nextTarget!.setId, sets[1].id);
+      // The notification already fired while backgrounded and the user
+      // wasn't there to feel a buzz — the restore path must not re-fire
+      // either.
+      expect(haptics.restFinishedCalls, 0);
+      expect(sound.restCompleteCalls, 0);
+    });
+
+    test(
+        'a rest that lapsed while the app was closed shows the rest bar on '
+        'restore when auto-focus is off', () async {
+      await seedAndStart(restSeconds: 90);
+      final controller = container.read(activeSessionControllerProvider.notifier);
+      await controller.setAutoFocusNextSet(false);
+      final sets = (await state()).session.exercises.first.sets;
+      await controller.completeSet(sets[0].id);
+      await writeLapsedRest((await state()).session.session.id, sets[0].id);
+
+      simulateColdStart();
+      final restored = await state();
+
+      expect(restored.rest.status, RestTimerStatus.finished);
+      expect(restored.focusedSetId, isNull);
+      expect(restored.restJustFinished, isTrue);
+      // The exact condition `ActiveSessionScreen` uses to mount `RestBar`:
+      // `finished` is not `isActive`, so without `restJustFinished` the user
+      // would get no acknowledgment at all that rest ended.
+      expect(restored.rest.isActive || restored.restJustFinished, isTrue);
+      expect(haptics.restFinishedCalls, 0);
+      expect(sound.restCompleteCalls, 0);
+    });
+
+    test(
+        'a rest already persisted as finished does not re-fire the finish '
+        'path on restore', () async {
+      await seedAndStart(restSeconds: 90);
+      final controller = container.read(activeSessionControllerProvider.notifier);
+      await controller.setAutoFocusNextSet(false);
+      final sets = (await state()).session.exercises.first.sets;
+      await controller.completeSet(sets[0].id);
+      // Finished *in-app*, with the finish path already run and its rest bar
+      // already shown — restoring that must not resurrect the bar.
+      await controller.skipRest();
+      expect((await state()).restJustFinished, isTrue);
+
+      simulateColdStart();
+      final restored = await state();
+
+      expect(restored.rest.status, RestTimerStatus.finished);
+      expect(restored.restJustFinished, isFalse);
+    });
+
     test('a paused rest comes back paused with its frozen remainder',
         () async {
       await seedAndStart(restSeconds: 90);
