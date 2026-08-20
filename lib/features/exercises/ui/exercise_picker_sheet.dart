@@ -87,19 +87,35 @@ class _ExercisePickerSheetState extends ConsumerState<_ExercisePickerSheet> {
                       // move is creating the exercise they were looking
                       // for, since they are mid-way through building a
                       // template.
-                      return EmptyState(
-                        icon: query.isEmpty
-                            ? Icons.fitness_center
-                            : Icons.search_off,
-                        title: query.isEmpty ? 'No exercises yet' : 'No matches',
-                        message: query.isEmpty
-                            ? 'Add the movements you train so you can drop them '
-                                'into this workout.'
-                            : 'Nothing in your library matches "$_query". '
-                                'Create it and it will be added straight to '
-                                'this workout.',
-                        actionLabel: 'Create new exercise',
-                        onAction: () => _createExercise(context),
+                      // Wrapped in a ListView carrying the sheet's own
+                      // scrollController: without it, this branch drops the
+                      // controller the DraggableScrollableSheet handed us,
+                      // and the sheet can no longer be dragged to resize or
+                      // dismiss while "no results" is showing.
+                      // Wrapped in a ListView carrying the sheet's own
+                      // scrollController: without it, this branch drops the
+                      // controller the DraggableScrollableSheet handed us,
+                      // and the sheet can no longer be dragged to resize or
+                      // dismiss while "no results" is showing.
+                      return ListView(
+                        controller: scrollController,
+                        children: [
+                          EmptyState(
+                            icon: query.isEmpty
+                                ? Icons.fitness_center
+                                : Icons.search_off,
+                            title:
+                                query.isEmpty ? 'No exercises yet' : 'No matches',
+                            message: query.isEmpty
+                                ? 'Add the movements you train so you can drop them '
+                                    'into this workout.'
+                                : 'Nothing in your library matches "$_query". '
+                                    'Create it and it will be added straight to '
+                                    'this workout.',
+                            actionLabel: 'Create new exercise',
+                            onAction: () => _createExercise(context),
+                          ),
+                        ],
                       );
                     }
                     return ListView.builder(

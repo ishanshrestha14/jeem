@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gymflow/core/theme/app_theme.dart';
+import 'package:gymflow/core/widgets/empty_state.dart';
 import 'package:gymflow/db/app_database.dart';
 import 'package:gymflow/features/exercises/data/exercise_repository.dart';
 import 'package:gymflow/features/exercises/ui/exercise_list_screen.dart';
@@ -41,6 +42,37 @@ void main() {
     await pumpUntilData(tester);
     expect(find.text('Lat Pulldown'), findsOneWidget);
     expect(find.text('Leg Press'), findsNothing);
+    await disposeAndDrainTimers(tester);
+  });
+
+  testWidgets(
+      'a search matching nothing shows a full empty state and "Clear '
+      'search" restores the list (PRD §16.6)', (tester) async {
+    final repo = ExerciseRepository(db);
+    await repo.create(name: 'Lat Pulldown', loggingType: LoggingType.strengthWeightRepsRir);
+    await repo.create(name: 'Leg Press', loggingType: LoggingType.strengthWeightRepsRir);
+
+    await tester.pumpWidget(harness());
+    await pumpUntilData(tester);
+
+    await tester.enterText(find.byType(TextField).first, 'zzz-nomatch');
+    await pumpUntilData(tester, until: find.byType(EmptyState));
+
+    final empty = tester.widget<EmptyState>(find.byType(EmptyState));
+    expect(empty.icon, Icons.search_off);
+    expect(empty.title, 'No matches');
+    expect(empty.message, contains('zzz-nomatch'));
+    expect(empty.actionLabel, 'Clear search');
+    expect(empty.onAction, isNotNull);
+
+    await tester.tap(find.text('Clear search'));
+    await pumpUntilData(tester);
+
+    final field = tester.widget<TextField>(find.byType(TextField).first);
+    expect(field.controller!.text, isEmpty);
+    expect(find.text('Lat Pulldown'), findsOneWidget);
+    expect(find.text('Leg Press'), findsOneWidget);
+
     await disposeAndDrainTimers(tester);
   });
 

@@ -141,6 +141,27 @@ void main() {
   }
 
   testWidgets(
+      'a new exercise with no photo shows the icon + explanation placeholder '
+      '(PRD §16.6)', (tester) async {
+    useTallSurface(tester);
+
+    await tester.pumpWidget(harness());
+    await pumpUntilData(tester);
+    await openEditor(tester);
+    await pumpUntilData(tester);
+
+    expect(find.byIcon(Icons.add_a_photo_outlined), findsOneWidget);
+    expect(
+      find.textContaining('Add one so you can recognise this exercise'),
+      findsOneWidget,
+    );
+    expect(find.text('Choose photo'), findsOneWidget);
+    expect(find.text('Take photo'), findsOneWidget);
+
+    await disposeAndDrainTimers(tester);
+  });
+
+  testWidgets(
       'pick then cancel: nothing lands in the managed directory, staged file untouched',
       (tester) async {
     useTallSurface(tester);

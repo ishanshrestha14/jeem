@@ -193,4 +193,53 @@ void main() {
 
     await disposeAndDrainTimers(tester);
   });
+
+  testWidgets(
+      'the picker shows a full empty state for a search matching nothing, '
+      'and the sheet stays draggable (PRD §16.6)', (tester) async {
+    final templates = TemplateRepository(db);
+    final exercises = ExerciseRepository(db);
+    final t = await templates.createTemplate(name: 'Pull');
+    final row = await exercises.create(
+        name: 'Row', loggingType: LoggingType.strengthWeightRepsRir);
+    // Give the template one exercise already, so the screen *behind* the
+    // sheet isn't itself showing an EmptyState (its own "no exercises yet"
+    // state) while the sheet's "no matches" state is asserted below.
+    await templates.addExercise(templateId: t.id, exerciseId: row.id);
+
+    await tester.pumpWidget(harness(t.id));
+    await pumpUntilData(tester, until: find.text('Add exercise'));
+
+    final addButton = find.text('Add exercise').last;
+    await tester.ensureVisible(addButton);
+    await tester.pump();
+    await tester.tap(addButton);
+    await pumpUntilData(tester, until: find.text('Row'), maxFrames: 120);
+
+    await tester.enterText(find.byType(TextField).last, 'zzz-nomatch');
+    await pumpUntilData(tester, until: find.byType(EmptyState), maxFrames: 120);
+
+    final empty = tester.widget<EmptyState>(find.byType(EmptyState));
+    expect(empty.icon, Icons.search_off);
+    expect(empty.title, 'No matches');
+    expect(empty.message, contains('zzz-nomatch'));
+    expect(empty.actionLabel, 'Create new exercise');
+    expect(empty.onAction, isNotNull);
+
+    // The DraggableScrollableSheet's scrollController must still be
+    // attached to a scrollable while the empty state is showing, or the
+    // sheet can no longer be dragged to resize/dismiss (Important 2). Find
+    // the ListView that both wraps the EmptyState and carries an explicit
+    // (non-null) controller — the sheet always passes its own
+    // scrollController in, unlike a plain default-constructed ListView.
+    final wrappingListView = tester.widgetList<ListView>(find.ancestor(
+      of: find.byType(EmptyState),
+      matching: find.byType(ListView),
+    ));
+    expect(wrappingListView, hasLength(1));
+    expect(wrappingListView.single.controller, isNotNull);
+    expect(tester.takeException(), isNull);
+
+    await disposeAndDrainTimers(tester);
+  });
 }
