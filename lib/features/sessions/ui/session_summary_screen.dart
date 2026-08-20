@@ -110,25 +110,28 @@ class _SessionSummaryScreenState extends ConsumerState<SessionSummaryScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: widget.readOnly ? null : _buildActions(context),
+      bottomNavigationBar:
+          widget.readOnly ? null : _buildActions(context, workout.id),
     );
   }
 
-  Widget _buildActions(BuildContext context) {
+  Widget _buildActions(BuildContext context, String liveSessionId) {
     return SafeArea(
       minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Row(
         children: [
           Expanded(
             child: OutlinedButton(
-              onPressed: _busy ? null : () => _handleDiscard(context),
+              onPressed:
+                  _busy ? null : () => _handleDiscard(context, liveSessionId),
               child: const Text('Discard'),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: FilledButton(
-              onPressed: _busy ? null : () => _handleSave(context),
+              onPressed:
+                  _busy ? null : () => _handleSave(context, liveSessionId),
               child: const Text('Save'),
             ),
           ),
@@ -137,20 +140,50 @@ class _SessionSummaryScreenState extends ConsumerState<SessionSummaryScreen> {
     );
   }
 
-  Future<void> _handleSave(BuildContext context) async {
+  /// Both mutators below commit whatever session
+  /// [activeSessionControllerProvider] currently considers active — not
+  /// necessarily [widget.sessionId]. That's fine for the only live entry
+  /// point today (the active session's own Finish flow, where the two always
+  /// agree), but this screen is reused read-only for history (Task 20), and
+  /// `readOnly` is opt-in — so a future caller that forgets it would
+  /// otherwise silently commit/discard the wrong session. [liveSessionId] is
+  /// the id loaded via [widget.sessionId] itself (threaded through from the
+  /// `data:` branch), so comparing it against [widget.sessionId] here is a
+  /// no-op today and a guard against exactly that future mistake.
+  Future<void> _handleSave(BuildContext context, String liveSessionId) async {
+    if (liveSessionId != widget.sessionId) {
+      assert(false, 'Refusing to save: displayed session != active session');
+      return;
+    }
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
     final router = GoRouter.of(context);
     final notes = _notesController.text.trim();
-    await ref.read(activeSessionControllerProvider.notifier).finish(
-          notes: notes.isEmpty ? null : notes,
-        );
-    if (!context.mounted) return;
-    router.go('/home');
-    messenger.showSnackBar(const SnackBar(content: Text('Workout saved')));
+    try {
+      await ref.read(activeSessionControllerProvider.notifier).finish(
+            notes: notes.isEmpty ? null : notes,
+          );
+      if (!context.mounted) return;
+      router.go('/home');
+      messenger.showSnackBar(const SnackBar(content: Text('Workout saved')));
+    } catch (e) {
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not save workout: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
-  Future<void> _handleDiscard(BuildContext context) async {
+  Future<void> _handleDiscard(
+    BuildContext context,
+    String liveSessionId,
+  ) async {
+    if (liveSessionId != widget.sessionId) {
+      assert(false, 'Refusing to discard: displayed session != active session');
+      return;
+    }
     final confirmed = await confirmDestructive(
       context,
       title: 'Discard session?',
@@ -160,10 +193,20 @@ class _SessionSummaryScreenState extends ConsumerState<SessionSummaryScreen> {
     if (!confirmed || !context.mounted) return;
 
     setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
     final router = GoRouter.of(context);
-    await ref.read(activeSessionControllerProvider.notifier).cancelSession();
-    if (!context.mounted) return;
-    router.go('/home');
+    try {
+      await ref.read(activeSessionControllerProvider.notifier).cancelSession();
+      if (!context.mounted) return;
+      router.go('/home');
+    } catch (e) {
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not discard workout: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 }
 
@@ -263,9 +306,9 @@ class _ExerciseSummary extends StatelessWidget {
     if (exercise.loggingType == LoggingType.durationOnly) {
       return 'Set ${set.setIndex + 1} · ${formatDurationSeconds(set.durationSeconds)}';
     }
-    final weight = formatWeight(set.weight);
     final reps = set.reps?.toString() ?? '—';
-    return 'Set ${set.setIndex + 1} · $weight $weightUnit × $reps · '
-        'RIR ${formatRir(set.rir)}';
+    final weight = formatWeight(set.weight);
+    final repsSegment = weight.isEmpty ? '$reps reps' : '$weight $weightUnit × $reps';
+    return 'Set ${set.setIndex + 1} · $repsSegment · RIR ${formatRir(set.rir)}';
   }
 }

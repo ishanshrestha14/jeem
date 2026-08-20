@@ -140,6 +140,22 @@ void main() {
     await disposeAndDrainTimers(tester);
   });
 
+  testWidgets('Save and Discard are shown when not read-only', (tester) async {
+    useTallSurface(tester);
+    final sessionId = await seedPartialSession(tester);
+
+    await tester.pumpWidget(harness(sessionId));
+    await pumpUntilData(tester, until: find.text('2 / 6 sets'));
+
+    expect(find.widgetWithText(FilledButton, 'Save'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Discard'), findsOneWidget);
+
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.enabled, isTrue);
+
+    await disposeAndDrainTimers(tester);
+  });
+
   testWidgets('Save and Discard are hidden in read-only mode', (tester) async {
     useTallSurface(tester);
     final sessionId = await seedPartialSession(tester);

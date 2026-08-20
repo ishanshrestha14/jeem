@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:gymflow/core/theme/app_theme.dart';
 import 'package:gymflow/db/app_database.dart';
 import 'package:gymflow/features/exercises/data/exercise_repository.dart';
 import 'package:gymflow/features/sessions/providers/active_session_controller.dart';
 import 'package:gymflow/features/sessions/ui/active_session_screen.dart';
+import 'package:gymflow/features/sessions/ui/session_summary_screen.dart';
 import 'package:gymflow/features/sessions/ui/widgets/duration_set_row.dart';
 import 'package:gymflow/features/sessions/ui/widgets/rest_bar.dart';
 import 'package:gymflow/features/sessions/ui/widgets/strength_set_row.dart';
@@ -132,6 +134,42 @@ void main() {
       child: MaterialApp(
         theme: AppTheme.dark(),
         home: const ActiveSessionScreen(),
+      ),
+    );
+  }
+
+  /// Like [harness], but with a real [GoRouter] wired for `/session` and
+  /// `/session/summary/:id` — needed to exercise the app bar overflow's
+  /// Finish flow, which pushes to the summary screen via `context.push`
+  /// (a go_router extension that throws without a `GoRouter` ancestor).
+  Widget routedHarness() {
+    container = ProviderContainer(
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        ...sessionFeedbackOverrides(),
+      ],
+    );
+    final router = GoRouter(
+      initialLocation: '/session',
+      routes: [
+        GoRoute(
+          path: '/session',
+          builder: (_, _) => const ActiveSessionScreen(),
+        ),
+        GoRoute(
+          path: '/session/summary/:id',
+          builder: (_, s) => SessionSummaryScreen(
+            sessionId: s.pathParameters['id']!,
+            readOnly: s.uri.queryParameters['readOnly'] == 'true',
+          ),
+        ),
+      ],
+    );
+    return UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp.router(
+        theme: AppTheme.dark(),
+        routerConfig: router,
       ),
     );
   }
@@ -527,6 +565,47 @@ void main() {
       ),
       findsOneWidget,
     );
+
+    await disposeAndDrainTimers(tester, container: container);
+  });
+
+  testWidgets(
+      '"Finish anyway" on an incomplete session navigates to the summary '
+      'without committing it — the session stays active until Save '
+      '(Task 19 core invariant)', (tester) async {
+    final templates = TemplateRepository(db);
+    final exercises = ExerciseRepository(db);
+    final sessions = SessionRepository(db);
+    final t = await templates.createTemplate(name: 'Legs A');
+    final squat = await exercises.create(
+        name: 'Back Squat', loggingType: LoggingType.strengthWeightRepsRir);
+    await templates.addExercise(
+        templateId: t.id, exerciseId: squat.id, targetSets: 3);
+    await sessions.startFromTemplate(t.id, weightUnit: 'kg');
+
+    await tester.pumpWidget(routedHarness());
+    await pumpUntilSessionData(tester);
+
+    // Open the app bar overflow and tap "Finish" with sets still
+    // incomplete (0/3) — this must show the "Finish workout?" dialog
+    // rather than finishing straight away.
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Finish'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Finish workout?'), findsOneWidget);
+
+    await tester.tap(find.text('Finish anyway'));
+    await pumpUntilData(tester, until: find.text('Summary'));
+
+    // Landed on the summary screen...
+    expect(find.text('Summary'), findsOneWidget);
+
+    // ...but the underlying session was never committed by navigating
+    // there: only Save (ActiveSessionController.finish) may do that.
+    final row = await (db.select(db.workoutSessions)).getSingle();
+    expect(row.status, SessionStatus.active);
 
     await disposeAndDrainTimers(tester, container: container);
   });
