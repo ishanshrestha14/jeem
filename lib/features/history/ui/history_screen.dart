@@ -1,24 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/theme/app_theme.dart';
-import '../../../core/theme/semantic_colors.dart';
+import '../../../core/utils/formatting.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../sessions/data/session_models.dart';
+import '../../templates/data/template_repository.dart';
+import '../../templates/providers/template_providers.dart';
 import '../providers/history_providers.dart';
 
-/// A basic real listing of completed sessions (date, workout name, duration,
-/// completed/total sets). This is deliberately minimal — the read-only
-/// session detail screen and the duplicate-template action are a later
-/// task; this screen exists so the History tab never leads to a
-/// "coming soon" placeholder.
+/// Read-only session history: a list of completed sessions, newest first.
+/// There is no separate detail screen — tapping a row pushes
+/// `SessionSummaryScreen(readOnly: true)`, the same screen the Finish flow
+/// uses, at `/session/summary/:id?readOnly=true`. Each row also offers a
+/// "Duplicate this workout as a template" overflow action when the session
+/// still points at a template that exists.
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessions = ref.watch(completedSessionsProvider);
+    final sessions = ref.watch(historyProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('History')),
@@ -27,17 +30,19 @@ class HistoryScreen extends ConsumerWidget {
         error: (e, _) => Center(child: Text('$e')),
         data: (rows) {
           if (rows.isEmpty) {
-            return const EmptyState(
+            return EmptyState(
               icon: Icons.history,
               title: 'No completed sessions yet',
               message: 'Finish a workout and it will show up here.',
+              actionLabel: 'Go to Home',
+              onAction: () => context.go('/home'),
             );
           }
           return ListView.separated(
             padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: rows.length,
             separatorBuilder: (_, _) => const Divider(height: 1),
-            itemBuilder: (_, i) => _HistoryRow(session: rows[i]),
+            itemBuilder: (_, i) => _HistoryTile(session: rows[i]),
           );
         },
       ),
@@ -45,66 +50,68 @@ class HistoryScreen extends ConsumerWidget {
   }
 }
 
-class _HistoryRow extends StatelessWidget {
-  const _HistoryRow({required this.session});
+class _HistoryTile extends ConsumerWidget {
+  const _HistoryTile({required this.session});
 
   final ActiveSession session;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final muted = theme.extension<SemanticColors>()!.muted;
+  Widget build(BuildContext context, WidgetRef ref) {
     final workout = session.session;
     final endedAt = workout.endedAt;
-
     final duration = endedAt == null
-        ? null
+        ? Duration.zero
         : endedAt.difference(workout.startedAt) -
             Duration(seconds: workout.pausedSeconds);
+    final volume = session.completedVolume;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  endedAt == null
-                      ? DateFormat.yMMMd().format(workout.startedAt)
-                      : DateFormat.yMMMd().format(endedAt),
-                  style: AppTheme.columnHeader.copyWith(color: muted),
-                ),
-                const SizedBox(height: 4),
-                Text(workout.name, style: AppTheme.exerciseName.copyWith(
-                  color: theme.colorScheme.onSurface,
-                )),
-                const SizedBox(height: 2),
-                Text(
-                  '${session.completedSets}/${session.totalSets} sets',
-                  style: AppTheme.body.copyWith(color: muted),
+    var subtitle =
+        '${DateFormat.yMMMd().format(workout.startedAt)} · ${mmss(duration)} · '
+        '${session.completedSets}/${session.totalSets} sets';
+    if (volume > 0) {
+      subtitle += ' · ${volume.round()} ${workout.weightUnit}';
+    }
+
+    final templateId = workout.templateId;
+    final templateAsync = templateId == null
+        ? null
+        : ref.watch(templateProvider(templateId));
+    final canDuplicate = templateAsync?.valueOrNull != null;
+
+    return ListTile(
+      title: Text(workout.name),
+      subtitle: Text(subtitle),
+      onTap: () =>
+          context.push('/session/summary/${workout.id}?readOnly=true'),
+      trailing: canDuplicate
+          ? PopupMenuButton<_HistoryAction>(
+              onSelected: (action) =>
+                  _handleAction(context, ref, action, templateId!),
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: _HistoryAction.duplicateTemplate,
+                  child: Text('Duplicate this workout as a template'),
                 ),
               ],
-            ),
-          ),
-          if (duration != null)
-            Text(
-              _formatDuration(duration),
-              style: AppTheme.elapsedTime.copyWith(
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-        ],
-      ),
+            )
+          : null,
     );
   }
 
-  String _formatDuration(Duration d) {
-    final totalMinutes = d.inMinutes;
-    final hours = totalMinutes ~/ 60;
-    final minutes = totalMinutes % 60;
-    if (hours > 0) return '${hours}h ${minutes}m';
-    return '${minutes}m';
+  Future<void> _handleAction(
+    BuildContext context,
+    WidgetRef ref,
+    _HistoryAction action,
+    String templateId,
+  ) async {
+    switch (action) {
+      case _HistoryAction.duplicateTemplate:
+        final repo = ref.read(templateRepositoryProvider);
+        final copy = await repo.duplicateTemplate(templateId);
+        if (!context.mounted) return;
+        context.push('/templates/${copy.id}');
+    }
   }
 }
+
+enum _HistoryAction { duplicateTemplate }

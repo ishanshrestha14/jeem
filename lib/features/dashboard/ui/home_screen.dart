@@ -25,7 +25,7 @@ import '../../templates/ui/start_workout_action.dart';
 ///    elsewhere);
 ///  - quick start reads [templateSummariesProvider], sorted by
 ///    `TemplateSummary.lastPerformedAt` (nulls last);
-///  - last workout reads [completedSessionsProvider].
+///  - last workout reads [historyProvider].
 ///
 /// Streaks/analytics are computed from completed sessions, and no session
 /// can be completed until the finish-session flow exists — see the gap
@@ -37,7 +37,7 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final summaries = ref.watch(templateSummariesProvider);
     final active = ref.watch(activeSessionProvider);
-    final completed = ref.watch(completedSessionsProvider);
+    final completed = ref.watch(historyProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Home')),
