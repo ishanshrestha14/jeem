@@ -391,3 +391,10 @@ final sessionRepositoryProvider = Provider<SessionRepository>(
 final activeSessionProvider = StreamProvider<ActiveSession?>(
   (ref) => ref.watch(sessionRepositoryProvider).watchActiveSession(),
 );
+
+/// Watches a single session by id — used by [SessionSummaryScreen] both live
+/// (the just-finished-or-not-yet-finished session, still `active`) and
+/// read-only (a completed row from history, Task 20).
+final sessionByIdProvider = StreamProvider.autoDispose.family<ActiveSession?, String>(
+  (ref, id) => ref.watch(sessionRepositoryProvider).watchSession(id),
+);

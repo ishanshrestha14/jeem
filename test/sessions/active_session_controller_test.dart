@@ -365,6 +365,38 @@ void main() {
     expect(await container.read(activeSessionControllerProvider.future), isNull);
   });
 
+  test('finishing with incomplete sets is allowed but reported', () async {
+    await seedAndStart(sets: 3);
+    final controller = container.read(activeSessionControllerProvider.notifier);
+    await controller.completeSet((await state()).session.exercises.first.sets.first.id);
+
+    final before = await state();
+    expect(before.session.completedSets, 1);
+    expect(before.session.totalSets, 6);
+
+    await controller.finish(notes: 'Cut it short');
+
+    final saved = (await container.read(sessionRepositoryProvider)
+        .watchSession(before.session.session.id).first)!;
+    expect(saved.session.status, SessionStatus.completed);
+    expect(saved.session.notes, 'Cut it short');
+    expect(saved.completedSets, 1);
+    expect(saved.session.endedAt, isNotNull);
+  });
+
+  test('cancelling marks the session cancelled and keeps it out of history',
+      () async {
+    await seedAndStart();
+    final id = (await state()).session.session.id;
+    await container.read(activeSessionControllerProvider.notifier).cancelSession();
+
+    final row = (await container.read(sessionRepositoryProvider)
+        .watchSession(id).first)!;
+    expect(row.session.status, SessionStatus.cancelled);
+    expect(await container.read(sessionRepositoryProvider)
+        .watchCompletedSessions().first, isEmpty);
+  });
+
   test('auto-focus next set moves focus when rest finishes mid-exercise',
       () async {
     await seedAndStart(restSeconds: 1, sets: 3);

@@ -8,6 +8,7 @@ import '../../../core/services/keep_screen_on_setting.dart';
 import '../../../core/services/wakelock_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatting.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../../../db/app_database.dart';
 import '../providers/active_session_controller.dart';
 import 'session_settings_sheet.dart';
@@ -16,6 +17,10 @@ import 'widgets/session_exercise_card.dart';
 import 'widgets/session_progress_header.dart';
 
 enum _SessionMenuAction { settings, reorder, pauseResume, finish, cancel }
+
+/// The three choices offered by the "sets are still incomplete" dialog
+/// (PRD FR-116).
+enum _FinishDialogAction { finishAnyway, continueWorkout, discard }
 
 /// The screen used mid-workout, one-handed, between sets (PRD §9.4).
 /// Renders the live session snapshot from [activeSessionControllerProvider]
@@ -486,24 +491,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen>
           await controller.pauseSession();
         }
       case _SessionMenuAction.finish:
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Finish workout?'),
-            content: const Text('This ends the session.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('Finish'),
-              ),
-            ],
-          ),
-        );
-        if (confirmed ?? false) await controller.finish();
+        await _handleFinish(context, state);
       case _SessionMenuAction.cancel:
         final confirmed = await showDialog<bool>(
           context: context,
@@ -525,6 +513,76 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen>
           ),
         );
         if (confirmed ?? false) await controller.cancelSession();
+    }
+  }
+
+  /// From the app bar overflow's "Finish" (PRD FR-116). A fully-complete
+  /// session goes straight to the summary screen — nothing to warn about.
+  /// An incomplete one is offered the choice between finishing anyway,
+  /// going back to the workout, or discarding the whole session outright.
+  /// The session itself is never committed here: [ActiveSessionController.
+  /// finish] is only ever called from [SessionSummaryScreen]'s Save, so
+  /// backing out of the summary after "Finish anyway" still returns to a
+  /// live session rather than losing it.
+  Future<void> _handleFinish(
+    BuildContext context,
+    ActiveSessionState state,
+  ) async {
+    final session = state.session;
+    final sessionId = session.session.id;
+
+    if (session.completedSets == session.totalSets) {
+      if (context.mounted) await context.push('/session/summary/$sessionId');
+      return;
+    }
+
+    final remaining = session.totalSets - session.completedSets;
+    final action = await showDialog<_FinishDialogAction>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Finish workout?'),
+        content: Text('$remaining sets are still incomplete.'),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.of(ctx).pop(_FinishDialogAction.continueWorkout),
+            child: const Text('Continue workout'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.of(ctx).pop(_FinishDialogAction.discard),
+            child: const Text('Discard session'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(ctx).pop(_FinishDialogAction.finishAnyway),
+            child: const Text('Finish anyway'),
+          ),
+        ],
+      ),
+    );
+
+    if (!context.mounted) return;
+    switch (action) {
+      case _FinishDialogAction.finishAnyway:
+        await context.push('/session/summary/$sessionId');
+      case _FinishDialogAction.discard:
+        final confirmed = await confirmDestructive(
+          context,
+          title: 'Discard session?',
+          message: 'This discards the session. This cannot be undone.',
+          confirmLabel: 'Discard',
+        );
+        // No explicit pop here: `cancelSession` sets the controller's state
+        // to null, and this screen's own `build` (see the `data: (state)`
+        // branch above) already reacts to that by popping itself — the same
+        // path the plain "Cancel" menu action below relies on.
+        if (confirmed) {
+          await ref.read(activeSessionControllerProvider.notifier).cancelSession();
+        }
+      case _FinishDialogAction.continueWorkout:
+      case null:
+        break;
     }
   }
 

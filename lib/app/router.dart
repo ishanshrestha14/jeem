@@ -6,6 +6,7 @@ import '../features/exercises/ui/exercise_list_screen.dart';
 import '../features/history/ui/history_screen.dart';
 import '../features/sessions/ui/active_session_screen.dart';
 import '../features/sessions/ui/session_reorder_screen.dart';
+import '../features/sessions/ui/session_summary_screen.dart';
 import '../features/settings/ui/settings_screen.dart';
 import '../features/templates/ui/template_editor_screen.dart';
 import '../features/templates/ui/workout_screen.dart';
@@ -31,7 +32,10 @@ import 'app_shell.dart';
 /// slot is already the rest timer bar, and mid-workout the user needs the
 /// fewest possible ways to accidentally tap away). `/session/reorder` is
 /// pushed from `/session` for the "machine is occupied" drag-reorder flow
-/// and inherits the same no-bottom-nav rule.
+/// and inherits the same no-bottom-nav rule. `/session/summary/:id` is
+/// pushed from `/session`'s Finish flow — and, read-only via `?readOnly=true`,
+/// from history — to show the finish/detail screen; it stays outside the
+/// shell for the same reason.
 GoRouter createAppRouter() => GoRouter(
       initialLocation: '/',
       routes: [
@@ -98,6 +102,13 @@ GoRouter createAppRouter() => GoRouter(
         GoRoute(
           path: '/session/reorder',
           builder: (_, _) => const SessionReorderScreen(),
+        ),
+        GoRoute(
+          path: '/session/summary/:id',
+          builder: (_, s) => SessionSummaryScreen(
+            sessionId: s.pathParameters['id']!,
+            readOnly: s.uri.queryParameters['readOnly'] == 'true',
+          ),
         ),
       ],
     );
