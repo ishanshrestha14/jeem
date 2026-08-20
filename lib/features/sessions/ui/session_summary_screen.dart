@@ -110,28 +110,25 @@ class _SessionSummaryScreenState extends ConsumerState<SessionSummaryScreen> {
           ],
         ),
       ),
-      bottomNavigationBar:
-          widget.readOnly ? null : _buildActions(context, workout.id),
+      bottomNavigationBar: widget.readOnly ? null : _buildActions(context),
     );
   }
 
-  Widget _buildActions(BuildContext context, String liveSessionId) {
+  Widget _buildActions(BuildContext context) {
     return SafeArea(
       minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Row(
         children: [
           Expanded(
             child: OutlinedButton(
-              onPressed:
-                  _busy ? null : () => _handleDiscard(context, liveSessionId),
+              onPressed: _busy ? null : () => _handleDiscard(context),
               child: const Text('Discard'),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: FilledButton(
-              onPressed:
-                  _busy ? null : () => _handleSave(context, liveSessionId),
+              onPressed: _busy ? null : () => _handleSave(context),
               child: const Text('Save'),
             ),
           ),
@@ -141,17 +138,30 @@ class _SessionSummaryScreenState extends ConsumerState<SessionSummaryScreen> {
   }
 
   /// Both mutators below commit whatever session
-  /// [activeSessionControllerProvider] currently considers active — not
-  /// necessarily [widget.sessionId]. That's fine for the only live entry
-  /// point today (the active session's own Finish flow, where the two always
-  /// agree), but this screen is reused read-only for history (Task 20), and
-  /// `readOnly` is opt-in — so a future caller that forgets it would
-  /// otherwise silently commit/discard the wrong session. [liveSessionId] is
-  /// the id loaded via [widget.sessionId] itself (threaded through from the
-  /// `data:` branch), so comparing it against [widget.sessionId] here is a
-  /// no-op today and a guard against exactly that future mistake.
-  Future<void> _handleSave(BuildContext context, String liveSessionId) async {
-    if (liveSessionId != widget.sessionId) {
+  /// [activeSessionControllerProvider] currently considers active — an id it
+  /// resolves entirely on its own (via `SessionRepository.watchActiveSession`),
+  /// completely independent of [widget.sessionId] / the `sessionByIdProvider`
+  /// snapshot this screen renders. Those two normally agree (the only live
+  /// entry point today is the active session's own Finish flow), but this
+  /// screen is reused read-only for history (Task 20) with `readOnly` opt-in
+  /// — so a future caller that forgets that flag would otherwise silently
+  /// commit/discard whatever session the controller happens to have live,
+  /// not the one on screen. Guard by reading the controller's own resolved
+  /// session id and refusing to proceed if it disagrees with
+  /// [widget.sessionId] (including when the controller has no active session
+  /// at all).
+  bool _liveSessionMatches() {
+    final activeId = ref
+        .read(activeSessionControllerProvider)
+        .valueOrNull
+        ?.session
+        .session
+        .id;
+    return activeId == widget.sessionId;
+  }
+
+  Future<void> _handleSave(BuildContext context) async {
+    if (!_liveSessionMatches()) {
       assert(false, 'Refusing to save: displayed session != active session');
       return;
     }
@@ -176,11 +186,8 @@ class _SessionSummaryScreenState extends ConsumerState<SessionSummaryScreen> {
     }
   }
 
-  Future<void> _handleDiscard(
-    BuildContext context,
-    String liveSessionId,
-  ) async {
-    if (liveSessionId != widget.sessionId) {
+  Future<void> _handleDiscard(BuildContext context) async {
+    if (!_liveSessionMatches()) {
       assert(false, 'Refusing to discard: displayed session != active session');
       return;
     }
