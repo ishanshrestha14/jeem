@@ -10,6 +10,7 @@ import '../../../core/widgets/numeric_field.dart';
 import '../../../db/app_database.dart';
 import '../../exercises/ui/exercise_info_sheet.dart';
 import '../../exercises/ui/exercise_picker_sheet.dart';
+import '../../settings/providers/settings_providers.dart';
 import '../data/template_models.dart';
 import '../data/template_repository.dart';
 import '../providers/template_providers.dart';
@@ -67,7 +68,11 @@ class _TemplateEditorScreenState extends ConsumerState<TemplateEditorScreen> {
   }
 
   Future<void> _createDraft() async {
-    final created = await _repo.createTemplate(name: '');
+    final defaultRestSeconds = ref.read(settingsProvider).defaultRestSeconds;
+    final created = await _repo.createTemplate(
+      name: '',
+      defaultRestSeconds: defaultRestSeconds,
+    );
     if (!mounted) return;
     setState(() => _templateId = created.id);
   }

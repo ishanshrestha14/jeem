@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../sessions/data/session_repository.dart';
 import '../../sessions/ui/notification_permission_prompt.dart';
+import '../../settings/providers/settings_providers.dart';
 
 enum _StartChoice { resume, discard }
 
@@ -50,7 +51,8 @@ Future<void> startWorkout(
     }
     await repo.cancelSession(active.session.id);
   }
-  await repo.startFromTemplate(templateId, weightUnit: 'kg');
+  final weightUnit = ref.read(settingsProvider).weightUnit;
+  await repo.startFromTemplate(templateId, weightUnit: weightUnit);
   if (context.mounted) {
     await maybeRequestNotificationPermission(context, ref);
   }

@@ -53,6 +53,17 @@ void main() {
 
   testWidgets('the shell renders 4 destinations, in order, and switches tabs on tap',
       (tester) async {
+    // Task 21's Profile/Settings screen now has enough real content
+    // (defaults, feedback switches, notification permission, data
+    // export/import, About) that its "GymFlow" About text sits below the
+    // fold on the default test surface. A taller surface avoids scrolling
+    // the ListView just to assert it's there — same `useTallSurface`
+    // pattern as `test/widget/exercise_editor_image_test.dart`.
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await tester.pumpWidget(harness());
     // The app boots on Home (`/` -> `/home`); with no templates yet it shows
     // the "point at Workout" empty state.
