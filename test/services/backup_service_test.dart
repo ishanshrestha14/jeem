@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gymflow/core/services/backup_service.dart';
@@ -162,11 +164,86 @@ void main() {
     await ExerciseRepository(dbB)
         .create(name: 'Keep me', loggingType: LoggingType.durationOnly);
 
-    expect(
+    await expectLater(
       () => BackupService(dbB).importJson('{"version": 99, "exercises": []}'),
       throwsA(isA<FormatException>()),
     );
     expect(await dbB.select(dbB.exercises).get(), hasLength(1));
+  });
+
+  test(
+      'a payload that violates a foreign key mid-insert rolls back the '
+      'whole transaction rather than leaving a half-deleted database',
+      () async {
+    await ExerciseRepository(dbB)
+        .create(name: 'Keep me', loggingType: LoggingType.durationOnly);
+
+    final now = DateTime.utc(2026, 8, 15, 10).toIso8601String();
+    // Hand-written payload: `templateExercises` references an
+    // `exerciseId` ('missing-ex') that doesn't exist in its own
+    // `exercises` list. The delete phase (all six tables) runs first, then
+    // the insert phase hits this dangling FK on `templateExercises` and
+    // Drift surfaces it as an exception (PRAGMA foreign_keys = ON in
+    // AppDatabase) — proving the whole transaction rolls back.
+    final badJson = jsonEncode({
+      'version': BackupService.backupVersion,
+      'exportedAt': now,
+      'exercises': [
+        {
+          'id': 'ex-1',
+          'name': 'Bench Press',
+          'category': null,
+          'loggingType': 'strengthWeightRepsRir',
+          'description': null,
+          'notes': null,
+          'imagePath': null,
+          'isArchived': false,
+          'createdAt': now,
+          'updatedAt': now,
+          'deletedAt': null,
+        },
+      ],
+      'workoutTemplates': [
+        {
+          'id': 'tpl-1',
+          'name': 'Push Day',
+          'notes': null,
+          'defaultRestSeconds': 90,
+          'autoFocusNextSet': true,
+          'autoFocusNextExercise': true,
+          'createdAt': now,
+          'updatedAt': now,
+          'deletedAt': null,
+        },
+      ],
+      'templateExercises': [
+        {
+          'id': 'te-1',
+          'templateId': 'tpl-1',
+          'exerciseId': 'missing-ex',
+          'sortOrder': 0,
+          'targetSets': 3,
+          'restSeconds': 90,
+          'defaultRir': null,
+          'defaultDurationSeconds': null,
+          'notes': null,
+          'createdAt': now,
+          'updatedAt': now,
+          'deletedAt': null,
+        },
+      ],
+      'workoutSessions': [],
+      'sessionExercises': [],
+      'sessionSets': [],
+    });
+
+    await expectLater(
+      () => BackupService(dbB).importJson(badJson),
+      throwsA(isA<Exception>()),
+    );
+
+    final names = (await dbB.select(dbB.exercises).get()).map((e) => e.name);
+    expect(names, contains('Keep me'));
   });
 
   test('ids and timestamps round-trip exactly', () async {
