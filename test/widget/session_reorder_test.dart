@@ -300,4 +300,41 @@ void main() {
 
     await disposeAndDrainTimers(tester, container: container);
   });
+
+  testWidgets(
+      'reordering a session leaves the originating template order untouched '
+      '(PRD §19 Reordering / §24.6)', (tester) async {
+    await seedPending(['A', 'B', 'C']);
+
+    Future<List<String>> templateOrder() async {
+      final rows = await (db.select(db.templateExercises)
+            ..orderBy([(t) => OrderingTerm(expression: t.sortOrder)]))
+          .get();
+      final names = <String>[];
+      for (final r in rows) {
+        final e = await (db.select(db.exercises)
+              ..where((t) => t.id.equals(r.exerciseId)))
+            .getSingle();
+        names.add(e.name);
+      }
+      return names;
+    }
+
+    expect(await templateOrder(), ['A', 'B', 'C']);
+
+    await tester.pumpWidget(reorderHarness());
+    await pumpUntilSessionData(tester);
+
+    final handles = find.byIcon(Icons.drag_handle);
+    expect(handles, findsNWidgets(3));
+    await dragHandleTo(tester, handles.at(2), handles.at(0));
+    await pumpUntilSessionData(tester);
+
+    // The session order genuinely changed...
+    expect(await orderedNames(), isNot(['A', 'B', 'C']));
+    // ...and the template it was started from did not.
+    expect(await templateOrder(), ['A', 'B', 'C']);
+
+    await disposeAndDrainTimers(tester, container: container);
+  });
 }

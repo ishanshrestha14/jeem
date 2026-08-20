@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/empty_state.dart';
 import '../../../db/app_database.dart';
 import '../providers/exercise_providers.dart';
 import 'exercise_editor_screen.dart';
@@ -78,6 +79,29 @@ class _ExercisePickerSheetState extends ConsumerState<_ExercisePickerSheet> {
                             .where((e) =>
                                 e.name.toLowerCase().contains(query))
                             .toList();
+                    if (rows.isEmpty) {
+                      // Same reasoning as the library screen's
+                      // no-search-results state: a search that matched
+                      // nothing needs its own icon/title/explanation and a
+                      // CTA that moves the user forward. Here the forward
+                      // move is creating the exercise they were looking
+                      // for, since they are mid-way through building a
+                      // template.
+                      return EmptyState(
+                        icon: query.isEmpty
+                            ? Icons.fitness_center
+                            : Icons.search_off,
+                        title: query.isEmpty ? 'No exercises yet' : 'No matches',
+                        message: query.isEmpty
+                            ? 'Add the movements you train so you can drop them '
+                                'into this workout.'
+                            : 'Nothing in your library matches "$_query". '
+                                'Create it and it will be added straight to '
+                                'this workout.',
+                        actionLabel: 'Create new exercise',
+                        onAction: () => _createExercise(context),
+                      );
+                    }
                     return ListView.builder(
                       controller: scrollController,
                       itemCount: rows.length + 1,

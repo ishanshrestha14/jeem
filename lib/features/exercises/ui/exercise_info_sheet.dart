@@ -56,9 +56,31 @@ Future<void> showExerciseInfoSheet(
                     : Container(
                         height: 140,
                         width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
                         color: theme.colorScheme.surfaceContainerHighest,
-                        child: Icon(Icons.fitness_center,
-                            size: 48, color: theme.colorScheme.outline),
+                        // Icon plus a sentence, rather than a bare icon —
+                        // an unlabelled grey square reads as a failed image
+                        // load rather than "this exercise has no photo".
+                        // No CTA here on purpose: this sheet is read-only at
+                        // every call site (session card, picker, template
+                        // row); adding a photo belongs to the editor, which
+                        // carries that CTA itself.
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.image_not_supported_outlined,
+                                size: 40, color: theme.colorScheme.outline),
+                            const SizedBox(height: 8),
+                            Text(
+                              'No photo for this exercise yet. Add one from '
+                              'the exercise library.',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.outline,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
               ),
               if (description != null && description.isNotEmpty) ...[

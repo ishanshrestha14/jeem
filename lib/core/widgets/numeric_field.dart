@@ -99,7 +99,13 @@ class _NumericFieldState extends State<NumericField> {
       decoration: widget.dense
           ? const InputDecoration(
               isDense: true,
-              contentPadding: EdgeInsets.zero,
+              // Vertical padding only — it adds no box chrome (still no
+              // border, no label, no horizontal inset), but it lifts the
+              // field's *tappable* height from ~33dp of bare glyph box to
+              // ≥48dp, which PRD §16.3/§24.4 require of every input. The
+              // set row is 56dp tall regardless (the done control sets
+              // that), so this costs no layout.
+              contentPadding: EdgeInsets.symmetric(vertical: 8),
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,

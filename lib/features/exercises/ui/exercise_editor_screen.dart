@@ -482,7 +482,24 @@ class _DashedPlaceholder extends StatelessWidget {
         width: double.infinity,
         height: double.infinity,
         color: fill,
-        child: Icon(Icons.fitness_center, size: 40, color: color),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        // Icon + a sentence of explanation; the "Photo" heading above is the
+        // title and the Choose/Take buttons below are the call to action, so
+        // together this placeholder carries all four pieces an empty state
+        // owes the user (PRD §16.6).
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_a_photo_outlined, size: 40, color: color),
+            const SizedBox(height: 8),
+            Text(
+              'No photo yet. Add one so you can recognise this exercise at a '
+              'glance mid-workout.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: color),
+            ),
+          ],
+        ),
       ),
     );
   }

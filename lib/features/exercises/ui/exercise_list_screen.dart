@@ -8,12 +8,40 @@ import '../data/exercise_repository.dart';
 import '../providers/exercise_providers.dart';
 import 'exercise_info_sheet.dart';
 
-class ExerciseListScreen extends ConsumerWidget {
+class ExerciseListScreen extends ConsumerStatefulWidget {
   const ExerciseListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ExerciseListScreen> createState() => _ExerciseListScreenState();
+}
+
+class _ExerciseListScreenState extends ConsumerState<ExerciseListScreen> {
+  // Owned here (rather than left implicit on the TextField) so the
+  // no-search-results empty state can offer a real "Clear search" CTA that
+  // actually empties the visible box, not just the provider behind it.
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.text = ref.read(exerciseSearchQueryProvider);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    ref.read(exerciseSearchQueryProvider.notifier).state = '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final exercises = ref.watch(filteredExercisesProvider);
+    final query = ref.watch(exerciseSearchQueryProvider).trim();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Exercises')),
@@ -27,9 +55,17 @@ class ExerciseListScreen extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
             child: TextField(
-              decoration: const InputDecoration(
+              controller: _searchController,
+              decoration: InputDecoration(
                 hintText: 'Search exercises',
-                prefixIcon: Icon(Icons.search),
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: query.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.close),
+                        tooltip: 'Clear search',
+                        onPressed: _clearSearch,
+                      ),
               ),
               onChanged: (v) =>
                   ref.read(exerciseSearchQueryProvider.notifier).state = v,
@@ -40,6 +76,22 @@ class ExerciseListScreen extends ConsumerWidget {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('$e')),
               data: (rows) {
+                if (rows.isEmpty && query.isNotEmpty) {
+                  // A search that matched nothing is a different situation
+                  // from an empty library: telling the user to "add the
+                  // movements you train" when they have fifty of them and
+                  // simply mistyped one is wrong, and the useful next
+                  // action is to widen the search, not to create.
+                  return EmptyState(
+                    icon: Icons.search_off,
+                    title: 'No matches',
+                    message:
+                        'Nothing in your library matches "$query". Try a shorter '
+                        'search, or create this exercise.',
+                    actionLabel: 'Clear search',
+                    onAction: _clearSearch,
+                  );
+                }
                 if (rows.isEmpty) {
                   return EmptyState(
                     icon: Icons.fitness_center,

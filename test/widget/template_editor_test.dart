@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gymflow/core/theme/app_theme.dart';
+import 'package:gymflow/core/widgets/empty_state.dart';
 import 'package:gymflow/db/app_database.dart';
 import 'package:gymflow/features/exercises/data/exercise_repository.dart';
 import 'package:gymflow/features/templates/data/template_repository.dart';
@@ -138,5 +139,58 @@ void main() {
           ..where((row) => row.id.equals(t.id)))
         .getSingle();
     expect(row.name, 'New Name');
+  });
+
+  testWidgets(
+      'a template with no exercises shows a full empty state: icon, title, '
+      'explanation and CTA (PRD §16.6)', (tester) async {
+    final templates = TemplateRepository(db);
+    final t = await templates.createTemplate(name: 'Empty Day');
+
+    await tester.pumpWidget(harness(t.id));
+    await pumpUntilData(tester, until: find.byType(EmptyState));
+
+    final empty = tester.widget<EmptyState>(find.byType(EmptyState));
+    expect(empty.icon, isNotNull);
+    expect(empty.title, 'No exercises yet');
+    expect(empty.message, isNotEmpty);
+    expect(empty.actionLabel, 'Add exercise');
+    expect(empty.onAction, isNotNull);
+
+    await disposeAndDrainTimers(tester);
+  });
+
+  testWidgets(
+      'the picker disambiguates duplicate exercise names with a category '
+      'subtitle (PRD §18.9)', (tester) async {
+    final templates = TemplateRepository(db);
+    final exercises = ExerciseRepository(db);
+    final t = await templates.createTemplate(name: 'Pull');
+    await exercises.create(
+        name: 'Row',
+        loggingType: LoggingType.strengthWeightRepsRir,
+        category: 'Back');
+    await exercises.create(
+        name: 'Row',
+        loggingType: LoggingType.strengthWeightRepsRir,
+        category: 'Legs');
+
+    await tester.pumpWidget(harness(t.id));
+    await pumpUntilData(tester, until: find.text('Add exercise'));
+
+    final addButton = find.text('Add exercise').last;
+    await tester.ensureVisible(addButton);
+    await tester.pump();
+    await tester.tap(addButton);
+    await pumpUntilData(
+        tester, until: find.text('Back · Strength'), maxFrames: 120);
+
+    // Duplicate names are allowed and both are offered...
+    expect(find.text('Row'), findsNWidgets(2));
+    // ...told apart only by the category shown as a subtitle.
+    expect(find.text('Back · Strength'), findsOneWidget);
+    expect(find.text('Legs · Strength'), findsOneWidget);
+
+    await disposeAndDrainTimers(tester);
   });
 }

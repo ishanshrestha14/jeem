@@ -609,4 +609,63 @@ void main() {
 
     await disposeAndDrainTimers(tester, container: container);
   });
+
+  testWidgets(
+      'a 60-character exercise name ellipsises without pushing the info icon '
+      'off a 320dp-wide screen', (tester) async {
+    // PRD §18.10: very long names must wrap/ellipsise and the `i` icon must
+    // stay reachable. Same 320dp viewport + real-font setup as the overflow
+    // tests above — the fallback font measures wider than the real
+    // 'Barlow' face, so a name-length test built against it would be
+    // testing the wrong glyph widths.
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    tester.view.physicalSize = const Size(320, 800);
+    tester.view.devicePixelRatio = 1.0;
+
+    const paddedName =
+        'Seated Single-Arm Dumbbell Overhead Triceps Extension (Left)';
+    expect(paddedName.length, 60);
+
+    final templates = TemplateRepository(db);
+    final exercises = ExerciseRepository(db);
+    final sessions = SessionRepository(db);
+    final t = await templates.createTemplate(name: 'Legs A');
+    final e = await exercises.create(
+        name: paddedName, loggingType: LoggingType.strengthWeightRepsRir);
+    await templates.addExercise(
+        templateId: t.id, exerciseId: e.id, targetSets: 2);
+    await sessions.startFromTemplate(t.id, weightUnit: 'kg');
+
+    await tester.pumpWidget(harness());
+    await pumpUntilSessionData(tester);
+
+    // Nothing overflowed while laying the header row out.
+    expect(tester.takeException(), isNull);
+
+    // The name is rendered, ellipsised (maxLines 2 + TextOverflow.ellipsis)
+    // rather than allowed to push its siblings out of the row.
+    final nameFinder = find.text(paddedName);
+    expect(nameFinder, findsOneWidget);
+    final nameWidget = tester.widget<Text>(nameFinder);
+    expect(nameWidget.overflow, TextOverflow.ellipsis);
+    expect(nameWidget.maxLines, 2);
+
+    // The info icon is still fully on-screen and hit-testable — the actual
+    // regression §18.10 guards against.
+    final infoFinder = find.byTooltip('Exercise info');
+    expect(infoFinder, findsOneWidget);
+    final infoRect = tester.getRect(infoFinder);
+    expect(infoRect.left, greaterThanOrEqualTo(0));
+    expect(infoRect.right, lessThanOrEqualTo(320));
+    expect(infoRect.width, greaterThan(0));
+    await tester.tap(infoFinder);
+    await tester.pumpAndSettle();
+    // The sheet actually opened, so the icon was genuinely reachable.
+    expect(find.text('Strength'), findsWidgets);
+
+    await disposeAndDrainTimers(tester, container: container);
+  });
 }

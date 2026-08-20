@@ -82,4 +82,32 @@ void main() {
     expect(calls, 1);
     expect(received, isNull);
   });
+
+  testWidgets(
+      'every tappable control in the row is at least 48dp tall '
+      '(PRD §16.3 / §24.4)', (tester) async {
+    // The weight and reps fields are `NumericField(dense: true)`, which
+    // deliberately strips all box chrome. With `contentPadding: zero` the
+    // resulting `TextField` measured only ~33dp tall — visually fine inside
+    // a 56dp row, but its *tappable* area was well under the 48dp floor the
+    // PRD sets for every input. This pins the floor for all four controls.
+    await tester.pumpWidget(harness(buildSet(rir: 2), (_) {}));
+
+    for (final field in find.byType(TextField).evaluate()) {
+      expect((field.renderObject! as RenderBox).size.height,
+          greaterThanOrEqualTo(48.0));
+    }
+    // The RIR control is not a TextField (it's an InkWell + showMenu), so
+    // measure the InkWell — the thing that actually takes the tap — rather
+    // than the `Text` it centres inside itself.
+    expect(
+      tester
+          .getSize(find.ancestor(
+              of: find.text('2'), matching: find.byType(InkWell)))
+          .height,
+      greaterThanOrEqualTo(48.0),
+    );
+    expect(tester.getSize(find.byTooltip('Complete set')).height,
+        greaterThanOrEqualTo(48.0));
+  });
 }

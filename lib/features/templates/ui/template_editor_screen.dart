@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/semantic_colors.dart';
 import '../../../core/utils/formatting.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/numeric_field.dart';
 import '../../../db/app_database.dart';
 import '../../exercises/ui/exercise_info_sheet.dart';
@@ -304,13 +305,15 @@ class _TemplateEditorScreenState extends ConsumerState<TemplateEditorScreen> {
           Text('Exercises', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           if (exercises.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Text(
-                'Add exercises to build this workout.',
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
+            EmptyState(
+              icon: Icons.playlist_add,
+              title: 'No exercises yet',
+              message:
+                  'A workout needs at least one exercise before you can start '
+                  'it. Add the movements you want to train, in the order you '
+                  'want to train them.',
+              actionLabel: 'Add exercise',
+              onAction: _addExercise,
             )
           else
             ReorderableListView.builder(
