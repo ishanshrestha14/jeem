@@ -26,7 +26,7 @@ void main() {
   /// 1 completed session with a single session exercise carrying 3 sets
   /// (weight/reps/rir values, one of them completed).
   Future<String> seedAndExport() async {
-    final now = DateTime.utc(2026, 8, 15, 10);
+    final now = DateTime.utc(2026, 8, 15, 10, 30, 45, 123, 456);
 
     await dbA.into(dbA.exercises).insert(ExercisesCompanion.insert(
           id: 'ex-1',
@@ -255,12 +255,13 @@ void main() {
           ..where((t) => t.id.equals('ex-1')))
         .getSingle();
     expect(exercise.id, 'ex-1');
-    expect(exercise.createdAt, DateTime.utc(2026, 8, 15, 10));
+    expect(exercise.createdAt, DateTime.utc(2026, 8, 15, 10, 30, 45, 123, 456));
 
     final session = await (dbB.select(dbB.workoutSessions)
           ..where((t) => t.id.equals('sess-1')))
         .getSingle();
     expect(session.id, 'sess-1');
-    expect(session.endedAt, DateTime.utc(2026, 8, 15, 11));
+    expect(session.endedAt,
+        DateTime.utc(2026, 8, 15, 10, 30, 45, 123, 456).add(const Duration(hours: 1)));
   });
 }
