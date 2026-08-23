@@ -86,7 +86,9 @@ the same reason `TemplateExercises` exists.
 - [x] **No scheduling** — an ordered list is enough (owner, 2026-08-23).
 - [x] Library **opens on Routines**, not Programs: landing on an empty first chip would make the
       library look emptier than it is (owner, 2026-08-23).
-- [ ] Should starting a workout from a program be a thing later, or do programs stay organisational?
+- [x] **Programs stay organisational** (owner, 2026-08-23). Sessions are started from a routine;
+      a program only arranges the library. So no "start program", no current-position tracking, and
+      no notion of being partway through one — all of which a scheduling model would have dragged in.
 
 ## What shipped
 
