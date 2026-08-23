@@ -7,6 +7,7 @@ import '../features/exercises/ui/exercise_list_screen.dart';
 import '../features/history/ui/history_screen.dart';
 import '../features/library/ui/library_screen.dart';
 import '../features/profile/ui/you_screen.dart';
+import '../features/programs/ui/program_editor_screen.dart';
 import '../features/sessions/ui/active_session_screen.dart';
 import '../features/sessions/ui/session_reorder_screen.dart';
 import '../features/sessions/ui/session_summary_screen.dart';
@@ -102,6 +103,15 @@ GoRouter createAppRouter() => GoRouter(
           path: '/exercises/:id',
           builder: (_, s) =>
               ExerciseEditorScreen(exerciseId: s.pathParameters['id']),
+        ),
+        GoRoute(
+          path: '/programs/new',
+          builder: (_, _) => const ProgramEditorScreen(),
+        ),
+        GoRoute(
+          path: '/programs/:id',
+          builder: (_, s) =>
+              ProgramEditorScreen(programId: s.pathParameters['id']),
         ),
         GoRoute(
           path: '/templates/new',

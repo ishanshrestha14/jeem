@@ -19,6 +19,8 @@ part 'app_database.g.dart';
     Exercises,
     ExerciseMuscles,
     ExerciseBodyParts,
+    WorkoutPrograms,
+    ProgramRoutines,
     WorkoutTemplates,
     TemplateExercises,
     WorkoutSessions,
@@ -32,7 +34,7 @@ class AppDatabase extends _$AppDatabase {
   factory AppDatabase.open() => AppDatabase(_openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   DriftDatabaseOptions get options =>
@@ -66,6 +68,10 @@ class AppDatabase extends _$AppDatabase {
               await m.alterTable(TableMigration(exercises));
             }
             await _deriveMissingBodyParts();
+          }
+          if (from < 5) {
+            await m.createTable(workoutPrograms);
+            await m.createTable(programRoutines);
           }
         },
         beforeOpen: (details) async {

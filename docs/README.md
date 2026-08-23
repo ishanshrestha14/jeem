@@ -155,7 +155,7 @@ Next free CMP-ID: **CMP-028**.
 | [T-003](tickets/T-003-numeric-keypad.md) | In-session numeric keypad | **Done** | M | CMP-018 |
 | [T-004](tickets/T-004-exercise-taxonomy.md) | Muscle group + equipment taxonomy on exercises | **Done** (schema v3) | L | S-002, S-026, CMP-022, CMP-024 |
 | [T-005](tickets/T-005-plural-primary-muscles.md) | Correct the exercise taxonomy: body parts + plural muscles (schema v4) | **Done** (schema v4) | L | S-025, S-027 |
-| [T-006](tickets/T-006-programs.md) | Programs: a container above routines (schema v5) | Mini-plan — awaiting go | L | S-004 |
+| [T-006](tickets/T-006-programs.md) | Programs: a container above routines (schema v5) | **Done** (schema v5) | L | S-004 |
 
 Next free T-ID: **T-007**.
 
@@ -351,11 +351,11 @@ default | pressed | disabled | loading | selected | error
 | FL (flows) | 0 |
 | CMP (components) | 27 candidates — 0 written specs |
 | F (features) | 0 |
-| T (tickets) | 6 — 4 done, 1 blocked (T-002), 1 planned (T-006) |
+| T (tickets) | 6 — 5 done, 1 blocked (T-002) |
 | ADR (decisions) | 6 |
 
-**Last updated:** **five-tab shell live** — `Home · Explore · Workout · Library · You` (ADR-005),
-pulled forward from Phase 3 at the owner's request. 219 tests pass.
+**Last updated:** **Programs shipped** (T-006, schema v5) and the Library tab rebuilt to match
+S-004. 233 tests pass. Next: the **You** tab, still drifted from S-005.
 
 **Screenshot workflow:** paste into any note under `docs/`; Obsidian writes the PNG to disk and I
 rename it into `screenshots/` under its manifest name.

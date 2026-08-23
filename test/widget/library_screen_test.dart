@@ -5,6 +5,7 @@ import 'package:gymflow/core/theme/app_theme.dart';
 import 'package:gymflow/db/app_database.dart';
 import 'package:gymflow/features/exercises/data/exercise_repository.dart';
 import 'package:gymflow/features/library/ui/library_screen.dart';
+import 'package:gymflow/features/programs/data/program_repository.dart';
 import 'package:gymflow/features/templates/data/template_repository.dart';
 
 import '../db/test_database.dart';
@@ -112,6 +113,30 @@ void main() {
     expect(find.text('Create a reusable workout routine'), findsOneWidget);
     expect(find.text('Exercise'), findsOneWidget);
     expect(find.text('Create a custom exercise'), findsOneWidget);
+
+    await disposeAndDrainTimers(tester, container: container);
+  });
+
+  testWidgets('opens on Routines, and Programs lists programs with counts',
+      (tester) async {
+    final templates = TemplateRepository(db);
+    final program = await ProgramRepository(db).create(name: 'Upper / Lower');
+    final upper = await templates.createTemplate(name: 'Upper A');
+    await ProgramRepository(db)
+        .addRoutine(programId: program.id, templateId: upper.id);
+
+    await tester.pumpWidget(harness());
+    await pumpUntilData(tester, until: find.text('Create new routine'));
+
+    // Opens on Routines, not Programs: landing on an empty first chip would
+    // make the library look emptier than it is (owner decision).
+    expect(find.text('Create new program'), findsNothing);
+
+    await tester.tap(find.text('Programs'));
+    await pumpUntilData(tester, until: find.text('Upper / Lower'));
+
+    expect(find.text('Create new program'), findsOneWidget);
+    expect(find.text('1 routine'), findsOneWidget);
 
     await disposeAndDrainTimers(tester, container: container);
   });

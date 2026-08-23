@@ -7,6 +7,7 @@ import '../../../core/theme/semantic_colors.dart';
 import '../../../core/utils/formatting.dart';
 import '../../../db/app_database.dart';
 import '../../exercises/providers/exercise_providers.dart';
+import '../../programs/providers/program_providers.dart';
 import '../../templates/data/template_models.dart';
 import '../../templates/providers/template_providers.dart';
 
@@ -22,7 +23,7 @@ import '../../templates/providers/template_providers.dart';
 ///     is the routine, so the chip would filter to nothing.
 ///   - **Favourites appears only under Exercises.** Exercises carry a
 ///     favourite flag (T-004); routines do not yet.
-enum _LibraryFilter { routines, exercises }
+enum _LibraryFilter { programs, routines, exercises }
 
 enum _CreateTarget { program, routine, exercise }
 
@@ -62,6 +63,10 @@ class LibraryScreen extends ConsumerStatefulWidget {
 }
 
 class _LibraryScreenState extends ConsumerState<LibraryScreen> {
+  /// Defaults to Routines rather than Programs (owner decision): the
+  /// reference app opens on Programs because it has one, and landing on an
+  /// empty first chip would make the library look emptier than it is. Once a
+  /// program exists, Programs leads the chip row and can be selected.
   _LibraryFilter _filter = _LibraryFilter.routines;
 
   @override
@@ -117,22 +122,29 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             ),
           ),
           Expanded(
-            child: _filter == _LibraryFilter.routines
-                ? _RoutineList(onCreate: _create)
-                : _ExerciseList(onCreate: _create),
+            child: switch (_filter) {
+              _LibraryFilter.programs => _ProgramList(onCreate: _create),
+              _LibraryFilter.routines => _RoutineList(onCreate: _create),
+              _LibraryFilter.exercises => _ExerciseList(onCreate: _create),
+            },
           ),
         ],
       ),
     );
   }
 
-  String _label(_LibraryFilter f) =>
-      f == _LibraryFilter.routines ? 'Routines' : 'Exercises';
+  String _label(_LibraryFilter f) => switch (f) {
+        _LibraryFilter.programs => 'Programs',
+        _LibraryFilter.routines => 'Routines',
+        _LibraryFilter.exercises => 'Exercises',
+      };
 
   void _create() {
-    context.push(_filter == _LibraryFilter.routines
-        ? '/templates/new'
-        : '/exercises/new');
+    context.push(switch (_filter) {
+      _LibraryFilter.programs => '/programs/new',
+      _LibraryFilter.routines => '/templates/new',
+      _LibraryFilter.exercises => '/exercises/new',
+    });
   }
 
   Future<void> _openCreateSheet() async {
@@ -170,17 +182,41 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       case _CreateTarget.exercise:
         context.push('/exercises/new');
       case _CreateTarget.program:
-        // Offered because the sheet is the reference app's, but a program
-        // groups routines and we have no object above the routine yet. Saying
-        // so beats an entry that silently does nothing.
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Programs group routines into a plan — not built yet.',
-            ),
-          ),
-        );
+        context.push('/programs/new');
     }
+  }
+}
+
+class _ProgramList extends ConsumerWidget {
+  const _ProgramList({required this.onCreate});
+
+  final VoidCallback onCreate;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summaries = ref.watch(programSummariesProvider);
+    return summaries.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('$e')),
+      data: (rows) => ListView(
+        padding: const EdgeInsets.only(bottom: 96),
+        children: [
+          LibraryRow(
+            tile: const _GlyphTile(icon: Icons.add),
+            title: 'Create new program',
+            onTap: onCreate,
+          ),
+          for (final s in rows)
+            LibraryRow(
+              tile: InitialsTile(name: s.program.name),
+              title: s.program.name,
+              subtitle: '${s.routineCount} '
+                  '${s.routineCount == 1 ? 'routine' : 'routines'}',
+              onTap: () => context.push('/programs/${s.program.id}'),
+            ),
+        ],
+      ),
+    );
   }
 }
 

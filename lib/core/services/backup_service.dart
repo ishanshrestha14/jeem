@@ -30,6 +30,8 @@ class BackupService {
     final exerciseMuscles = await _db.select(_db.exerciseMuscles).get();
     final exerciseBodyParts = await _db.select(_db.exerciseBodyParts).get();
     final templates = await _db.select(_db.workoutTemplates).get();
+    final programs = await _db.select(_db.workoutPrograms).get();
+    final programRoutines = await _db.select(_db.programRoutines).get();
     final templateExercises = await _db.select(_db.templateExercises).get();
     final sessions = await _db.select(_db.workoutSessions).get();
     final sessionExercises = await _db.select(_db.sessionExercises).get();
@@ -43,6 +45,8 @@ class BackupService {
       'exerciseBodyParts':
           exerciseBodyParts.map(_exerciseBodyPartToJson).toList(),
       'workoutTemplates': templates.map(_templateToJson).toList(),
+      'workoutPrograms': programs.map(_programToJson).toList(),
+      'programRoutines': programRoutines.map(_programRoutineToJson).toList(),
       'templateExercises':
           templateExercises.map(_templateExerciseToJson).toList(),
       'workoutSessions': sessions.map(_sessionToJson).toList(),
@@ -110,6 +114,10 @@ class BackupService {
         .toList();
     final templates =
         _list(data['workoutTemplates']).map(_templateFromJson).toList();
+    // Absent in pre-v5 backups, which import as "no programs yet".
+    final programs = _list(data['workoutPrograms']).map(_programFromJson).toList();
+    final programRoutines =
+        _list(data['programRoutines']).map(_programRoutineFromJson).toList();
     final templateExercises = _list(data['templateExercises'])
         .map(_templateExerciseFromJson)
         .toList();
@@ -125,6 +133,9 @@ class BackupService {
       await _db.delete(_db.sessionSets).go();
       await _db.delete(_db.sessionExercises).go();
       await _db.delete(_db.workoutSessions).go();
+      // Before templates: program memberships reference them.
+      await _db.delete(_db.programRoutines).go();
+      await _db.delete(_db.workoutPrograms).go();
       await _db.delete(_db.templateExercises).go();
       await _db.delete(_db.workoutTemplates).go();
       // Deleted before exercises only for symmetry with the FK-safe order
@@ -152,6 +163,12 @@ class BackupService {
       }
       if (templates.isNotEmpty) {
         await _db.batch((b) => b.insertAll(_db.workoutTemplates, templates));
+      }
+      if (programs.isNotEmpty) {
+        await _db.batch((b) => b.insertAll(_db.workoutPrograms, programs));
+      }
+      if (programRoutines.isNotEmpty) {
+        await _db.batch((b) => b.insertAll(_db.programRoutines, programRoutines));
       }
       if (templateExercises.isNotEmpty) {
         await _db.batch(
@@ -286,6 +303,50 @@ class BackupService {
       ));
     }
     return out;
+  }
+
+  Map<String, dynamic> _programToJson(WorkoutProgram p) => {
+        'id': p.id,
+        'name': p.name,
+        'notes': p.notes,
+        'createdAt': _toIso(p.createdAt),
+        'updatedAt': _toIso(p.updatedAt),
+        'deletedAt': _toIsoOrNull(p.deletedAt),
+      };
+
+  WorkoutProgram _programFromJson(dynamic json) {
+    final j = json as Map<String, dynamic>;
+    return WorkoutProgram(
+      id: j['id'] as String,
+      name: j['name'] as String,
+      notes: j['notes'] as String?,
+      createdAt: _parseDate(j['createdAt'] as String),
+      updatedAt: _parseDate(j['updatedAt'] as String),
+      deletedAt: _parseDateOrNull(j['deletedAt']),
+    );
+  }
+
+  Map<String, dynamic> _programRoutineToJson(ProgramRoutine r) => {
+        'id': r.id,
+        'programId': r.programId,
+        'templateId': r.templateId,
+        'sortOrder': r.sortOrder,
+        'createdAt': _toIso(r.createdAt),
+        'updatedAt': _toIso(r.updatedAt),
+        'deletedAt': _toIsoOrNull(r.deletedAt),
+      };
+
+  ProgramRoutine _programRoutineFromJson(dynamic json) {
+    final j = json as Map<String, dynamic>;
+    return ProgramRoutine(
+      id: j['id'] as String,
+      programId: j['programId'] as String,
+      templateId: j['templateId'] as String,
+      sortOrder: j['sortOrder'] as int,
+      createdAt: _parseDate(j['createdAt'] as String),
+      updatedAt: _parseDate(j['updatedAt'] as String),
+      deletedAt: _parseDateOrNull(j['deletedAt']),
+    );
   }
 
   // ---------------------------------------------------------------------

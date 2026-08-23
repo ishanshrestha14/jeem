@@ -164,6 +164,38 @@ class TemplateExercises extends Table with SyncColumns {
   Set<Column> get primaryKey => {id};
 }
 
+/// A named, ordered collection of routines — "create a program with your
+/// routines" (S-004). Organisation only: no scheduling, no week/day
+/// assignment. A program does not change how you train, only how the library
+/// is arranged.
+class WorkoutPrograms extends Table with SyncColumns {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get notes => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// One row per membership, rather than a program column on the template, so a
+/// routine can sit in several programs without being copied — the same reason
+/// [TemplateExercises] exists.
+///
+/// Deliberately **no** unique constraint on (programId, templateId): an
+/// A/B/A week is a real thing, so the same routine may appear twice in one
+/// program and only [sortOrder] tells the two apart.
+class ProgramRoutines extends Table with SyncColumns {
+  TextColumn get id => text()();
+  TextColumn get programId =>
+      text().references(WorkoutPrograms, #id, onDelete: KeyAction.cascade)();
+  TextColumn get templateId =>
+      text().references(WorkoutTemplates, #id, onDelete: KeyAction.cascade)();
+  IntColumn get sortOrder => integer()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 class WorkoutSessions extends Table with SyncColumns {
   TextColumn get id => text()();
   TextColumn get templateId => text().nullable()();

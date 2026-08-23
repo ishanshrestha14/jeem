@@ -270,12 +270,28 @@ void main() {
     );
   });
 
-  test('a fresh database creates the v4 taxonomy tables', () async {
+  test('a fresh database creates every current table', () async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
     await db.select(db.exerciseMuscles).get();
     await db.select(db.exerciseBodyParts).get();
-    expect(db.schemaVersion, 4);
+    await db.select(db.workoutPrograms).get();
+    await db.select(db.programRoutines).get();
+    expect(db.schemaVersion, 5);
+  });
+
+  test('v2 reaches v5 in one open, with programs available', () async {
+    await createV2Database();
+    await insertV2Exercise(id: 'mine-1', name: 'Ishan Special Curl');
+
+    final db = AppDatabase(NativeDatabase(file));
+    addTearDown(db.close);
+
+    // The program tables are created on the way through, and the v2 row
+    // still survives the whole chain.
+    expect(await db.select(db.workoutPrograms).get(), isEmpty);
+    final rows = await db.select(db.exercises).get();
+    expect(rows.where((r) => r.id == 'mine-1'), hasLength(1));
   });
 }
 

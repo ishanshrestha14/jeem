@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gymflow/core/services/backup_service.dart';
 import 'package:gymflow/db/app_database.dart';
 import 'package:gymflow/features/exercises/data/exercise_repository.dart';
+import 'package:gymflow/features/programs/data/program_repository.dart';
+import 'package:gymflow/features/templates/data/template_repository.dart';
 
 import '../db/test_database.dart';
 
@@ -285,5 +287,35 @@ void main() {
     final decoded =
         jsonDecode(await file.readAsString()) as Map<String, dynamic>;
     expect(decoded['version'], isNotNull);
+  });
+
+  test('round-trips programs and their routines, in order', () async {
+    final templates = TemplateRepository(dbA);
+    final programs = ProgramRepository(dbA);
+    final program = await programs.create(name: 'Upper / Lower');
+    final upper = await templates.createTemplate(name: 'Upper A');
+    final lower = await templates.createTemplate(name: 'Lower A');
+    await programs.addRoutine(programId: program.id, templateId: upper.id);
+    await programs.addRoutine(programId: program.id, templateId: lower.id);
+    await programs.reorder(program.id, 1, 0);
+
+    await BackupService(dbB).importJson(await BackupService(dbA).exportJson());
+
+    final restored = await ProgramRepository(dbB).watchProgram(program.id).first;
+    expect(restored, isNotNull);
+    expect([for (final r in restored!.routines) r.template.name],
+        ['Lower A', 'Upper A'], reason: 'order must survive the round trip');
+  });
+
+  test('a backup written before programs existed still imports', () async {
+    final json = jsonDecode(await BackupService(dbA).exportJson())
+        as Map<String, dynamic>;
+    // Exactly the shape of a pre-v5 file: the keys simply are not there.
+    json.remove('workoutPrograms');
+    json.remove('programRoutines');
+
+    await BackupService(dbB).importJson(jsonEncode(json));
+
+    expect(await ProgramRepository(dbB).watchSummaries().first, isEmpty);
   });
 }

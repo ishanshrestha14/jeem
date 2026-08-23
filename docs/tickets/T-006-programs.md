@@ -1,6 +1,6 @@
 # T-006 — Programs: a container above routines (schema v5)
 
-- **Status:** Mini-plan submitted — awaiting go
+- **Status:** **Done** (2026-08-23) — `flutter analyze` clean, 233 tests pass.
 - **Priority:** Should
 - **Effort:** L
 - **Specs:** S-004
@@ -83,10 +83,33 @@ the same reason `TemplateExercises` exists.
 
 ## Open questions
 
-- [ ] Does a program need **scheduling** (days/weeks), or is an ordered list enough for now?
-- [ ] Should `Programs` be the default chip even while you have none — an empty first tab — or
-      should Library open on `Routines` until a program exists?
+- [x] **No scheduling** — an ordered list is enough (owner, 2026-08-23).
+- [x] Library **opens on Routines**, not Programs: landing on an empty first chip would make the
+      library look emptier than it is (owner, 2026-08-23).
 - [ ] Should starting a workout from a program be a thing later, or do programs stay organisational?
+
+## What shipped
+
+- Schema **v5**: `WorkoutPrograms` + `ProgramRoutines`, created on the way through from any earlier
+  version (a v2 install still reaches v5 in one open).
+- `ProgramRepository` — summaries with live routine counts, create/rename/soft-delete, add/remove/
+  reorder, and `updatedAt` touched when contents change so "Recent" reflects edits to a program's
+  routines, not just its name.
+- Program editor at `/programs/new` and `/programs/:id`, reusing the template editor's grammar.
+  Creation happens on first save, so backing out of a blank editor leaves nothing behind.
+- Library gains the third chip; the `+` sheet's Program entry now creates one.
+- Backup round-trips both tables; pre-v5 files import as "no programs yet".
+
+## Decisions made during implementation
+
+- **Soft delete**, matching templates: history and backups keep referring to ids long after the
+  user is done with them.
+- **Counts exclude soft-deleted routines.** Templates are soft-deleted, so a cascade never fires and
+  a naive count would keep counting a routine the program can no longer show.
+- **Removal resequences** the remaining `sortOrder` values to 0..n-1, so a gap can never collide
+  with the next insert.
+- **Adding a routine to an unsaved program saves it first** rather than refusing — the alternative
+  is an editor that says "name it first" for an action the user has already committed to.
 
 ## Revision log
 - 2026-08-23 — created from `ref-S004-library.png` and the create sheet.
