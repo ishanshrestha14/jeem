@@ -64,3 +64,6 @@ app.*.map.json
 
 # Project-specific / Superpowers SDD workspace (scratch)
 .superpowers/
+
+# Obsidian vault config for docs/ — editor state, not project content
+docs/.obsidian/
