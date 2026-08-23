@@ -68,3 +68,18 @@ Future<void> disposeAndDrainTimers(
     }
   }
 }
+
+/// Mirror of [pumpUntilData] for a disappearance: pumps until [finder] matches
+/// nothing, or gives up so the caller's own `expect` reports the failure with
+/// a useful message rather than a bare timeout.
+Future<void> pumpUntilGone(
+  WidgetTester tester,
+  Finder finder, {
+  int maxFrames = 40,
+  Duration step = const Duration(milliseconds: 50),
+}) async {
+  for (var i = 0; i < maxFrames; i++) {
+    if (finder.evaluate().isEmpty) return;
+    await tester.pump(step);
+  }
+}

@@ -6,6 +6,10 @@ Future<bool> confirmDestructive(
   required String title,
   required String message,
   required String confirmLabel,
+  /// Defaults to "Cancel". Worth overriding wherever "Cancel" could be read as
+  /// cancelling the *subject* rather than the dialog — "Cancel" next to
+  /// "Discard workout" is exactly that trap.
+  String cancelLabel = 'Cancel',
 }) async {
   final danger = Theme.of(context).extension<SemanticColors>()!.danger;
   final result = await showDialog<bool>(
@@ -16,7 +20,7 @@ Future<bool> confirmDestructive(
       actions: [
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(false),
-          child: const Text('Cancel'),
+          child: Text(cancelLabel),
         ),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: danger),

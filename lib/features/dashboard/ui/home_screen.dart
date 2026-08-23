@@ -8,7 +8,6 @@ import '../../../core/theme/semantic_colors.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../history/providers/history_providers.dart';
 import '../../sessions/data/session_models.dart';
-import '../../sessions/data/session_repository.dart';
 import '../../templates/data/template_models.dart';
 import '../../templates/providers/template_providers.dart';
 import '../../templates/ui/start_workout_action.dart';
@@ -19,10 +18,6 @@ import '../../templates/ui/start_workout_action.dart';
 /// metric — a dashboard showing a hardcoded zero or a fake sparkline is
 /// worse than one that shows less. Every element below reads a real
 /// provider:
-///  - the resume card reads [activeSessionProvider] (a live stream — this
-///    is the one place the one-shot [ActiveSessionController] is NOT the
-///    right tool, since Home must react to a session started/finished
-///    elsewhere);
 ///  - quick start reads [templateSummariesProvider], sorted by
 ///    `TemplateSummary.lastPerformedAt` (nulls last);
 ///  - last workout reads [historyProvider].
@@ -30,13 +25,17 @@ import '../../templates/ui/start_workout_action.dart';
 /// Streaks/analytics are computed from completed sessions, and no session
 /// can be completed until the finish-session flow exists — see the gap
 /// left below rather than a placeholder section.
+///
+/// A live session is **not** surfaced here any more: the shell's
+/// `WorkoutInProgressBar` (CMP-001, T-001) shows it above the nav on every
+/// tab, so a Home-only resume card would be a second, less consistent way to
+/// do the same thing.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summaries = ref.watch(templateSummariesProvider);
-    final active = ref.watch(activeSessionProvider);
     final completed = ref.watch(historyProvider);
 
     return Scaffold(
@@ -46,20 +45,12 @@ class HomeScreen extends ConsumerWidget {
         error: (e, _) => Center(child: Text('$e')),
         data: (rows) {
           if (rows.isEmpty) {
-            // A running session must stay reachable even with zero
-            // templates left (e.g. the last template was deleted mid-
-            // workout) — `/session` is only reachable from this resume
-            // card, `startWorkout`, or the template editor, so the empty
-            // state alone would strand the session with no way back.
-            return active.maybeWhen(
-              data: (session) => session == null
-                  ? _buildEmptyState(context)
-                  : ListView(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
-                      children: [_ResumeCard(session: session)],
-                    ),
-              orElse: () => _buildEmptyState(context),
-            );
+            // A running session stays reachable here even with zero templates
+            // left (e.g. the last one was deleted mid-workout): the shell's
+            // WorkoutInProgressBar (CMP-001) sits above the nav on every tab,
+            // so the empty state no longer strands the session the way it
+            // would have when Home's resume card was the only way back.
+            return _buildEmptyState(context);
           }
 
           final quickStart = _quickStart(rows);
@@ -67,12 +58,6 @@ class HomeScreen extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
             children: [
-              active.maybeWhen(
-                data: (session) => session == null
-                    ? const SizedBox.shrink()
-                    : _ResumeCard(session: session),
-                orElse: () => const SizedBox.shrink(),
-              ),
               _SectionHeader('Quick start'),
               const SizedBox(height: 8),
               for (final s in quickStart)
@@ -144,66 +129,6 @@ class _SectionHeader extends StatelessWidget {
     return Text(
       label.toUpperCase(),
       style: AppTheme.columnHeader.copyWith(color: muted),
-    );
-  }
-}
-
-/// The single most important thing on the screen when it applies: a
-/// prominent card surfacing the in-progress session so the user's next tap
-/// is always "get back to my workout".
-class _ResumeCard extends StatelessWidget {
-  const _ResumeCard({required this.session});
-
-  final ActiveSession session;
-
-  @override
-  Widget build(BuildContext context) {
-    final semantic = Theme.of(context).extension<SemanticColors>()!;
-    // Not a live elapsed-time countup: Home is a `ConsumerWidget` with no
-    // ticker (unlike `ActiveSessionScreen`, which owns a 1s `Timer.periodic`
-    // for exactly this reason), so a duration computed once at build would
-    // sit frozen on screen — worse than not showing a number at all. The
-    // start time itself doesn't need a ticker to stay correct.
-    final startedAt = session.session.startedAt;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 20),
-      color: semantic.surfaceHigh,
-      child: InkWell(
-        onTap: () => context.push('/session'),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'IN PROGRESS',
-                      style: AppTheme.columnHeader.copyWith(color: semantic.rest),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(session.session.name, style: AppTheme.exerciseName.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface,
-                    )),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Started ${DateFormat.jm().format(startedAt)}',
-                      style: AppTheme.elapsedTime.copyWith(color: semantic.muted),
-                    ),
-                  ],
-                ),
-              ),
-              FilledButton(
-                onPressed: () => context.push('/session'),
-                child: const Text('Resume'),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

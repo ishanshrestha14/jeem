@@ -3,10 +3,17 @@ import 'package:go_router/go_router.dart';
 
 import '../core/theme/app_theme.dart';
 import '../core/theme/semantic_colors.dart';
+import '../features/sessions/ui/widgets/workout_in_progress_bar.dart';
 
 /// Hosts the four primary destinations (Home / Workout / History / Profile)
 /// behind a [StatefulShellRoute.indexedStack] so each tab keeps its own
 /// navigation stack and scroll position across tab switches.
+///
+/// A live session shows a [WorkoutInProgressBar] directly above the nav
+/// (CMP-001). It sits inside the `bottomNavigationBar` slot rather than in the
+/// body so it occupies layout on every tab at once — each branch keeps its own
+/// scroll view, and putting the bar in the body would mean every one of them
+/// needing to reserve space for it.
 ///
 /// The bottom nav is hand-built rather than a Material [NavigationBar]: the
 /// design system (docs/design/gymflow-design-system.md) explicitly bans the
@@ -22,14 +29,20 @@ class AppShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: navigationShell,
-      bottomNavigationBar: _AppNavigationBar(
-        currentIndex: navigationShell.currentIndex,
-        onTap: (index) => navigationShell.goBranch(
-          index,
-          // Tapping the already-selected tab returns it to its initial
-          // location (e.g. pops any local navigation) rather than a no-op.
-          initialLocation: index == navigationShell.currentIndex,
-        ),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const WorkoutInProgressBar(),
+          _AppNavigationBar(
+            currentIndex: navigationShell.currentIndex,
+            onTap: (index) => navigationShell.goBranch(
+              index,
+              // Tapping the already-selected tab returns it to its initial
+              // location (e.g. pops any local navigation) rather than a no-op.
+              initialLocation: index == navigationShell.currentIndex,
+            ),
+          ),
+        ],
       ),
     );
   }
