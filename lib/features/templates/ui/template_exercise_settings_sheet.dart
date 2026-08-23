@@ -96,14 +96,14 @@ class _TemplateExerciseSettingsSheetState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Exercise settings', style: theme.textTheme.headlineSmall),
-            const SizedBox(height: 16),
-            NumericField(
-              label: 'Target sets',
-              value: _config.targetSets,
-              min: 1,
-              max: 20,
-              onChanged: (v) =>
-                  _apply((c) => c.copyWith(targetSets: (v ?? 3).toInt())),
+            const SizedBox(height: 4),
+            // Set count, RIR and duration moved out in schema v6: they are
+            // per *set* now, edited in the planned-sets table where the
+            // numbers are visible (S-028). What is left here is the
+            // configuration that genuinely applies to the whole exercise.
+            Text(
+              'Sets, reps and weight are planned per set.',
+              style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
             NumericField(
@@ -128,31 +128,6 @@ class _TemplateExerciseSettingsSheetState
                   ),
               ],
             ),
-            if (widget.loggingType == LoggingType.strengthWeightRepsRir) ...[
-              const SizedBox(height: 16),
-              DropdownButtonFormField<double?>(
-                initialValue: _config.defaultRir,
-                decoration: const InputDecoration(labelText: 'Default RIR'),
-                items: [
-                  for (final rir in kRirValues)
-                    DropdownMenuItem(value: rir, child: Text(formatRir(rir))),
-                ],
-                onChanged: (v) =>
-                    _apply((c) => c.copyWith(defaultRir: Value(v))),
-              ),
-            ],
-            if (widget.loggingType == LoggingType.durationOnly) ...[
-              const SizedBox(height: 16),
-              NumericField(
-                label: 'Default duration',
-                value: _config.defaultDurationSeconds,
-                min: 0,
-                suffix: 's',
-                onChanged: (v) => _apply(
-                  (c) => c.copyWith(defaultDurationSeconds: Value(v?.toInt())),
-                ),
-              ),
-            ],
             const SizedBox(height: 16),
             TextField(
               controller: _notesController,

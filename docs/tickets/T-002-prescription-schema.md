@@ -81,5 +81,38 @@ pre-filling simply does nothing for them until edited. No destructive migration.
 - [ ] Start a session from an old template — no crash, no empty rows regression.
 - [ ] Export a backup, reinstall, import — everything returns.
 
+## What shipped
+
+- Schema **v6**: `TemplateSets` (row per planned set: weight, reps, repsMax, rir, duration), and
+  `plannedWeight`/`plannedReps`/`plannedRepsMax` on `SessionSets`.
+- `TemplateExercises.targetSets`, `.defaultRir` and `.defaultDurationSeconds` migrated into rows and
+  **dropped**. The set count is now the row count, so the two can never disagree.
+- Repository: `setsFor`, `addSet`, `updateSet`, `removeSet` (resequencing), and duplication that
+  carries the prescription across — the numbers being the point of duplicating a routine.
+- Session snapshot copies the plan onto `SessionSets` without touching the logged columns.
+- Routine editor: rows summarise their plan (`1  70kg x 8 reps`) or say `Press to add details`;
+  tapping opens a planned-sets table with `Kg`, `Reps`, a reps-vs-range toggle on the column header,
+  and `+ Add Set`.
+- Backup round-trips `templateSets`, and **rebuilds them from a pre-v6 file's per-exercise columns**
+  so an older backup restores routines with the right number of sets rather than none.
+
+## Deviations
+
+- **The set table is a sheet, not inline expansion.** The reference expands in place; our editor is a
+  `ReorderableListView`, and embedding an editable table inside a drag target is a fight not worth
+  picking for the first version. Columns and behaviour match, which is what the pre-fill depends on.
+- **Adding a set copies the previous one** rather than starting blank — the common case is another
+  set of the same thing.
+
+## Two things this shook out
+
+- **A drift subscription cancel that never completes.** The new combined stream awaited both
+  subscription cancels in `onCancel`; cancelling a drift query stream never completes on this
+  drift/Dart version — the same hang `watchSummaries` was already hand-rolled to avoid. It surfaced
+  as a widget test hanging in teardown, not as an error. Cancels are now fired, not awaited.
+- **The migration test's v2 fixture was a stub.** It created only `exercises`, which the earlier
+  ticket admitted to; the v6 migration touches `session_sets`, so the fixture is now a realistic v2
+  database and the v2 → v6 path is genuinely exercised.
+
 ## Revision log
 - 2026-08-23 — created from the roadmap (Phase 1, item 1); blocked pending the routine-builder screenshot.

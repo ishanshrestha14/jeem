@@ -30,6 +30,57 @@ void main() {
     if (await dir.exists()) await dir.delete(recursive: true);
   });
 
+  /// The tables later migrations touch. Written out rather than generated:
+  /// these only need to be shape-compatible with what drift produced then —
+  /// the migrations are what is under test, not the old schema's exact text.
+  Future<void> createSupportingTables(NativeDatabase raw) async {
+    const statements = [
+      'CREATE TABLE workout_templates ('
+          'id TEXT NOT NULL, name TEXT NOT NULL, notes TEXT NULL,'
+          'default_rest_seconds INTEGER NOT NULL DEFAULT 90,'
+          'auto_focus_next_set INTEGER NOT NULL DEFAULT 1,'
+          'auto_focus_next_exercise INTEGER NOT NULL DEFAULT 1,'
+          'created_at TEXT NOT NULL, updated_at TEXT NOT NULL,'
+          'deleted_at TEXT NULL, PRIMARY KEY (id));',
+      'CREATE TABLE template_exercises ('
+          'id TEXT NOT NULL, template_id TEXT NOT NULL, exercise_id TEXT NOT NULL,'
+          'sort_order INTEGER NOT NULL, target_sets INTEGER NOT NULL DEFAULT 3,'
+          'rest_seconds INTEGER NOT NULL DEFAULT 90, default_rir REAL NULL,'
+          'default_duration_seconds INTEGER NULL, notes TEXT NULL,'
+          'created_at TEXT NOT NULL, updated_at TEXT NOT NULL,'
+          'deleted_at TEXT NULL, PRIMARY KEY (id));',
+      'CREATE TABLE workout_sessions ('
+          'id TEXT NOT NULL, template_id TEXT NULL, name TEXT NOT NULL,'
+          "weight_unit TEXT NOT NULL DEFAULT 'kg', status TEXT NOT NULL,"
+          'auto_focus_next_set INTEGER NOT NULL DEFAULT 1,'
+          'auto_focus_next_exercise INTEGER NOT NULL DEFAULT 1,'
+          'started_at TEXT NOT NULL, ended_at TEXT NULL,'
+          'paused_seconds INTEGER NOT NULL DEFAULT 0, paused_at TEXT NULL,'
+          "notes TEXT NULL, rest_status TEXT NOT NULL DEFAULT 'idle',"
+          'rest_ends_at TEXT NULL, rest_remaining_seconds INTEGER NULL,'
+          'rest_total_seconds INTEGER NULL, rest_after_set_id TEXT NULL,'
+          'created_at TEXT NOT NULL, updated_at TEXT NOT NULL,'
+          'deleted_at TEXT NULL, PRIMARY KEY (id));',
+      'CREATE TABLE session_exercises ('
+          'id TEXT NOT NULL, session_id TEXT NOT NULL, exercise_id TEXT NULL,'
+          'name TEXT NOT NULL, description TEXT NULL, notes TEXT NULL,'
+          'image_path TEXT NULL, logging_type TEXT NOT NULL,'
+          'sort_order INTEGER NOT NULL, rest_seconds INTEGER NOT NULL,'
+          'target_sets INTEGER NOT NULL, session_notes TEXT NULL,'
+          'created_at TEXT NOT NULL, updated_at TEXT NOT NULL,'
+          'deleted_at TEXT NULL, PRIMARY KEY (id));',
+      'CREATE TABLE session_sets ('
+          'id TEXT NOT NULL, session_exercise_id TEXT NOT NULL,'
+          'set_index INTEGER NOT NULL, weight REAL NULL, reps INTEGER NULL,'
+          'rir REAL NULL, duration_seconds INTEGER NULL, completed_at TEXT NULL,'
+          'created_at TEXT NOT NULL, updated_at TEXT NOT NULL,'
+          'deleted_at TEXT NULL, PRIMARY KEY (id));',
+    ];
+    for (final sql in statements) {
+      await raw.runCustom(sql, const []);
+    }
+  }
+
   Future<void> createV2Database() async {
     final raw = NativeDatabase(file);
     // A minimal drift-shaped v2 `exercises` table: note `category`, and the
@@ -51,6 +102,7 @@ void main() {
         PRIMARY KEY (id)
       );
     ''', const []);
+    await createSupportingTables(raw);
     await raw.runCustom('PRAGMA user_version = 2;', const []);
     await raw.close();
   }
@@ -118,6 +170,7 @@ void main() {
       "VALUES ('row-1', 'biceps'), ('row-1', 'upperBack');",
       const [],
     );
+    await createSupportingTables(raw);
     await raw.runCustom('PRAGMA user_version = 3;', const []);
     await raw.close();
   }
@@ -277,7 +330,8 @@ void main() {
     await db.select(db.exerciseBodyParts).get();
     await db.select(db.workoutPrograms).get();
     await db.select(db.programRoutines).get();
-    expect(db.schemaVersion, 5);
+    await db.select(db.templateSets).get();
+    expect(db.schemaVersion, 6);
   });
 
   test('v2 reaches v5 in one open, with programs available', () async {

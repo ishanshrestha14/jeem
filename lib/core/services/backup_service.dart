@@ -33,6 +33,7 @@ class BackupService {
     final programs = await _db.select(_db.workoutPrograms).get();
     final programRoutines = await _db.select(_db.programRoutines).get();
     final templateExercises = await _db.select(_db.templateExercises).get();
+    final templateSets = await _db.select(_db.templateSets).get();
     final sessions = await _db.select(_db.workoutSessions).get();
     final sessionExercises = await _db.select(_db.sessionExercises).get();
     final sessionSets = await _db.select(_db.sessionSets).get();
@@ -49,6 +50,7 @@ class BackupService {
       'programRoutines': programRoutines.map(_programRoutineToJson).toList(),
       'templateExercises':
           templateExercises.map(_templateExerciseToJson).toList(),
+      'templateSets': templateSets.map(_templateSetToJson).toList(),
       'workoutSessions': sessions.map(_sessionToJson).toList(),
       'sessionExercises': sessionExercises.map(_sessionExerciseToJson).toList(),
       'sessionSets': sessionSets.map(_sessionSetToJson).toList(),
@@ -121,6 +123,13 @@ class BackupService {
     final templateExercises = _list(data['templateExercises'])
         .map(_templateExerciseFromJson)
         .toList();
+    // Pre-v6 backups carry the prescription as columns on the exercise. Those
+    // are rebuilt into rows on read, so an older file still restores a routine
+    // with the right number of sets rather than none at all.
+    final templateSets = <TemplateSet>[
+      ..._list(data['templateSets']).map(_templateSetFromJson),
+      ..._legacyTemplateSetsFrom(data),
+    ];
     final sessions =
         _list(data['workoutSessions']).map(_sessionFromJson).toList();
     final sessionExercises = _list(data['sessionExercises'])
@@ -136,6 +145,7 @@ class BackupService {
       // Before templates: program memberships reference them.
       await _db.delete(_db.programRoutines).go();
       await _db.delete(_db.workoutPrograms).go();
+      await _db.delete(_db.templateSets).go();
       await _db.delete(_db.templateExercises).go();
       await _db.delete(_db.workoutTemplates).go();
       // Deleted before exercises only for symmetry with the FK-safe order
@@ -173,6 +183,9 @@ class BackupService {
       if (templateExercises.isNotEmpty) {
         await _db.batch(
             (b) => b.insertAll(_db.templateExercises, templateExercises));
+      }
+      if (templateSets.isNotEmpty) {
+        await _db.batch((b) => b.insertAll(_db.templateSets, templateSets));
       }
       if (sessions.isNotEmpty) {
         await _db.batch((b) => b.insertAll(_db.workoutSessions, sessions));
@@ -389,10 +402,9 @@ class BackupService {
         'templateId': te.templateId,
         'exerciseId': te.exerciseId,
         'sortOrder': te.sortOrder,
-        'targetSets': te.targetSets,
+
         'restSeconds': te.restSeconds,
-        'defaultRir': te.defaultRir,
-        'defaultDurationSeconds': te.defaultDurationSeconds,
+
         'notes': te.notes,
         'createdAt': _toIso(te.createdAt),
         'updatedAt': _toIso(te.updatedAt),
@@ -406,15 +418,78 @@ class BackupService {
       templateId: j['templateId'] as String,
       exerciseId: j['exerciseId'] as String,
       sortOrder: j['sortOrder'] as int,
-      targetSets: j['targetSets'] as int,
+
       restSeconds: j['restSeconds'] as int,
-      defaultRir: (j['defaultRir'] as num?)?.toDouble(),
-      defaultDurationSeconds: j['defaultDurationSeconds'] as int?,
+
       notes: j['notes'] as String?,
       createdAt: _parseDate(j['createdAt'] as String),
       updatedAt: _parseDate(j['updatedAt'] as String),
       deletedAt: _parseDateOrNull(j['deletedAt']),
     );
+  }
+
+  Map<String, dynamic> _templateSetToJson(TemplateSet s) => {
+        'id': s.id,
+        'templateExerciseId': s.templateExerciseId,
+        'setIndex': s.setIndex,
+        'weight': s.weight,
+        'reps': s.reps,
+        'repsMax': s.repsMax,
+        'rir': s.rir,
+        'durationSeconds': s.durationSeconds,
+        'createdAt': _toIso(s.createdAt),
+        'updatedAt': _toIso(s.updatedAt),
+        'deletedAt': _toIsoOrNull(s.deletedAt),
+      };
+
+  TemplateSet _templateSetFromJson(dynamic json) {
+    final j = json as Map<String, dynamic>;
+    return TemplateSet(
+      id: j['id'] as String,
+      templateExerciseId: j['templateExerciseId'] as String,
+      setIndex: j['setIndex'] as int,
+      weight: (j['weight'] as num?)?.toDouble(),
+      reps: j['reps'] as int?,
+      repsMax: j['repsMax'] as int?,
+      rir: (j['rir'] as num?)?.toDouble(),
+      durationSeconds: j['durationSeconds'] as int?,
+      createdAt: _parseDate(j['createdAt'] as String),
+      updatedAt: _parseDate(j['updatedAt'] as String),
+      deletedAt: _parseDateOrNull(j['deletedAt']),
+    );
+  }
+
+  /// Rebuilds planned sets from a pre-v6 backup's per-exercise columns —
+  /// `targetSets` rows carrying that exercise's `defaultRir` and
+  /// `defaultDurationSeconds`, exactly as the v6 migration does for a live
+  /// database.
+  List<TemplateSet> _legacyTemplateSetsFrom(Map<String, dynamic> data) {
+    if (_list(data['templateSets']).isNotEmpty) return const [];
+    final out = <TemplateSet>[];
+    for (final raw in _list(data['templateExercises'])) {
+      final j = raw as Map<String, dynamic>;
+      final count = j['targetSets'] as int?;
+      if (count == null) continue;
+      final createdAt = _parseDate(j['createdAt'] as String);
+      for (var i = 0; i < count; i++) {
+        out.add(TemplateSet(
+          // Deterministic, so importing the same file twice cannot
+          // produce two sets of rows for one exercise.
+          id: '${j['id']}-legacy-set-$i',
+          templateExerciseId: j['id'] as String,
+          setIndex: i,
+          weight: null,
+          reps: null,
+          repsMax: null,
+          rir: (j['defaultRir'] as num?)?.toDouble(),
+          durationSeconds: j['defaultDurationSeconds'] as int?,
+          createdAt: createdAt,
+          updatedAt: createdAt,
+          deletedAt: null,
+        ));
+      }
+    }
+    return out;
   }
 
   // ---------------------------------------------------------------------
@@ -521,6 +596,9 @@ class BackupService {
         'id': s.id,
         'sessionExerciseId': s.sessionExerciseId,
         'setIndex': s.setIndex,
+        'plannedWeight': s.plannedWeight,
+        'plannedReps': s.plannedReps,
+        'plannedRepsMax': s.plannedRepsMax,
         'weight': s.weight,
         'reps': s.reps,
         'rir': s.rir,
@@ -537,6 +615,11 @@ class BackupService {
       id: j['id'] as String,
       sessionExerciseId: j['sessionExerciseId'] as String,
       setIndex: j['setIndex'] as int,
+      // Absent in pre-v6 backups: those sessions were never prescribed
+      // anything, so null is the truthful value rather than a gap.
+      plannedWeight: (j['plannedWeight'] as num?)?.toDouble(),
+      plannedReps: j['plannedReps'] as int?,
+      plannedRepsMax: j['plannedRepsMax'] as int?,
       weight: (j['weight'] as num?)?.toDouble(),
       reps: j['reps'] as int?,
       rir: (j['rir'] as num?)?.toDouble(),

@@ -154,11 +154,44 @@ class TemplateExercises extends Table with SyncColumns {
       text().references(WorkoutTemplates, #id, onDelete: KeyAction.cascade)();
   TextColumn get exerciseId => text().references(Exercises, #id)();
   IntColumn get sortOrder => integer()();
-  IntColumn get targetSets => integer().withDefault(const Constant(3))();
   IntColumn get restSeconds => integer().withDefault(const Constant(90))();
-  RealColumn get defaultRir => real().nullable()();
-  IntColumn get defaultDurationSeconds => integer().nullable()();
   TextColumn get notes => text().nullable()();
+
+  // `targetSets`, `defaultRir` and `defaultDurationSeconds` lived here until
+  // schema v6. They said "every set of this exercise is prescribed the same",
+  // which the routine editor disproves — a top set followed by back-offs is
+  // 70kg x 8 then 60kg x 6 (S-028). Prescription moved to [TemplateSets], and
+  // the set count is now simply how many rows are there.
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// One planned set. The prescription a routine carries — what the live session
+/// pre-fills from (S-028, T-002).
+///
+/// A row per set rather than columns on the exercise, because sets of the same
+/// exercise are routinely prescribed differently. Mirrors [SessionSets] one
+/// level up, which is the same reason [TemplateExercises] mirrors
+/// [SessionExercises].
+class TemplateSets extends Table with SyncColumns {
+  TextColumn get id => text()();
+  TextColumn get templateExerciseId =>
+      text().references(TemplateExercises, #id, onDelete: KeyAction.cascade)();
+  IntColumn get setIndex => integer()();
+
+  /// All nullable: a set can be planned as "just do it" before any numbers are
+  /// decided, and bodyweight work never gets a weight at all.
+  RealColumn get weight => real().nullable()();
+  IntColumn get reps => integer().nullable()();
+
+  /// Upper bound of a rep range. `null` means [reps] is an exact target — the
+  /// reps-vs-range mode is *derived* from this rather than stored separately,
+  /// so a mode flag can never disagree with the numbers it describes.
+  IntColumn get repsMax => integer().nullable()();
+
+  RealColumn get rir => real().nullable()();
+  IntColumn get durationSeconds => integer().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -254,6 +287,15 @@ class SessionSets extends Table with SyncColumns {
   TextColumn get sessionExerciseId =>
       text().references(SessionExercises, #id, onDelete: KeyAction.cascade)();
   IntColumn get setIndex => integer()();
+
+  // What the routine asked for, snapshotted at session start. Kept strictly
+  // apart from the logged columns below: overwriting the plan with what was
+  // actually done would destroy the comparison the set row exists to show.
+  RealColumn get plannedWeight => real().nullable()();
+  IntColumn get plannedReps => integer().nullable()();
+  IntColumn get plannedRepsMax => integer().nullable()();
+
+  // What was actually done.
   RealColumn get weight => real().nullable()();
   IntColumn get reps => integer().nullable()();
   RealColumn get rir => real().nullable()();

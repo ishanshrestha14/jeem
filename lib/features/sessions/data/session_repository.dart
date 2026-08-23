@@ -67,6 +67,12 @@ class SessionRepository {
                   e.id.equals(config.exerciseId) & e.deletedAt.isNull()))
             .getSingle();
 
+        final plannedSets = await (_db.select(_db.templateSets)
+              ..where((t) =>
+                  t.templateExerciseId.equals(config.id) & t.deletedAt.isNull())
+              ..orderBy([(t) => OrderingTerm(expression: t.setIndex)]))
+            .get();
+
         final sessionExercise = SessionExercise(
           id: newId(),
           sessionId: session.id,
@@ -78,7 +84,7 @@ class SessionRepository {
           loggingType: exercise.loggingType,
           sortOrder: config.sortOrder,
           restSeconds: config.restSeconds,
-          targetSets: config.targetSets,
+          targetSets: plannedSets.length,
           sessionNotes: null,
           createdAt: now,
           updatedAt: now,
@@ -86,15 +92,23 @@ class SessionRepository {
         );
         await _db.into(_db.sessionExercises).insert(sessionExercise);
 
-        for (var i = 0; i < config.targetSets; i++) {
+        for (final planned in plannedSets) {
           await _db.into(_db.sessionSets).insert(SessionSet(
                 id: newId(),
                 sessionExerciseId: sessionExercise.id,
-                setIndex: i,
+                setIndex: planned.setIndex,
+                // The plan, copied so the session is a true snapshot: editing
+                // the routine afterwards must not rewrite what a past session
+                // was asked to do.
+                plannedWeight: planned.weight,
+                plannedReps: planned.reps,
+                plannedRepsMax: planned.repsMax,
+                // Logged values start empty — the plan is a suggestion, not a
+                // record of having done it.
                 weight: null,
                 reps: null,
-                rir: config.defaultRir,
-                durationSeconds: config.defaultDurationSeconds,
+                rir: planned.rir,
+                durationSeconds: planned.durationSeconds,
                 completedAt: null,
                 createdAt: now,
                 updatedAt: now,

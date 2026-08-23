@@ -21,6 +21,7 @@ part 'app_database.g.dart';
     ExerciseBodyParts,
     WorkoutPrograms,
     ProgramRoutines,
+    TemplateSets,
     WorkoutTemplates,
     TemplateExercises,
     WorkoutSessions,
@@ -34,7 +35,7 @@ class AppDatabase extends _$AppDatabase {
   factory AppDatabase.open() => AppDatabase(_openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   DriftDatabaseOptions get options =>
@@ -72,6 +73,15 @@ class AppDatabase extends _$AppDatabase {
           if (from < 5) {
             await m.createTable(workoutPrograms);
             await m.createTable(programRoutines);
+          }
+          if (from < 6) {
+            await m.createTable(templateSets);
+            await m.addColumn(sessionSets, sessionSets.plannedWeight);
+            await m.addColumn(sessionSets, sessionSets.plannedReps);
+            await m.addColumn(sessionSets, sessionSets.plannedRepsMax);
+            // Reads the departing columns before they are dropped.
+            await _seedTemplateSetsFromLegacyColumns();
+            await m.alterTable(TableMigration(templateExercises));
           }
         },
         beforeOpen: (details) async {
@@ -265,6 +275,48 @@ extension _V4Backfill on AppDatabase {
               bodyPart: part,
             ),
             mode: InsertMode.insertOrIgnore,
+          );
+        }
+      }
+    });
+  }
+}
+
+extension _V6Backfill on AppDatabase {
+  /// Turns the old per-exercise prescription into rows: `targetSets` rows per
+  /// exercise, each carrying that exercise's `defaultRir` and
+  /// `defaultDurationSeconds`.
+  ///
+  /// Raw SQL because the columns are gone from the generated schema by the
+  /// time this runs — they exist in the file, not in the Dart definition.
+  Future<void> _seedTemplateSetsFromLegacyColumns() async {
+    final rows = await customSelect(
+      'SELECT id, target_sets, default_rir, default_duration_seconds '
+      'FROM template_exercises;',
+    ).get();
+    if (rows.isEmpty) return;
+
+    final now = DateTime.now();
+    await batch((b) {
+      for (final row in rows) {
+        final count = row.read<int?>('target_sets') ?? 0;
+        final rir = row.read<double?>('default_rir');
+        final duration = row.read<int?>('default_duration_seconds');
+        for (var i = 0; i < count; i++) {
+          b.insert(
+            templateSets,
+            TemplateSetsCompanion.insert(
+              id: newId(),
+              templateExerciseId: row.read<String>('id'),
+              setIndex: i,
+              createdAt: now,
+              updatedAt: now,
+              // Weight and reps were never prescribed before v6, so every
+              // migrated set starts unplanned — which is exactly what the old
+              // data meant.
+              rir: Value(rir),
+              durationSeconds: Value(duration),
+            ),
           );
         }
       }

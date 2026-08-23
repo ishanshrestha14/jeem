@@ -176,10 +176,14 @@ void main() {
         primaryMuscles: [Muscle.quadriceps]);
 
     await tester.pumpWidget(harness(t.id));
-    await pumpUntilData(tester, until: find.text('Add exercise'));
+    await pumpUntilData(tester, until: find.byType(ReorderableListView));
 
-    final addButton = find.text('Add exercise').last;
-    await tester.ensureVisible(addButton);
+    // "Add exercise" sits below the exercise list, and each row now carries
+    // its planned sets — so on a test-sized surface the button starts
+    // off-screen and unbuilt. Scroll to it rather than assuming it is there.
+    final addButton = find.widgetWithText(OutlinedButton, 'Add exercise');
+    await tester.scrollUntilVisible(addButton, 200,
+        scrollable: find.byType(Scrollable).first);
     await tester.pump();
     await tester.tap(addButton);
     await pumpUntilData(
@@ -208,10 +212,14 @@ void main() {
     await templates.addExercise(templateId: t.id, exerciseId: row.id);
 
     await tester.pumpWidget(harness(t.id));
-    await pumpUntilData(tester, until: find.text('Add exercise'));
+    await pumpUntilData(tester, until: find.byType(ReorderableListView));
 
-    final addButton = find.text('Add exercise').last;
-    await tester.ensureVisible(addButton);
+    // "Add exercise" sits below the exercise list, and each row now carries
+    // its planned sets — so on a test-sized surface the button starts
+    // off-screen and unbuilt. Scroll to it rather than assuming it is there.
+    final addButton = find.widgetWithText(OutlinedButton, 'Add exercise');
+    await tester.scrollUntilVisible(addButton, 200,
+        scrollable: find.byType(Scrollable).first);
     await tester.pump();
     await tester.tap(addButton);
     await pumpUntilData(tester, until: find.text('Row'), maxFrames: 120);

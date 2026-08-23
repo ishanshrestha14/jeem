@@ -7,6 +7,54 @@ import '../../../core/utils/ids.dart';
 import '../../../db/app_database.dart';
 import 'template_models.dart';
 
+/// Emits whenever either source does, once both have produced a value.
+///
+/// Hand-rolled rather than pulling in rxdart for one operator: the routine
+/// stream needs the exercises *and* their planned sets, and a single drift
+/// join cannot watch both without duplicating every exercise row per set.
+Stream<R> _combineLatest2<A, B, R>(
+  Stream<A> a,
+  Stream<B> b,
+  R Function(A, B) combine,
+) {
+  late StreamController<R> controller;
+  StreamSubscription<A>? subA;
+  StreamSubscription<B>? subB;
+  A? latestA;
+  B? latestB;
+  var hasA = false;
+  var hasB = false;
+
+  void emit() {
+    if (hasA && hasB) controller.add(combine(latestA as A, latestB as B));
+  }
+
+  controller = StreamController<R>(
+    onListen: () {
+      subA = a.listen((value) {
+        latestA = value;
+        hasA = true;
+        emit();
+      }, onError: controller.addError);
+      subB = b.listen((value) {
+        latestB = value;
+        hasB = true;
+        emit();
+      }, onError: controller.addError);
+    },
+    // Not awaited. Cancelling a drift query-stream subscription can never
+    // complete on this drift/Dart version — the same hang `watchSummaries`
+    // below is hand-rolled to avoid. Awaiting here would leave the
+    // controller's own cancel pending forever, which surfaces as a widget
+    // test that hangs in teardown rather than as an error.
+    onCancel: () {
+      unawaited(subA?.cancel() ?? Future<void>.value());
+      unawaited(subB?.cancel() ?? Future<void>.value());
+    },
+  );
+  return controller.stream;
+}
+
 class TemplateRepository {
   TemplateRepository(this._db);
 
@@ -34,8 +82,20 @@ class TemplateRepository {
           _db.workoutTemplates.deletedAt.isNull())
       ..orderBy([OrderingTerm(expression: _db.templateExercises.sortOrder)]);
 
-    return query.watch().map((rows) {
+    // The planned sets are watched alongside, so adding or editing a set
+    // refreshes the routine without a second subscription in the UI.
+    final sets = (_db.select(_db.templateSets)
+          ..where((t) => t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm(expression: t.setIndex)]))
+        .watch();
+
+    return _combineLatest2(query.watch(), sets, (rows, allSets) {
       if (rows.isEmpty) return null;
+
+      final byExercise = <String, List<TemplateSet>>{};
+      for (final set in allSets) {
+        byExercise.putIfAbsent(set.templateExerciseId, () => []).add(set);
+      }
 
       final template = rows.first.readTable(_db.workoutTemplates);
       final exercises = <TemplateExerciseWithExercise>[];
@@ -43,9 +103,11 @@ class TemplateRepository {
         final config = row.readTableOrNull(_db.templateExercises);
         final exercise = row.readTableOrNull(_db.exercises);
         if (config != null && exercise != null) {
-          exercises.add(
-            TemplateExerciseWithExercise(config: config, exercise: exercise),
-          );
+          exercises.add(TemplateExerciseWithExercise(
+            config: config,
+            exercise: exercise,
+            sets: byExercise[config.id] ?? const [],
+          ));
         }
       }
       return TemplateWithExercises(template: template, exercises: exercises);
@@ -123,11 +185,23 @@ class TemplateRepository {
       summaries.add(TemplateSummary(
         template: template,
         exerciseCount: exerciseRows.length,
-        totalSets: exerciseRows.fold(0, (sum, e) => sum + e.targetSets),
+        totalSets: await _plannedSetCount(exerciseRows),
         lastPerformedAt: lastSession?.endedAt,
       ));
     }
     return summaries;
+  }
+
+  /// Total planned sets across a template's exercises. Counted from rows
+  /// since v6 — there is no per-exercise total to add up any more.
+  Future<int> _plannedSetCount(List<TemplateExercise> exercises) async {
+    if (exercises.isEmpty) return 0;
+    final rows = await (_db.select(_db.templateSets)
+          ..where((t) =>
+              t.templateExerciseId.isIn([for (final e in exercises) e.id]) &
+              t.deletedAt.isNull()))
+        .get();
+    return rows.length;
   }
 
   Future<WorkoutTemplate> createTemplate({
@@ -187,22 +261,39 @@ class TemplateRepository {
       await _db.into(_db.workoutTemplates).insert(copy);
 
       for (final te in originalExercises) {
+        final copiedId = newId();
         await _db.into(_db.templateExercises).insert(
               TemplateExercise(
-                id: newId(),
+                id: copiedId,
                 templateId: copy.id,
                 exerciseId: te.exerciseId,
                 sortOrder: te.sortOrder,
-                targetSets: te.targetSets,
                 restSeconds: te.restSeconds,
-                defaultRir: te.defaultRir,
-                defaultDurationSeconds: te.defaultDurationSeconds,
                 notes: te.notes,
                 createdAt: now,
                 updatedAt: now,
                 deletedAt: null,
               ),
             );
+        // The prescription is the point of duplicating a routine, so the
+        // planned sets come with it.
+        for (final set in await setsFor(te.id)) {
+          await _db.into(_db.templateSets).insert(
+                TemplateSet(
+                  id: newId(),
+                  templateExerciseId: copiedId,
+                  setIndex: set.setIndex,
+                  weight: set.weight,
+                  reps: set.reps,
+                  repsMax: set.repsMax,
+                  rir: set.rir,
+                  durationSeconds: set.durationSeconds,
+                  createdAt: now,
+                  updatedAt: now,
+                  deletedAt: null,
+                ),
+              );
+        }
       }
       return copy;
     });
@@ -231,17 +322,109 @@ class TemplateRepository {
       templateId: templateId,
       exerciseId: exerciseId,
       sortOrder: sortOrder,
-      targetSets: targetSets ?? 3,
       restSeconds: restSeconds ?? 90,
-      defaultRir: defaultRir,
-      defaultDurationSeconds: defaultDurationSeconds,
       notes: null,
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
     );
     await _db.into(_db.templateExercises).insert(row);
+
+    // An exercise with no sets is not a plan, so it arrives with rows —
+    // unprescribed, which the editor shows as "Press to add details".
+    final count = targetSets ?? 3;
+    await _db.batch((b) {
+      for (var i = 0; i < count; i++) {
+        b.insert(
+          _db.templateSets,
+          TemplateSetsCompanion.insert(
+            id: newId(),
+            templateExerciseId: row.id,
+            setIndex: i,
+            createdAt: now,
+            updatedAt: now,
+            rir: Value(defaultRir),
+            durationSeconds: Value(defaultDurationSeconds),
+          ),
+        );
+      }
+    });
     return row;
+  }
+
+  // -------------------------------------------------------------------
+  // Planned sets (T-002)
+  // -------------------------------------------------------------------
+
+  Future<List<TemplateSet>> setsFor(String templateExerciseId) async {
+    return (_db.select(_db.templateSets)
+          ..where((t) =>
+              t.templateExerciseId.equals(templateExerciseId) &
+              t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm(expression: t.setIndex)]))
+        .get();
+  }
+
+  Future<TemplateSet> addSet(String templateExerciseId) async {
+    final existing = await setsFor(templateExerciseId);
+    final now = DateTime.now();
+    // A new set copies the last one: the common case is another set of the
+    // same thing, and typing it again would be busywork.
+    final previous = existing.isEmpty ? null : existing.last;
+    final row = TemplateSet(
+      id: newId(),
+      templateExerciseId: templateExerciseId,
+      setIndex: existing.length,
+      weight: previous?.weight,
+      reps: previous?.reps,
+      repsMax: previous?.repsMax,
+      rir: previous?.rir,
+      durationSeconds: previous?.durationSeconds,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    );
+    await _db.into(_db.templateSets).insert(row);
+    return row;
+  }
+
+  Future<void> updateSet(
+    String setId, {
+    Value<double?> weight = const Value.absent(),
+    Value<int?> reps = const Value.absent(),
+    Value<int?> repsMax = const Value.absent(),
+    Value<double?> rir = const Value.absent(),
+    Value<int?> durationSeconds = const Value.absent(),
+  }) async {
+    await (_db.update(_db.templateSets)..where((t) => t.id.equals(setId)))
+        .write(TemplateSetsCompanion(
+      weight: weight,
+      reps: reps,
+      repsMax: repsMax,
+      rir: rir,
+      durationSeconds: durationSeconds,
+      updatedAt: Value(DateTime.now()),
+    ));
+  }
+
+  Future<void> removeSet(String setId) async {
+    final row = await (_db.select(_db.templateSets)
+          ..where((t) => t.id.equals(setId)))
+        .getSingleOrNull();
+    if (row == null) return;
+    await (_db.delete(_db.templateSets)..where((t) => t.id.equals(setId))).go();
+    // Resequence, so a gap can never collide with the next insert.
+    final remaining = await setsFor(row.templateExerciseId);
+    final now = DateTime.now();
+    await _db.batch((b) {
+      for (var i = 0; i < remaining.length; i++) {
+        b.update(
+          _db.templateSets,
+          TemplateSetsCompanion(setIndex: Value(i), updatedAt: Value(now)),
+          where: (t) => t.id.equals(remaining[i].id),
+        );
+      }
+    });
   }
 
   Future<void> updateTemplateExercise(TemplateExercise te) async {

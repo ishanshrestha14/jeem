@@ -36,7 +36,8 @@ void main() {
 
     expect(loaded.exercises.map((e) => e.name),
         ['Bench Press', 'Overhead Press']);
-    expect(loaded.exercises.first.config.targetSets, 3);
+    // Planned sets are rows now, so the count comes from them.
+    expect(loaded.exercises.first.targetSets, 3);
     expect(loaded.exercises.first.config.restSeconds, 90);
     expect(loaded.totalSets, 6);
   });
@@ -88,7 +89,7 @@ void main() {
     expect(copy.name, 'Legs A (copy)');
 
     final loaded = (await templates.watchTemplate(copy.id).first)!;
-    expect(loaded.exercises.single.config.targetSets, 5);
+    expect(loaded.exercises.single.targetSets, 5);
     expect(loaded.exercises.single.config.restSeconds, 180);
     expect(
         loaded.exercises.single.config.id,

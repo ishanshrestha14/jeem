@@ -17,6 +17,7 @@ import '../data/template_repository.dart';
 import '../providers/template_providers.dart';
 import 'start_workout_action.dart';
 import 'template_exercise_settings_sheet.dart';
+import 'template_sets_sheet.dart';
 
 /// Assembles a workout template: name, notes, defaults, and the ordered
 /// list of exercises. When [templateId] is null, a draft template is
@@ -189,13 +190,14 @@ class _TemplateEditorScreenState extends ConsumerState<TemplateEditorScreen> {
         content: Text('${te.name} removed'),
         action: SnackBarAction(
           label: 'Undo',
+          // Undo restores the exercise with the same number of sets; their
+          // prescribed numbers are not recovered, since the rows were deleted
+          // with it. Better than losing the exercise entirely.
           onPressed: () => _repo.addExercise(
             templateId: tid,
             exerciseId: te.exercise.id,
-            targetSets: te.config.targetSets,
+            targetSets: te.targetSets,
             restSeconds: te.config.restSeconds,
-            defaultRir: te.config.defaultRir,
-            defaultDurationSeconds: te.config.defaultDurationSeconds,
           ),
         ),
       ),
@@ -379,9 +381,35 @@ class _ExerciseRow extends ConsumerWidget {
           ],
         ],
       ),
-      subtitle: Text(
-        '${item.config.targetSets} sets · '
-        '${formatDurationSeconds(item.config.restSeconds)} rest',
+      // The collapsed row summarises the plan itself (S-028): each set on its
+      // own line, so a routine can be read without opening anything. An
+      // exercise with no numbers yet says so instead.
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!item.hasPrescription)
+            const Text('Press to add details')
+          else
+            // Capped: a routine can hold many sets, and an uncapped list
+            // makes one row tall enough to push the rest of the editor —
+            // including "Add exercise" — off screen.
+            for (var i = 0; i < item.sets.length && i < 3; i++)
+              Text(
+                '${i + 1}   ${describeTemplateSet(item.sets[i]) ?? '—'}',
+              ),
+          Text(
+            '${item.targetSets} sets · '
+            '${formatDurationSeconds(item.config.restSeconds)} rest',
+          ),
+        ],
+      ),
+      // Tapping the row plans its sets — "press to add details" is the row's
+      // own instruction, so it has to be the row that responds (S-028).
+      onTap: () => showTemplateSetsSheet(
+        context,
+        templateExerciseId: item.config.id,
+        exerciseName: item.name,
+        loggingType: item.loggingType,
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
