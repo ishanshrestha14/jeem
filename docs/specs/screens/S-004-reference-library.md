@@ -4,7 +4,7 @@
 - **Status:** Draft
 - **Source:** reference
 - **Counterpart:** ours, `library_screen.dart`
-- **Screenshots:** `ref-S004-library.png`
+- **Screenshots:** `ref-S004-library.png`, `ref-S004-library-create-sheet.png`
 - **Last updated:** 2026-08-23
 
 ## Purpose
@@ -35,8 +35,23 @@ than a stack of sections:
 | An item | the item's image | `Pull B` | `1 routine` |
 
 Worth noting: **the create action is a row in the list, not a floating button** — it sits at the top
-of the very list it adds to. The `+` in the top bar is presumably the same action; the row is the
-discoverable one.
+of the very list it adds to.
+
+## The `+` create sheet
+
+`ref-S004-library-create-sheet.png`. The top-bar `+` is **not** a shortcut for the selected chip: it
+opens a modal sheet offering all three kinds, so adding the other kind never means switching filter
+first.
+
+| Icon | Title | Subtitle |
+|---|---|---|
+| folder | **Program** | `Create a program with your routines` |
+| clipboard | **Routine** | `Create a reusable workout routine` |
+| dumbbell | **Exercise** | `Create a custom exercise` |
+
+Each row is a large circular icon avatar plus title and subtitle, with a drag handle above. The
+subtitles carry real weight: "Create a program with your routines" is the clearest statement anywhere
+in the app of what a program *is* — a container for routines.
 
 `Favorites` is a **pseudo-item**: it looks exactly like a real entry and carries its own count.
 
@@ -59,9 +74,10 @@ discoverable one.
 
 ## Open questions
 
-- [ ] What does the top-bar `+` offer — the same as the create row, or a menu?
+- [x] The top-bar `+` opens a three-option create sheet, not the selected chip's create action.
 - [ ] What sort options does `Recent` open?
 - [ ] Does the `Exercises` chip show the same row shape, or the card grid from S-026?
 
 ## Revision log
 - 2026-08-23 — created from `ref-S004-library.png`, after our own Library screen drifted from it.
+- 2026-08-23 — added the `+` create sheet from `ref-S004-library-create-sheet.png`.

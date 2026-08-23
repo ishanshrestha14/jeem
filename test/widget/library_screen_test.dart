@@ -98,7 +98,7 @@ void main() {
     await disposeAndDrainTimers(tester, container: container);
   });
 
-  testWidgets('the + button offers program, routine and exercise',
+  testWidgets('the + button opens a create sheet with all three options',
       (tester) async {
     await tester.pumpWidget(harness());
     await pumpUntilData(tester, until: find.text('Create new routine'));
@@ -107,11 +107,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Program'), findsOneWidget);
+    expect(find.text('Create a program with your routines'), findsOneWidget);
     expect(find.text('Routine'), findsOneWidget);
+    expect(find.text('Create a reusable workout routine'), findsOneWidget);
     expect(find.text('Exercise'), findsOneWidget);
-    // Programs have no model yet, and the menu says so rather than offering
-    // an entry that quietly does nothing.
-    expect(find.text('Not built yet'), findsOneWidget);
+    expect(find.text('Create a custom exercise'), findsOneWidget);
 
     await disposeAndDrainTimers(tester, container: container);
   });

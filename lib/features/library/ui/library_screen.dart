@@ -26,6 +26,34 @@ enum _LibraryFilter { routines, exercises }
 
 enum _CreateTarget { program, routine, exercise }
 
+typedef _CreateOption = ({
+  _CreateTarget target,
+  IconData icon,
+  String title,
+  String subtitle,
+});
+
+const _createOptions = <_CreateOption>[
+  (
+    target: _CreateTarget.program,
+    icon: Icons.folder_outlined,
+    title: 'Program',
+    subtitle: 'Create a program with your routines',
+  ),
+  (
+    target: _CreateTarget.routine,
+    icon: Icons.assignment_outlined,
+    title: 'Routine',
+    subtitle: 'Create a reusable workout routine',
+  ),
+  (
+    target: _CreateTarget.exercise,
+    icon: Icons.fitness_center,
+    title: 'Exercise',
+    subtitle: 'Create a custom exercise',
+  ),
+];
+
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
 
@@ -48,37 +76,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           // The top-bar `+` is a global create menu, not a shortcut for the
           // selected chip: it offers everything the library can hold, so you
           // do not have to switch filter first just to add the other kind.
-          PopupMenuButton<_CreateTarget>(
+          IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'Add to library',
-            onSelected: (target) => _createTarget(target),
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: _CreateTarget.program,
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.calendar_view_week_outlined),
-                  title: Text('Program'),
-                  subtitle: Text('Not built yet'),
-                ),
-              ),
-              const PopupMenuItem(
-                value: _CreateTarget.routine,
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.list_alt_outlined),
-                  title: Text('Routine'),
-                ),
-              ),
-              const PopupMenuItem(
-                value: _CreateTarget.exercise,
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.fitness_center_outlined),
-                  title: Text('Exercise'),
-                ),
-              ),
-            ],
+            onPressed: _openCreateSheet,
           ),
         ],
       ),
@@ -134,16 +135,44 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         : '/exercises/new');
   }
 
-  void _createTarget(_CreateTarget target) {
+  Future<void> _openCreateSheet() async {
+    final target = await showModalBottomSheet<_CreateTarget>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final option in _createOptions)
+              ListTile(
+                minTileHeight: 72,
+                leading: CircleAvatar(
+                  radius: 26,
+                  backgroundColor:
+                      Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                  child: Icon(option.icon,
+                      color: Theme.of(ctx).colorScheme.onSurface),
+                ),
+                title: Text(option.title,
+                    style: Theme.of(ctx).textTheme.titleMedium),
+                subtitle: Text(option.subtitle),
+                onTap: () => Navigator.of(ctx).pop(option.target),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (target == null || !mounted) return;
     switch (target) {
       case _CreateTarget.routine:
         context.push('/templates/new');
       case _CreateTarget.exercise:
         context.push('/exercises/new');
       case _CreateTarget.program:
-        // Listed because the menu is the reference app's, but a program
+        // Offered because the sheet is the reference app's, but a program
         // groups routines and we have no object above the routine yet. Saying
-        // so beats a menu entry that silently does nothing.
+        // so beats an entry that silently does nothing.
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
