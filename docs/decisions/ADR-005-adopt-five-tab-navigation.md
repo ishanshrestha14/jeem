@@ -1,6 +1,6 @@
 # ADR-005 — Adopt the reference app's 5-tab navigation
 
-- **Status:** Accepted
+- **Status:** Accepted — **implemented 2026-08-23**
 - **Date:** 2026-08-23
 - **Supersedes:** the "do not copy 5 tabs uncritically" recommendation in
   [05-gap-analysis.md §4](../research/reference-app/05-gap-analysis.md)
@@ -70,8 +70,13 @@ product ([00-overview §5](../research/reference-app/00-overview.md#5-explicitly
 - Settings needs a new home (top-bar icon on You) and a route that is no longer a tab.
 - Deep links change. Ours is a personal APK with no external links, so no compatibility burden.
 - **The five tabs are not equally ready.** You is nearly empty until the stats hub exists, and
-  Library needs an authoring surface. Shipping five tabs before their contents exist would be worse
-  than four working ones — so this ADR sets the destination, and the roadmap sequences it.
+  Library needs an authoring surface. The roadmap sequenced the shell last for that reason; the owner
+  chose to land it first instead (2026-08-23) and fill the screens after. Both new tabs therefore ship
+  as honest hubs — real counts, real entry points, and plain text saying what does not exist yet —
+  rather than placeholders dressed up as content.
+- **Found on implementation:** five labels no longer fit a narrow phone. The nav bar is hand-built,
+  so nothing caught it — the labels silently wrapped to a second line and overflowed. Labels are now
+  `FittedBox(scaleDown)`, and a test asserts no overflow at 320dp.
 
 ## Alternatives considered
 

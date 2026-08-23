@@ -14,8 +14,9 @@ import '../db/test_database.dart';
 import 'active_session_test.dart' show pumpUntilSessionData;
 import 'pump_helpers.dart';
 
-/// Covers the bottom-nav shell under the Home / Workout / History / Profile
-/// IA: the four destinations render (in that order) and switch the visible
+/// Covers the bottom-nav shell under the Home / Explore / Workout / Library /
+/// You IA (ADR-005): the five destinations render (in that order) and switch
+/// the visible
 /// screen (`StatefulShellRoute.indexedStack` keeps each tab's own
 /// navigation/scroll state), the Workout tab's `EXERCISES` header action
 /// pushes the exercise library, and — the guard this whole change exists
@@ -51,14 +52,32 @@ void main() {
     );
   }
 
-  testWidgets('the shell renders 4 destinations, in order, and switches tabs on tap',
+  testWidgets('five destinations fit a narrow screen without overflowing',
       (tester) async {
-    // Task 21's Profile/Settings screen now has enough real content
-    // (defaults, feedback switches, notification permission, data
-    // export/import, About) that its "GymFlow" About text sits below the
-    // fold on the default test surface. A taller surface avoids scrolling
-    // the ListView just to assert it's there — same `useTallSurface`
-    // pattern as `test/widget/exercise_editor_image_test.dart`.
+    // ADR-005 traded four destinations for five. The nav bar is hand-built
+    // (the design system bans NavigationBar's pill indicator), so nothing
+    // catches a label that no longer fits — it just overflows.
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(harness());
+    await pumpUntilData(tester, until: find.text('HOME'));
+
+    expect(tester.takeException(), isNull, reason: 'no RenderFlex overflow');
+    for (final label in ['HOME', 'EXPLORE', 'WORKOUT', 'LIBRARY', 'YOU']) {
+      final size = tester.getSize(find.text(label));
+      expect(size.width, greaterThan(0), reason: '$label must still render');
+    }
+
+    await disposeAndDrainTimers(tester, container: container);
+  });
+
+  testWidgets('the shell renders 5 destinations, in order, and switches tabs on tap',
+      (tester) async {
+    // Five labels have to fit across the nav bar without truncating, so the
+    // surface is set explicitly rather than left at the default.
     tester.view.physicalSize = const Size(800, 1600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -69,35 +88,36 @@ void main() {
     // the "point at Workout" empty state.
     await pumpUntilData(tester, until: find.text('Go to Workout'));
 
-    expect(find.text('HOME'), findsOneWidget);
-    expect(find.text('WORKOUT'), findsOneWidget);
-    expect(find.text('HISTORY'), findsOneWidget);
-    expect(find.text('PROFILE'), findsOneWidget);
+    for (final label in ['HOME', 'EXPLORE', 'WORKOUT', 'LIBRARY', 'YOU']) {
+      expect(find.text(label), findsOneWidget, reason: '$label destination');
+    }
 
-    // Order matters: Home, Workout, History, Profile left-to-right — assert
-    // via each label's on-screen x position rather than tree order (which
-    // isn't guaranteed to match paint order for arbitrary widgets).
-    final xHome = tester.getTopLeft(find.text('HOME')).dx;
-    final xWorkout = tester.getTopLeft(find.text('WORKOUT')).dx;
-    final xHistory = tester.getTopLeft(find.text('HISTORY')).dx;
-    final xProfile = tester.getTopLeft(find.text('PROFILE')).dx;
-    expect(xHome, lessThan(xWorkout));
-    expect(xWorkout, lessThan(xHistory));
-    expect(xHistory, lessThan(xProfile));
+    // Order matters — assert via each label's on-screen x position rather
+    // than tree order (which isn't guaranteed to match paint order for
+    // arbitrary widgets).
+    final xs = [
+      for (final label in ['HOME', 'EXPLORE', 'WORKOUT', 'LIBRARY', 'YOU'])
+        tester.getTopLeft(find.text(label)).dx,
+    ];
+    for (var i = 1; i < xs.length; i++) {
+      expect(xs[i - 1], lessThan(xs[i]), reason: 'destination $i is out of order');
+    }
+
+    await tester.tap(find.text('EXPLORE'));
+    await pumpUntilData(tester, until: find.widgetWithText(AppBar, 'Exercises'));
 
     await tester.tap(find.text('WORKOUT'));
     await pumpUntilData(tester, until: find.text('Create your first workout'));
     expect(find.widgetWithText(AppBar, 'Workout'), findsOneWidget);
 
-    await tester.tap(find.text('HISTORY'));
-    await pumpUntilData(tester,
-        until: find.text('No completed sessions yet'));
-    expect(find.widgetWithText(AppBar, 'History'), findsOneWidget);
+    await tester.tap(find.text('LIBRARY'));
+    await pumpUntilData(tester, until: find.widgetWithText(AppBar, 'Library'));
+    expect(find.text('Routines'), findsOneWidget);
 
-    await tester.tap(find.text('PROFILE'));
-    await tester.pump();
-    expect(find.widgetWithText(AppBar, 'Profile'), findsOneWidget);
-    expect(find.text('GymFlow'), findsOneWidget);
+    await tester.tap(find.text('YOU'));
+    await pumpUntilData(tester, until: find.widgetWithText(AppBar, 'You'));
+    // History kept its screen but lost its tab: it is reachable from here.
+    expect(find.text('Workout log'), findsOneWidget);
 
     // Switching back to Home preserves its earlier-loaded state rather
     // than re-showing a loading spinner.

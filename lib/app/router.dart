@@ -5,6 +5,8 @@ import '../features/dashboard/ui/home_screen.dart';
 import '../features/exercises/ui/exercise_editor_screen.dart';
 import '../features/exercises/ui/exercise_list_screen.dart';
 import '../features/history/ui/history_screen.dart';
+import '../features/library/ui/library_screen.dart';
+import '../features/profile/ui/you_screen.dart';
 import '../features/sessions/ui/active_session_screen.dart';
 import '../features/sessions/ui/session_reorder_screen.dart';
 import '../features/sessions/ui/session_summary_screen.dart';
@@ -56,27 +58,41 @@ GoRouter createAppRouter() => GoRouter(
             ]),
             StatefulShellBranch(routes: [
               GoRoute(
+                // Promoted from a pushed route: the exercise library was one
+                // level deeper than it should have been.
+                path: '/explore',
+                builder: (_, _) => const ExerciseListScreen(),
+              ),
+            ]),
+            StatefulShellBranch(routes: [
+              GoRoute(
                 path: '/workout',
                 builder: (_, _) => const WorkoutScreen(),
               ),
             ]),
             StatefulShellBranch(routes: [
               GoRoute(
-                path: '/history',
-                builder: (_, _) => const HistoryScreen(),
+                path: '/library',
+                builder: (_, _) => const LibraryScreen(),
               ),
             ]),
             StatefulShellBranch(routes: [
               GoRoute(
-                path: '/profile',
-                builder: (_, _) => const SettingsScreen(),
+                path: '/you',
+                builder: (_, _) => const YouScreen(),
               ),
             ]),
           ],
         ),
+        // History and Settings lost their tabs but kept their screens: both
+        // are now pushed from You (ADR-005).
         GoRoute(
-          path: '/exercises',
-          builder: (_, _) => const ExerciseListScreen(),
+          path: '/history',
+          builder: (_, _) => const HistoryScreen(),
+        ),
+        GoRoute(
+          path: '/settings',
+          builder: (_, _) => const SettingsScreen(),
         ),
         GoRoute(
           path: '/exercises/new',

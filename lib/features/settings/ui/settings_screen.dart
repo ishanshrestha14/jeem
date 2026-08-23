@@ -44,7 +44,7 @@ class SettingsScreen extends ConsumerWidget {
         ref.watch(keepScreenOnSettingProvider).valueOrNull ?? false;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

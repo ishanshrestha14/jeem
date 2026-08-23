@@ -82,7 +82,7 @@ void main() {
 
     // The whole point of moving this out of Home: it must survive navigation
     // to a tab that knows nothing about sessions.
-    await tester.tap(find.text('HISTORY'));
+    await tester.tap(find.text('LIBRARY'));
     await tester.pumpAndSettle();
 
     expect(find.text('Workout in Progress'), findsOneWidget);

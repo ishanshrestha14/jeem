@@ -353,13 +353,13 @@ default | pressed | disabled | loading | selected | error
 | T (tickets) | 5 — 4 done, 1 blocked (T-002) |
 | ADR (decisions) | 6 |
 
-**Last updated:** **T-003 implemented** — in-session numeric keypad with `RIR` and `Next`, decimal
-offered only where valid. Phase 1's unblocked work is done. 216 tests pass.
+**Last updated:** **five-tab shell live** — `Home · Explore · Workout · Library · You` (ADR-005),
+pulled forward from Phase 3 at the owner's request. 219 tests pass.
 
 **Screenshot workflow:** paste into any note under `docs/`; Obsidian writes the PNG to disk and I
 rename it into `screenshots/` under its manifest name.
 
 **Next step:** two paths, either order:
 1. `ref-S004-library-routine-edit.png` — unblocks **T-002** (the schema change). The last blocker.
-2. All unblocked Phase 1 tickets are done. **T-002** (prescription schema) is the last Must, still
-   waiting on `ref-S004-library-routine-edit.png`.
+2. Fill the new tabs: Library and You are deliberately thin. **T-002** (prescription schema) is the
+   last Must, still waiting on `ref-S004-library-routine-edit.png`.

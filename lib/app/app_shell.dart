@@ -5,7 +5,8 @@ import '../core/theme/app_theme.dart';
 import '../core/theme/semantic_colors.dart';
 import '../features/sessions/ui/widgets/workout_in_progress_bar.dart';
 
-/// Hosts the four primary destinations (Home / Workout / History / Profile)
+/// Hosts the five primary destinations (Home / Explore / Workout / Library /
+/// You) — the navigation shape recorded in ADR-005.
 /// behind a [StatefulShellRoute.indexedStack] so each tab keeps its own
 /// navigation stack and scroll position across tab switches.
 ///
@@ -67,19 +68,26 @@ const _destinations = [
     label: 'Home',
   ),
   _NavDestination(
-    icon: Icons.fitness_center_outlined,
-    selectedIcon: Icons.fitness_center,
+    icon: Icons.search,
+    selectedIcon: Icons.search,
+    label: 'Explore',
+  ),
+  // A circled "+" rather than a dumbbell: training is the app's create
+  // action, and the middle slot is the one the thumb reaches first.
+  _NavDestination(
+    icon: Icons.add_circle_outline,
+    selectedIcon: Icons.add_circle,
     label: 'Workout',
   ),
   _NavDestination(
-    icon: Icons.history_outlined,
-    selectedIcon: Icons.history,
-    label: 'History',
+    icon: Icons.view_week_outlined,
+    selectedIcon: Icons.view_week,
+    label: 'Library',
   ),
   _NavDestination(
     icon: Icons.person_outline,
     selectedIcon: Icons.person,
-    label: 'Profile',
+    label: 'You',
   ),
 ];
 
@@ -166,9 +174,26 @@ class _NavItem extends StatelessWidget {
                 size: 24,
               ),
               const SizedBox(height: 4),
-              Text(
-                destination.label.toUpperCase(),
-                style: AppTheme.columnHeader.copyWith(color: color),
+              // Five destinations leave roughly 64dp per label on a narrow
+              // phone, and the longest ("WORKOUT", letter-spaced) does not
+              // always fit. Unconstrained it wrapped to a second line and
+              // overflowed the 58dp bar. `scaleDown` shrinks the label only
+              // when it has to — wide screens render at full size, and a
+              // slightly smaller label beats both a wrapped one and an
+              // ellipsised one.
+              Flexible(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      destination.label.toUpperCase(),
+                      maxLines: 1,
+                      softWrap: false,
+                      style: AppTheme.columnHeader.copyWith(color: color),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

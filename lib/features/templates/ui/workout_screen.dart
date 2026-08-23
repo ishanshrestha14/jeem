@@ -35,7 +35,9 @@ class WorkoutScreen extends ConsumerWidget {
             padding: const EdgeInsets.only(right: 8),
             child: Center(
               child: _ExercisesAction(
-                onTap: () => context.push('/exercises'),
+                // Explore is a tab now, so this switches branch rather than
+                // pushing a second copy of the library on top of Workout.
+                onTap: () => context.go('/explore'),
               ),
             ),
           ),

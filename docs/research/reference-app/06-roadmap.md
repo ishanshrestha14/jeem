@@ -53,10 +53,11 @@ Only once the tabs have contents. Order matters: build the destination, then mov
 | 13 | **Date header + week strip + today's workouts** on Workout (CMP-005) | M |
 | 14 | **`You` stats hub** — sub-tab bar, Overview pane (Workout Log dot-strip → full history, Personal Records), settings demoted to a top-bar gear (CMP-009, CMP-010, CMP-020, CMP-021) | L |
 | 14b | **Muscle-based browsing UI** — the Explore grids over T-004's data (T-004 itself moved to Phase 1) | M |
-| 15 | **Five-tab shell** (ADR-005) — `Home · Explore · Workout · Library · You`; promote `/exercises` to a branch; move History under You → Overview; move Settings to a top-bar gear; check label truncation at five items | M |
+| 15 ✅ | **Five-tab shell** (ADR-005) — **done 2026-08-23, pulled forward at the owner's request** — `Home · Explore · Workout · Library · You`; promote `/exercises` to a branch; move History under You → Overview; move Settings to a top-bar gear; check label truncation at five items | M |
 
-**15 comes last on purpose.** Shipping five tabs before 12–14 exist would trade four working tabs for
-five half-empty ones.
+~~**15 comes last on purpose.**~~ **Superseded 2026-08-23:** the owner chose to land the shell first
+and fill the screens after. The trade-off stands — Library and You are thin until 12–14 land — but
+the shell is now the thing the remaining screen work slots into, rather than a migration at the end.
 
 ## Phase 4 — Later
 

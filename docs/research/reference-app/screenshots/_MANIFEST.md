@@ -17,18 +17,18 @@ Tick the box when the file lands. Extra unplanned shots are welcome: name them
 These map onto surfaces we already ship (S-015, S-008), so they convert straight into gap rows
 and tickets.
 
-| # | Filename | What to capture |
-|---|---|---|
-| 1 | ✅ `ref-S006-session-active.png` | A started routine (e.g. Pull A), mid-workout. Must show the chevron, the duration/volume/sets box, Finish, and a few exercises with sets. |
-| 2 | ⬜ `ref-S006-session-rest-timer.png` — *partly covered: the countdown pill is visible in the in-progress shot* | Immediately after marking a set complete, with the rest timer visible. |
-| 3 | ✅ covered by `ref-S006-session-active-inprogress.png` | Close-up of one exercise's set rows — column headers, previous-performance hints, the complete-set control. |
-| 4 | ✅ `ref-S006-session-minimised-wip-bar.png` | Session minimised via the chevron — the WIP bar above the bottom nav, on **any tab other than Workout** so its persistence is visible. |
-| 5 | ✅ `ref-S006-session-empty-adhoc.png` | Session started from the FAB with **no** exercises — the empty state plus the Add-exercise button. |
-| 6 | ⬜ `ref-S006-session-add-exercise.png` — still needed | The Add-exercise picker opened from inside a live session. |
-| 7 | ✅ `ref-S006-session-finish-confirm.png` + `ref-S023-finish-workout-form.png` + `ref-S024-celebration-share.png` | What Finish does — confirm dialog and/or the summary it lands on. |
-| 8 | ✅ `ref-S003-workout-tab-empty.png` + `ref-S003-workout-tab-logged.png` | Workout tab, full scroll top: date top bar, week strip, start-new-workout, FAB. |
-| 9 | ✅ covered by `ref-S003-workout-tab-empty.png` | The suggested-routines section. |
-| 10 | ✅ covered by both Workout shots | The insights block at the bottom. |
+| #   | Filename                                                                                                        | What to capture                                                                                                                           |
+| --- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | ✅ `ref-S006-session-active.png`                                                                                 | A started routine (e.g. Pull A), mid-workout. Must show the chevron, the duration/volume/sets box, Finish, and a few exercises with sets. |
+| 2   | ⬜ `ref-S006-session-rest-timer.png` — *partly covered: the countdown pill is visible in the in-progress shot*   | Immediately after marking a set complete, with the rest timer visible.                                                                    |
+| 3   | ✅ covered by `ref-S006-session-active-inprogress.png`                                                           | Close-up of one exercise's set rows — column headers, previous-performance hints, the complete-set control.                               |
+| 4   | ✅ `ref-S006-session-minimised-wip-bar.png`                                                                      | Session minimised via the chevron — the WIP bar above the bottom nav, on **any tab other than Workout** so its persistence is visible.    |
+| 5   | ✅ `ref-S006-session-empty-adhoc.png`                                                                            | Session started from the FAB with **no** exercises — the empty state plus the Add-exercise button.                                        |
+| 6   | ⬜ `ref-S006-session-add-exercise.png` — still needed                                                            | The Add-exercise picker opened from inside a live session.                                                                                |
+| 7   | ✅ `ref-S006-session-finish-confirm.png` + `ref-S023-finish-workout-form.png` + `ref-S024-celebration-share.png` | What Finish does — confirm dialog and/or the summary it lands on.                                                                         |
+| 8   | ✅ `ref-S003-workout-tab-empty.png` + `ref-S003-workout-tab-logged.png`                                          | Workout tab, full scroll top: date top bar, week strip, start-new-workout, FAB.                                                           |
+| 9   | ✅ covered by `ref-S003-workout-tab-empty.png`                                                                   | The suggested-routines section.                                                                                                           |
+| 10  | ✅ covered by both Workout shots                                                                                 | The insights block at the bottom.                                                                                                         |
 
 ## Batch 2 — Home + Profile (largest IA gaps)
 
