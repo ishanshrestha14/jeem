@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:flutter_test/flutter_test.dart';
@@ -263,5 +264,27 @@ void main() {
     expect(session.id, 'sess-1');
     expect(session.endedAt,
         DateTime.utc(2026, 8, 15, 10, 30, 45, 123, 456).add(const Duration(hours: 1)));
+  });
+
+  test('exportToFile creates the target directory if it does not exist',
+      () async {
+    // Regression: on macOS `getTemporaryDirectory()` returns
+    // Library/Caches/<bundle-id>, a path the OS does not create for a freshly
+    // installed sandboxed app, so the export died with PathNotFoundException
+    // (errno 2) before writing a single byte.
+    final root = await Directory.systemTemp.createTemp('gymflow-export-test');
+    addTearDown(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+    final missing = Directory('${root.path}/not/created/yet');
+    expect(await missing.exists(), isFalse);
+
+    final service = BackupService(dbA);
+    final file = await service.exportToFile(directory: missing);
+
+    expect(await file.exists(), isTrue);
+    final decoded =
+        jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+    expect(decoded['version'], isNotNull);
   });
 }

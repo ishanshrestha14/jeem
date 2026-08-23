@@ -47,9 +47,17 @@ class BackupService {
 
   /// Writes [exportJson]'s output to a temp file so it can be handed to
   /// `Share.shareXFiles`.
-  Future<File> exportToFile() async {
+  /// [directory] exists so tests can point this at a path that does not yet
+  /// exist; production always uses the platform temp directory.
+  Future<File> exportToFile({Directory? directory}) async {
     final json = await exportJson();
-    final dir = await getTemporaryDirectory();
+    final dir = directory ?? await getTemporaryDirectory();
+    // `getTemporaryDirectory` returns a *path*, not a guaranteed directory:
+    // on macOS it is `Library/Caches/<bundle-id>`, which the OS does not
+    // create for a freshly installed sandboxed app. Writing straight into it
+    // fails with PathNotFoundException (errno 2) until something creates it.
+    // Harmless where the directory already exists, e.g. Android's cacheDir.
+    await dir.create(recursive: true);
     final stamp =
         DateTime.now().toUtc().toIso8601String().replaceAll(RegExp('[:.]'), '-');
     final file = File(p.join(dir.path, 'gymflow-backup-$stamp.json'));
