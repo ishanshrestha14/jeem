@@ -1,6 +1,6 @@
 # T-007 — Rebuild the You tab against S-005
 
-- **Status:** Mini-plan submitted — awaiting go
+- **Status:** **Done** (2026-08-23) — `flutter analyze` clean, 243 tests pass.
 - **Priority:** Should
 - **Effort:** M
 - **Specs:** S-005, ADR-004
@@ -74,10 +74,32 @@ have.
 
 ## Open questions
 
-- [ ] Week starts **Monday** or Sunday? The screenshot's strip reads `S M T W T F S`, which suggests
-      Sunday — worth confirming, since it changes what "this week" means.
-- [ ] Should PRs show **one row per exercise** (its best) or one per metric? S-005 shows one row per
-      exercise with a weight headline; assuming that.
+- [x] Week starts **Sunday** (owner, 2026-08-23). Saturday is a rest day — the gym is closed — so
+      the week reads Sun..Sat with the rest day at the end rather than splitting the training week.
+- [x] **One row per exercise**, led by its heaviest lift.
+- [ ] Should the other three metrics (est. 1RM, volume, reps) be visible anywhere? They are computed
+      and tested, but only the weight record is displayed.
+
+## What shipped
+
+- `computePersonalRecords` over completed sessions — all four ADR-004 metrics per exercise, lifetime.
+  Pure function over `List<ActiveSession>`, so it is tested without a database or a widget.
+- `WeekDotStrip` (CMP-020) — Sunday-start week, filled dots on trained days, today by weight.
+- `YouScreen` rebuilt: Workout log + `See full workout history`, then Personal records.
+- Records are **derived, not stored**: a cached table would need invalidating on every set edit,
+  including edits to *completed* sets, which this app deliberately allows. Worth caching once it is
+  walking years of data, not before.
+
+## Decisions made during implementation
+
+- **Strictly-greater comparison**, so the earliest session to reach a value keeps the record —
+  matching a best again is not a new personal best.
+- **Volume is attributed to the session's heaviest set**, so the "achieving set" shown beside a
+  volume record is a real set rather than an invented average.
+- **The strip keeps its shape on an empty week** — untrained days stay small muted dots rather than
+  disappearing. A row that collapses as data runs out reads as broken.
+- **Semantics are scoped to the dot, not the day**: wrapping the column merged the weekday letter
+  into the label, so a screen reader announced "Trained S".
 
 ## Revision log
 - 2026-08-23 — created from `ref-S005-you-overview-log-prs.png` and `-charts-recovery.png`.

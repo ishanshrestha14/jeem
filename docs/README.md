@@ -156,7 +156,7 @@ Next free CMP-ID: **CMP-028**.
 | [T-004](tickets/T-004-exercise-taxonomy.md) | Muscle group + equipment taxonomy on exercises | **Done** (schema v3) | L | S-002, S-026, CMP-022, CMP-024 |
 | [T-005](tickets/T-005-plural-primary-muscles.md) | Correct the exercise taxonomy: body parts + plural muscles (schema v4) | **Done** (schema v4) | L | S-025, S-027 |
 | [T-006](tickets/T-006-programs.md) | Programs: a container above routines (schema v5) | **Done** (schema v5) | L | S-004 |
-| [T-007](tickets/T-007-you-overview.md) | Rebuild the You tab against S-005 | Mini-plan — awaiting go | M | S-005, ADR-004 |
+| [T-007](tickets/T-007-you-overview.md) | Rebuild the You tab against S-005 | **Done** | M | S-005, ADR-004 |
 
 Next free T-ID: **T-008**.
 
@@ -352,11 +352,11 @@ default | pressed | disabled | loading | selected | error
 | FL (flows) | 0 |
 | CMP (components) | 27 candidates — 0 written specs |
 | F (features) | 0 |
-| T (tickets) | 7 — 5 done, 1 blocked (T-002), 1 planned (T-007) |
+| T (tickets) | 7 — 6 done, 1 blocked (T-002) |
 | ADR (decisions) | 6 |
 
-**Last updated:** **Programs shipped** (T-006, schema v5) and the Library tab rebuilt to match
-S-004. 233 tests pass. Next: the **You** tab, still drifted from S-005.
+**Last updated:** **You tab rebuilt** against S-005 (T-007) — Workout log week strip and lifetime
+personal records. 243 tests pass.
 
 **Screenshot workflow:** paste into any note under `docs/`; Obsidian writes the PNG to disk and I
 rename it into `screenshots/` under its manifest name.
