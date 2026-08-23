@@ -2,6 +2,62 @@ import 'package:drift/drift.dart';
 
 enum LoggingType { strengthWeightRepsRir, durationOnly }
 
+/// Muscles an exercise can target. Fine-grained on purpose: coarse buckets
+/// ("Arms", "Legs") cannot be split later without a second migration, whereas
+/// several fine values can always be shown under one heading.
+///
+/// `adductors`, `neck` and `cardio` are unused by the seed library but are
+/// declared now so a user-created exercise never needs a schema change
+/// (docs/tickets/T-004-appendix-seed-tags.md).
+enum Muscle {
+  chest,
+  lats,
+  upperBack,
+  lowerBack,
+  deltsFront,
+  deltsSide,
+  deltsRear,
+  biceps,
+  triceps,
+  forearms,
+  abs,
+  obliques,
+  quadriceps,
+  hamstrings,
+  glutes,
+  hipFlexors,
+  adductors,
+  calves,
+  neck,
+  cardio,
+}
+
+/// Coarse browse axis, kept deliberately small (~10 buckets). This is what
+/// picker cards print as a subtitle and what the exercise grid groups by —
+/// a *separate* field from [Muscle], mirroring the reference app's
+/// "Body Parts" and "Primary muscles" being distinct (S-027).
+enum BodyPart {
+  chest,
+  back,
+  shoulders,
+  arms,
+  core,
+  legs,
+  glutes,
+  calves,
+  neck,
+  cardio,
+}
+
+/// Which role a muscle plays in an exercise. Both roles are many-valued: an
+/// exercise can have several primaries (S-025 shows two).
+enum MuscleRole { primary, secondary }
+
+/// Single-valued for now (T-004). An exercise needing two (cable + bench)
+/// records the second in its notes; multi-value is a later migration if that
+/// proves painful.
+enum Equipment { barbell, dumbbell, cable, machine, bodyweight, band, other }
+
 enum SessionStatus { active, paused, completed, cancelled }
 
 enum RestTimerStatus { idle, running, paused, finished }
@@ -15,7 +71,11 @@ mixin SyncColumns on Table {
 class Exercises extends Table with SyncColumns {
   TextColumn get id => text()();
   TextColumn get name => text()();
-  TextColumn get category => text().nullable()();
+  // Muscles and body parts live in their own tables (both are many-valued);
+  // "untagged" — no rows at all — is the normal state while the library is
+  // built from user-created exercises (ADR-006).
+  TextColumn get equipment => textEnum<Equipment>().nullable()();
+  BoolColumn get isFavourite => boolean().withDefault(const Constant(false))();
   TextColumn get loggingType => textEnum<LoggingType>()();
   TextColumn get description => text().nullable()();
   TextColumn get notes => text().nullable()();
@@ -25,6 +85,55 @@ class Exercises extends Table with SyncColumns {
   @override
   Set<Column> get primaryKey => {id};
 }
+
+/// Muscles worked by an exercise, with the role each plays. One relation
+/// rather than a column plus a table: primary is many-valued too, and the
+/// composite key makes "a muscle cannot be both primary and secondary" a
+/// database invariant rather than an editor convention.
+class ExerciseMuscles extends Table {
+  TextColumn get exerciseId =>
+      text().references(Exercises, #id, onDelete: KeyAction.cascade)();
+  TextColumn get muscle => textEnum<Muscle>()();
+  TextColumn get role => textEnum<MuscleRole>()();
+
+  @override
+  Set<Column> get primaryKey => {exerciseId, muscle};
+}
+
+/// Coarse grouping, set independently of [ExerciseMuscles] — the reference
+/// app's create form exposes both (S-027), so a user can tag "Back" without
+/// naming a muscle. Seeded rows derive theirs from their primaries.
+class ExerciseBodyParts extends Table {
+  TextColumn get exerciseId =>
+      text().references(Exercises, #id, onDelete: KeyAction.cascade)();
+  TextColumn get bodyPart => textEnum<BodyPart>()();
+
+  @override
+  Set<Column> get primaryKey => {exerciseId, bodyPart};
+}
+
+/// The coarse bucket a muscle belongs to. Used to derive body parts for
+/// seeded exercises and during the v4 migration, so the two axes start
+/// consistent without 55 hand-written lists.
+BodyPart bodyPartForMuscle(Muscle m) => switch (m) {
+      Muscle.chest => BodyPart.chest,
+      Muscle.lats || Muscle.upperBack || Muscle.lowerBack => BodyPart.back,
+      Muscle.deltsFront ||
+      Muscle.deltsSide ||
+      Muscle.deltsRear =>
+        BodyPart.shoulders,
+      Muscle.biceps || Muscle.triceps || Muscle.forearms => BodyPart.arms,
+      Muscle.abs || Muscle.obliques => BodyPart.core,
+      Muscle.quadriceps ||
+      Muscle.hamstrings ||
+      Muscle.hipFlexors ||
+      Muscle.adductors =>
+        BodyPart.legs,
+      Muscle.glutes => BodyPart.glutes,
+      Muscle.calves => BodyPart.calves,
+      Muscle.neck => BodyPart.neck,
+      Muscle.cardio => BodyPart.cardio,
+    };
 
 class WorkoutTemplates extends Table with SyncColumns {
   TextColumn get id => text()();

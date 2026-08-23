@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/utils/formatting.dart';
 import '../../../db/app_database.dart';
 import '../providers/exercise_providers.dart';
 import 'exercise_editor_screen.dart';
@@ -118,6 +119,9 @@ class _ExercisePickerSheetState extends ConsumerState<_ExercisePickerSheet> {
                         ],
                       );
                     }
+                    final bodyParts =
+                        ref.watch(bodyPartsByExerciseProvider).valueOrNull ??
+                            const <String, List<BodyPart>>{};
                     return ListView.builder(
                       controller: scrollController,
                       itemCount: rows.length + 1,
@@ -133,7 +137,8 @@ class _ExercisePickerSheetState extends ConsumerState<_ExercisePickerSheet> {
                         return ListTile(
                           title: Text(exercise.name),
                           subtitle: Text([
-                            if (exercise.category != null) exercise.category!,
+                            if ((bodyParts[exercise.id] ?? const []).isNotEmpty)
+                              bodyPartsSubtitle(bodyParts[exercise.id]!),
                             exercise.loggingType == LoggingType.durationOnly
                                 ? 'Duration'
                                 : 'Strength',
@@ -149,7 +154,8 @@ class _ExercisePickerSheetState extends ConsumerState<_ExercisePickerSheet> {
                               description: exercise.description,
                               notes: exercise.notes,
                               imagePath: exercise.imagePath,
-                              category: exercise.category,
+                              equipment: exercise.equipment,
+                              exerciseId: exercise.id,
                               isArchived: exercise.isArchived,
                             ),
                           ),

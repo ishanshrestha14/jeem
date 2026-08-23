@@ -161,7 +161,7 @@ void main() {
   });
 
   testWidgets(
-      'the picker disambiguates duplicate exercise names with a category '
+      'the picker disambiguates duplicate exercise names with a body-part '
       'subtitle (PRD §18.9)', (tester) async {
     final templates = TemplateRepository(db);
     final exercises = ExerciseRepository(db);
@@ -169,11 +169,11 @@ void main() {
     await exercises.create(
         name: 'Row',
         loggingType: LoggingType.strengthWeightRepsRir,
-        category: 'Back');
+        primaryMuscles: [Muscle.lats]);
     await exercises.create(
         name: 'Row',
         loggingType: LoggingType.strengthWeightRepsRir,
-        category: 'Legs');
+        primaryMuscles: [Muscle.quadriceps]);
 
     await tester.pumpWidget(harness(t.id));
     await pumpUntilData(tester, until: find.text('Add exercise'));
@@ -187,7 +187,7 @@ void main() {
 
     // Duplicate names are allowed and both are offered...
     expect(find.text('Row'), findsNWidgets(2));
-    // ...told apart only by the category shown as a subtitle.
+    // ...told apart only by the body part shown as a subtitle.
     expect(find.text('Back · Strength'), findsOneWidget);
     expect(find.text('Legs · Strength'), findsOneWidget);
 

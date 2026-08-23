@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:drift/drift.dart' show InsertMode;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -25,6 +27,8 @@ class BackupService {
 
   Future<String> exportJson() async {
     final exercises = await _db.select(_db.exercises).get();
+    final exerciseMuscles = await _db.select(_db.exerciseMuscles).get();
+    final exerciseBodyParts = await _db.select(_db.exerciseBodyParts).get();
     final templates = await _db.select(_db.workoutTemplates).get();
     final templateExercises = await _db.select(_db.templateExercises).get();
     final sessions = await _db.select(_db.workoutSessions).get();
@@ -35,6 +39,9 @@ class BackupService {
       'version': backupVersion,
       'exportedAt': DateTime.now().toUtc().toIso8601String(),
       'exercises': exercises.map(_exerciseToJson).toList(),
+      'exerciseMuscles': exerciseMuscles.map(_exerciseMuscleToJson).toList(),
+      'exerciseBodyParts':
+          exerciseBodyParts.map(_exerciseBodyPartToJson).toList(),
       'workoutTemplates': templates.map(_templateToJson).toList(),
       'templateExercises':
           templateExercises.map(_templateExerciseToJson).toList(),
@@ -88,6 +95,19 @@ class BackupService {
     }
 
     final exercises = _list(data['exercises']).map(_exerciseFromJson).toList();
+    // Three generations of backup have to import here:
+    //   pre-v3  — no taxonomy keys at all
+    //   v3      — `primaryMuscle` on the exercise + `exerciseSecondaryMuscles`
+    //   v4      — `exerciseMuscles` (with roles) + `exerciseBodyParts`
+    // Backups outlive schemas, so the older shapes are upgraded on read
+    // rather than rejected.
+    final exerciseMuscles = <ExerciseMuscle>[
+      ..._list(data['exerciseMuscles']).map(_exerciseMuscleFromJson),
+      ..._legacyMusclesFrom(data),
+    ];
+    final exerciseBodyParts = _list(data['exerciseBodyParts'])
+        .map(_exerciseBodyPartFromJson)
+        .toList();
     final templates =
         _list(data['workoutTemplates']).map(_templateFromJson).toList();
     final templateExercises = _list(data['templateExercises'])
@@ -107,10 +127,28 @@ class BackupService {
       await _db.delete(_db.workoutSessions).go();
       await _db.delete(_db.templateExercises).go();
       await _db.delete(_db.workoutTemplates).go();
+      // Deleted before exercises only for symmetry with the FK-safe order
+      // above; the cascade would remove these rows anyway.
+      await _db.delete(_db.exerciseMuscles).go();
+      await _db.delete(_db.exerciseBodyParts).go();
       await _db.delete(_db.exercises).go();
 
       if (exercises.isNotEmpty) {
         await _db.batch((b) => b.insertAll(_db.exercises, exercises));
+      }
+      if (exerciseMuscles.isNotEmpty) {
+        await _db.batch(
+          (b) => b.insertAll(
+            _db.exerciseMuscles,
+            exerciseMuscles,
+            mode: InsertMode.insertOrIgnore,
+          ),
+        );
+      }
+      if (exerciseBodyParts.isNotEmpty) {
+        await _db.batch(
+          (b) => b.insertAll(_db.exerciseBodyParts, exerciseBodyParts),
+        );
       }
       if (templates.isNotEmpty) {
         await _db.batch((b) => b.insertAll(_db.workoutTemplates, templates));
@@ -135,6 +173,18 @@ class BackupService {
   static List<dynamic> _list(dynamic value) =>
       value == null ? const [] : value as List<dynamic>;
 
+  /// Reads an enum by name, tolerating both a missing key (older backup) and
+  /// an unrecognised value (a backup written by a newer build). An unknown
+  /// value degrades to null rather than throwing and failing the whole import.
+  static T? _enumOrNull<T extends Enum>(List<T> values, dynamic raw) {
+    if (raw == null) return null;
+    final name = raw as String;
+    for (final v in values) {
+      if (v.name == name) return v;
+    }
+    return null;
+  }
+
   static DateTime _parseDate(String s) => DateTime.parse(s);
   static String _toIso(DateTime d) => d.toUtc().toIso8601String();
   static String? _toIsoOrNull(DateTime? d) => d == null ? null : _toIso(d);
@@ -148,7 +198,8 @@ class BackupService {
   Map<String, dynamic> _exerciseToJson(Exercise e) => {
         'id': e.id,
         'name': e.name,
-        'category': e.category,
+        'equipment': e.equipment?.name,
+        'isFavourite': e.isFavourite,
         'loggingType': e.loggingType.name,
         'description': e.description,
         'notes': e.notes,
@@ -164,7 +215,10 @@ class BackupService {
     return Exercise(
       id: j['id'] as String,
       name: j['name'] as String,
-      category: j['category'] as String?,
+      // Absent in pre-v3 backups, in which case the exercise imports
+      // untagged — a normal state under ADR-006, not a failure.
+      equipment: _enumOrNull(Equipment.values, j['equipment']),
+      isFavourite: (j['isFavourite'] as bool?) ?? false,
       loggingType: LoggingType.values.byName(j['loggingType'] as String),
       description: j['description'] as String?,
       notes: j['notes'] as String?,
@@ -174,6 +228,64 @@ class BackupService {
       updatedAt: _parseDate(j['updatedAt'] as String),
       deletedAt: _parseDateOrNull(j['deletedAt']),
     );
+  }
+
+  Map<String, dynamic> _exerciseMuscleToJson(ExerciseMuscle m) => {
+        'exerciseId': m.exerciseId,
+        'muscle': m.muscle.name,
+        'role': m.role.name,
+      };
+
+  ExerciseMuscle _exerciseMuscleFromJson(dynamic json) {
+    final j = json as Map<String, dynamic>;
+    return ExerciseMuscle(
+      exerciseId: j['exerciseId'] as String,
+      muscle: Muscle.values.byName(j['muscle'] as String),
+      role: MuscleRole.values.byName(j['role'] as String),
+    );
+  }
+
+  Map<String, dynamic> _exerciseBodyPartToJson(ExerciseBodyPart b) => {
+        'exerciseId': b.exerciseId,
+        'bodyPart': b.bodyPart.name,
+      };
+
+  ExerciseBodyPart _exerciseBodyPartFromJson(dynamic json) {
+    final j = json as Map<String, dynamic>;
+    return ExerciseBodyPart(
+      exerciseId: j['exerciseId'] as String,
+      bodyPart: BodyPart.values.byName(j['bodyPart'] as String),
+    );
+  }
+
+  /// Reads a v3-era backup's taxonomy into v4 rows: the exercise's
+  /// `primaryMuscle` becomes a primary row, and each
+  /// `exerciseSecondaryMuscles` entry becomes a secondary row. Unknown enum
+  /// names are skipped rather than throwing — one stale value should not cost
+  /// the whole import.
+  List<ExerciseMuscle> _legacyMusclesFrom(Map<String, dynamic> data) {
+    final out = <ExerciseMuscle>[];
+    for (final raw in _list(data['exercises'])) {
+      final j = raw as Map<String, dynamic>;
+      final m = _enumOrNull(Muscle.values, j['primaryMuscle']);
+      if (m == null) continue;
+      out.add(ExerciseMuscle(
+        exerciseId: j['id'] as String,
+        muscle: m,
+        role: MuscleRole.primary,
+      ));
+    }
+    for (final raw in _list(data['exerciseSecondaryMuscles'])) {
+      final j = raw as Map<String, dynamic>;
+      final m = _enumOrNull(Muscle.values, j['muscle']);
+      if (m == null) continue;
+      out.add(ExerciseMuscle(
+        exerciseId: j['exerciseId'] as String,
+        muscle: m,
+        role: MuscleRole.secondary,
+      ));
+    }
+    return out;
   }
 
   // ---------------------------------------------------------------------

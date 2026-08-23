@@ -1,3 +1,5 @@
+import '../../db/tables.dart';
+
 /// "1:05", "0:09", "12:30" — always at least M:SS.
 String mmss(Duration d) {
   final total = d.isNegative ? 0 : d.inSeconds;
@@ -21,3 +23,65 @@ String formatDurationSeconds(int? seconds) {
   if (seconds < 60) return '${seconds}s';
   return mmss(Duration(seconds: seconds));
 }
+
+/// Human labels for [Muscle]. Written out rather than derived from the enum
+/// name so multi-word values read properly ("Front delts", not "deltsFront")
+/// and so renaming an enum value can never silently change UI copy.
+String muscleLabel(Muscle m) => switch (m) {
+      Muscle.chest => 'Chest',
+      Muscle.lats => 'Lats',
+      Muscle.upperBack => 'Upper back',
+      Muscle.lowerBack => 'Lower back',
+      Muscle.deltsFront => 'Front delts',
+      Muscle.deltsSide => 'Side delts',
+      Muscle.deltsRear => 'Rear delts',
+      Muscle.biceps => 'Biceps',
+      Muscle.triceps => 'Triceps',
+      Muscle.forearms => 'Forearms',
+      Muscle.abs => 'Abs',
+      Muscle.obliques => 'Obliques',
+      Muscle.quadriceps => 'Quadriceps',
+      Muscle.hamstrings => 'Hamstrings',
+      Muscle.glutes => 'Glutes',
+      Muscle.hipFlexors => 'Hip flexors',
+      Muscle.adductors => 'Adductors',
+      Muscle.calves => 'Calves',
+      Muscle.neck => 'Neck',
+      Muscle.cardio => 'Cardio',
+    };
+
+String equipmentLabel(Equipment e) => switch (e) {
+      Equipment.barbell => 'Barbell',
+      Equipment.dumbbell => 'Dumbbell',
+      Equipment.cable => 'Cable',
+      Equipment.machine => 'Machine',
+      Equipment.bodyweight => 'Bodyweight',
+      Equipment.band => 'Band',
+      Equipment.other => 'Other',
+    };
+
+String bodyPartLabel(BodyPart b) => switch (b) {
+      BodyPart.chest => 'Chest',
+      BodyPart.back => 'Back',
+      BodyPart.shoulders => 'Shoulders',
+      BodyPart.arms => 'Arms',
+      BodyPart.core => 'Core',
+      BodyPart.legs => 'Legs',
+      BodyPart.glutes => 'Glutes',
+      BodyPart.calves => 'Calves',
+      BodyPart.neck => 'Neck',
+      BodyPart.cardio => 'Cardio',
+    };
+
+/// Subtitle for a list/picker row: body parts joined, capped at two with a
+/// `+n` overflow so long taxonomies cannot push the row's height around.
+String bodyPartsSubtitle(List<BodyPart> parts) {
+  if (parts.isEmpty) return '';
+  final labels = parts.map(bodyPartLabel).toList()..sort();
+  if (labels.length <= 2) return labels.join(' · ');
+  return '${labels.take(2).join(' · ')} +${labels.length - 2}';
+}
+
+/// `null` -> null, so callers can decide whether to render a chip at all.
+String? muscleLabelOrNull(Muscle? m) => m == null ? null : muscleLabel(m);
+String? equipmentLabelOrNull(Equipment? e) => e == null ? null : equipmentLabel(e);

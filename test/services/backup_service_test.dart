@@ -33,7 +33,6 @@ void main() {
           id: 'ex-1',
           name: 'Bench Press',
           loggingType: LoggingType.strengthWeightRepsRir,
-          category: const Value('Chest'),
           createdAt: now,
           updatedAt: now,
         ));

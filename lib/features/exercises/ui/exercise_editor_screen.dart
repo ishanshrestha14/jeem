@@ -7,22 +7,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/services/image_storage_service.dart';
+import '../../../core/utils/formatting.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../db/app_database.dart';
 import '../data/exercise_repository.dart';
 import '../providers/exercise_providers.dart';
 
-const _categories = [
-  'Chest',
-  'Back',
-  'Legs',
-  'Shoulders',
-  'Arms',
-  'Core',
-  'Stretching',
-  'Cardio',
-  'Other',
-];
+
 
 class ExerciseEditorScreen extends ConsumerStatefulWidget {
   const ExerciseEditorScreen({super.key, this.exerciseId});
@@ -41,7 +32,14 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
   final _descriptionController = TextEditingController();
   final _notesController = TextEditingController();
 
-  String? _category;
+  Equipment? _equipment;
+  final Set<Muscle> _primaryMuscles = {};
+  final Set<Muscle> _secondaryMuscles = {};
+  final Set<BodyPart> _bodyParts = {};
+  /// True until the user edits body parts by hand. While set, body parts track
+  /// the primary muscles automatically — tagging one exercise should not mean
+  /// filling in the same information twice.
+  bool _bodyPartsDerived = true;
   LoggingType _loggingType = LoggingType.strengthWeightRepsRir;
   String? _nameError;
   String? _imagePath;
@@ -87,12 +85,42 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
     if (_initialized) return;
     _initialized = true;
     _loaded = exercise;
+    // Secondary muscles live in their own table, so they arrive after the
+    // exercise row. Loading them here (rather than watching) keeps the chips
+    // as local edit state — a live stream would fight the user's selections.
+    unawaited(_loadTaxonomy(exercise.id));
     _nameController.text = exercise.name;
     _descriptionController.text = exercise.description ?? '';
     _notesController.text = exercise.notes ?? '';
-    _category = exercise.category;
+    _equipment = exercise.equipment;
     _loggingType = exercise.loggingType;
     _imagePath = exercise.imagePath;
+  }
+
+  Future<void> _loadTaxonomy(String exerciseId) async {
+    final t = await ref.read(exerciseRepositoryProvider).taxonomy(exerciseId);
+    if (!mounted) return;
+    setState(() {
+      _primaryMuscles
+        ..clear()
+        ..addAll(t.primary);
+      _secondaryMuscles
+        ..clear()
+        ..addAll(t.secondary);
+      _bodyParts
+        ..clear()
+        ..addAll(t.bodyParts);
+      // Anything already stored is treated as deliberate, so re-deriving
+      // cannot quietly discard a hand-picked set.
+      _bodyPartsDerived = t.bodyParts.isEmpty;
+    });
+  }
+
+  void _syncDerivedBodyParts() {
+    if (!_bodyPartsDerived) return;
+    _bodyParts
+      ..clear()
+      ..addAll(_primaryMuscles.map(bodyPartForMuscle));
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -179,18 +207,27 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
         await repo.update(
           _loaded!.copyWith(
             name: name,
-            category: Value(_category),
+            equipment: Value(_equipment),
             description: Value(description.isEmpty ? null : description),
             notes: Value(notes.isEmpty ? null : notes),
             loggingType: _loggingType,
             imagePath: Value(finalImagePath),
           ),
         );
+        await repo.setTaxonomy(
+          _loaded!.id,
+          primary: _primaryMuscles.toList(),
+          secondary: _secondaryMuscles.toList(),
+          bodyParts: _bodyParts.toList(),
+        );
       } else {
         final created = await repo.create(
           name: name,
           loggingType: _loggingType,
-          category: _category,
+          equipment: _equipment,
+          primaryMuscles: _primaryMuscles.toList(),
+          secondaryMuscles: _secondaryMuscles.toList(),
+          bodyParts: _bodyParts.toList(),
           description: description.isEmpty ? null : description,
           notes: notes.isEmpty ? null : notes,
           imagePath: finalImagePath,
@@ -307,15 +344,79 @@ class _ExerciseEditorScreenState extends ConsumerState<ExerciseEditorScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            initialValue: _category,
-            decoration: const InputDecoration(labelText: 'Category'),
+          DropdownButtonFormField<Equipment?>(
+            initialValue: _equipment,
+            decoration: const InputDecoration(labelText: 'Equipment'),
             items: [
               const DropdownMenuItem(value: null, child: Text('None')),
-              for (final c in _categories)
-                DropdownMenuItem(value: c, child: Text(c)),
+              for (final e in Equipment.values)
+                DropdownMenuItem(value: e, child: Text(equipmentLabel(e))),
             ],
-            onChanged: (v) => setState(() => _category = v),
+            onChanged: (v) => setState(() => _equipment = v),
+          ),
+          const SizedBox(height: 16),
+          _ChipSection(
+            title: 'Body parts',
+            subtitle: _bodyPartsDerived
+                ? 'Following the primary muscles. Tap to set your own.'
+                : null,
+            children: [
+              for (final b in BodyPart.values)
+                FilterChip(
+                  label: Text(bodyPartLabel(b)),
+                  selected: _bodyParts.contains(b),
+                  onSelected: (on) => setState(() {
+                    _bodyPartsDerived = false;
+                    if (on) {
+                      _bodyParts.add(b);
+                    } else {
+                      _bodyParts.remove(b);
+                    }
+                  }),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _ChipSection(
+            title: 'Primary muscles',
+            children: [
+              for (final m in Muscle.values)
+                FilterChip(
+                  label: Text(muscleLabel(m)),
+                  selected: _primaryMuscles.contains(m),
+                  onSelected: (on) => setState(() {
+                    if (on) {
+                      _primaryMuscles.add(m);
+                      // A muscle cannot hold both roles (it is one row in
+                      // exercise_muscles), so promoting it drops the
+                      // secondary rather than erroring.
+                      _secondaryMuscles.remove(m);
+                    } else {
+                      _primaryMuscles.remove(m);
+                    }
+                    _syncDerivedBodyParts();
+                  }),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _ChipSection(
+            title: 'Secondary muscles',
+            children: [
+              for (final m in Muscle.values)
+                if (!_primaryMuscles.contains(m))
+                  FilterChip(
+                    label: Text(muscleLabel(m)),
+                    selected: _secondaryMuscles.contains(m),
+                    onSelected: (on) => setState(() {
+                      if (on) {
+                        _secondaryMuscles.add(m);
+                      } else {
+                        _secondaryMuscles.remove(m);
+                      }
+                    }),
+                  ),
+            ],
           ),
           const SizedBox(height: 16),
           Text('Logging type', style: Theme.of(context).textTheme.titleSmall),
@@ -541,4 +642,40 @@ class _DashedBorderPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) =>
       oldDelegate.color != color;
+}
+
+
+/// A titled block of filter chips. Three of these sit in the editor, so the
+/// heading + optional hint + wrap is factored out rather than repeated.
+class _ChipSection extends StatelessWidget {
+  const _ChipSection({
+    required this.title,
+    required this.children,
+    this.subtitle,
+  });
+
+  final String title;
+  final String? subtitle;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: theme.textTheme.titleSmall),
+        if (subtitle != null) ...[
+          const SizedBox(height: 2),
+          Text(
+            subtitle!,
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.outline),
+          ),
+        ],
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, runSpacing: 8, children: children),
+      ],
+    );
+  }
 }

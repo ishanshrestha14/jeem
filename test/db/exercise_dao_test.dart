@@ -19,7 +19,7 @@ void main() {
           loggingType: LoggingType.strengthWeightRepsRir,
           createdAt: now,
           updatedAt: now,
-          category: const Value('Chest'),
+          equipment: const Value(Equipment.barbell),
           description: const Value('Barbell press on a flat bench.'),
         ));
 
@@ -27,7 +27,8 @@ void main() {
 
     expect(row.name, 'Bench Press');
     expect(row.loggingType, LoggingType.strengthWeightRepsRir);
-    expect(row.category, 'Chest');
+    expect(row.equipment, Equipment.barbell);
+    expect(row.isFavourite, isFalse);
     expect(row.isArchived, isFalse);
     expect(row.deletedAt, isNull);
   });
