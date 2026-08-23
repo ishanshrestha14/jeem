@@ -71,7 +71,7 @@ Full detail, counterparts and gaps: [`02-screen-inventory.md`](research/referenc
 | S-001 | reference | Home | screen | **Draft — [spec](specs/screens/S-001-reference-home.md)** |
 | S-002 | reference | Explore | screen, tabbed | **Draft — [spec](specs/screens/S-002-reference-explore.md)** |
 | S-003 | reference | Workout | screen | **Draft — [spec](specs/screens/S-003-reference-workout-tab.md)** |
-| S-004 | reference | Library | screen | Draft (UNVERIFIED) |
+| S-004 | reference | Library | screen | **Draft — [spec](specs/screens/S-004-reference-library.md)** |
 | S-005 | reference | You | screen, tabbed | **Draft — [spec](specs/screens/S-005-reference-you-tab.md)** |
 | S-006 | reference | Active session | screen | **Draft — [spec](specs/screens/S-006-reference-active-session.md)** |
 | S-007 | ours | Home / dashboard | screen | Implemented |
@@ -346,7 +346,7 @@ default | pressed | disabled | loading | selected | error
 
 | Type | Count |
 |---|---|
-| S (surfaces) | 27 registered (11 reference · 16 ours) — **10 written specs** |
+| S (surfaces) | 27 registered (11 reference · 16 ours) — **11 written specs** |
 | FL (flows) | 0 |
 | CMP (components) | 27 candidates — 0 written specs |
 | F (features) | 0 |

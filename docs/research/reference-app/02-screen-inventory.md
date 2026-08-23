@@ -16,7 +16,7 @@ Tab panes are sections of their parent's spec, not separate S-IDs (same ADR).
 | S-001 | reference | Home (feed + weekly summary) | screen | `ref-S001-home-populated.png`, `ref-S006-session-minimised-wip-bar.png` | **Draft (spec)** | S-007 | [S-001](../../specs/screens/S-001-reference-home.md) |
 | S-002 | reference | Explore (tabs: Exercises · Programs · Coaches) | screen, tabbed | `ref-S002-explore-exercises.png` | **Draft (spec)** | S-011 | [S-002](../../specs/screens/S-002-reference-explore.md) |
 | S-003 | reference | Workout | screen | `ref-S003-workout-tab-empty.png`, `ref-S003-workout-tab-logged.png` | **Draft (spec)** | S-008 | [S-003](../../specs/screens/S-003-reference-workout-tab.md) |
-| S-004 | reference | Library | screen | — | Draft (UNVERIFIED) | split → S-008 + S-011 | — |
+| S-004 | reference | Library ("Your library") | screen | `ref-S004-library.png` | **Draft (spec)** | ours `library_screen.dart` | [S-004](../../specs/screens/S-004-reference-library.md) |
 | S-005 | reference | **You** (tabs: Overview · Exercises · Measures · Photos) | screen, tabbed | `ref-S005-you-overview-log-prs.png`, `ref-S005-you-overview-charts-recovery.png` | **Draft (spec)** | S-019 + S-020 | [S-005](../../specs/screens/S-005-reference-you-tab.md) |
 | S-023 | reference | "Finish Workout" form | screen (pushed) | `ref-S023-finish-workout-form.png` | **Draft (spec)** | S-018 (partial) | [S-023](../../specs/screens/S-023-reference-finish-workout-form.md) |
 | S-024 | reference | Post-save celebration / share card | full-screen modal | `ref-S024-celebration-share.png` | **Draft (spec)** | none | [S-024](../../specs/screens/S-024-reference-celebration-share.md) |
