@@ -16,6 +16,9 @@ import 'package:gymflow/core/services/wakelock_service.dart';
 /// channel — this is the same shape as `_RecordingWakelockService` in
 /// `session_restore_test.dart`.
 class RecordingNotificationService implements NotificationService {
+  @override
+  bool get isAvailable => true;
+
   final List<({DateTime at, String nextLabel})> scheduled = [];
   int cancelCalls = 0;
   int requestPermissionCalls = 0;
@@ -59,6 +62,9 @@ class RecordingNotificationService implements NotificationService {
 /// calls can throw a `PlatformException`/`MissingPluginException` on-device;
 /// this simulates that.
 class ThrowingNotificationService implements NotificationService {
+  @override
+  bool get isAvailable => true;
+
   @override
   Future<void> scheduleRestComplete({
     required DateTime at,
