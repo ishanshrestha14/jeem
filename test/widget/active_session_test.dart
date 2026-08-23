@@ -302,7 +302,7 @@ void main() {
     // Weight is the first (leftmost) of the two empty TextFields in a
     // strength row — weight, then reps.
     final weightField = find.widgetWithText(TextField, '').first;
-    await tester.enterText(weightField, '80');
+    await typeOnKeypad(tester, weightField, '80');
     await pumpUntilSessionData(tester);
 
     final row = await (db.select(db.sessionSets)).getSingle();
@@ -364,7 +364,7 @@ void main() {
     final field = tester.widget<TextField>(weightField);
     expect(field.enabled, isNot(false));
 
-    await tester.enterText(weightField, '80');
+    await typeOnKeypad(tester, weightField, '80');
     await pumpUntilSessionData(tester);
 
     final rows = await (db.select(db.sessionSets)
@@ -409,7 +409,7 @@ void main() {
     // mid-workout row rather than an all-empty one, so any column that
     // would overflow with real digits in it is actually exercised.
     final weightField = find.widgetWithText(TextField, '').first;
-    await tester.enterText(weightField, '102.5');
+    await typeOnKeypad(tester, weightField, '102.5');
     await pumpUntilSessionData(tester);
 
     expect(find.byType(StrengthSetRow), findsNWidgets(3));
@@ -526,7 +526,7 @@ void main() {
           matching: find.widgetWithText(TextField, ''),
         )
         .first;
-    await tester.enterText(latWeightField, '42');
+    await typeOnKeypad(tester, latWeightField, '42');
     await tester.pump();
 
     // Move Squat to the front of session order. `currentTarget` tracks

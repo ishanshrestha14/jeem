@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/dashboard/ui/home_screen.dart';
@@ -97,7 +98,32 @@ GoRouter createAppRouter() => GoRouter(
         ),
         GoRoute(
           path: '/session',
-          builder: (_, _) => const ActiveSessionScreen(),
+          // Slides up from the bottom on entry and back down on exit, so
+          // minimising reads as the session collapsing into the
+          // Workout-in-Progress bar rather than as navigating backwards.
+          // The default horizontal push would imply the session is somewhere
+          // you left, not something still running underneath.
+          pageBuilder: (_, state) => CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: const ActiveSessionScreen(),
+            transitionDuration: const Duration(milliseconds: 260),
+            reverseTransitionDuration: const Duration(milliseconds: 220),
+            transitionsBuilder: (context, animation, _, child) {
+              // Honour the platform's reduce-motion setting: the session is
+              // entered and left constantly, so this is the single most
+              // repeated animation in the app.
+              if (MediaQuery.disableAnimationsOf(context)) return child;
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 1),
+                  end: Offset.zero,
+                ).animate(
+                  CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+                ),
+                child: child,
+              );
+            },
+          ),
         ),
         GoRoute(
           path: '/session/reorder',

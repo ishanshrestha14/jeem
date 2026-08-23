@@ -21,6 +21,7 @@ class StrengthSetRow extends StatelessWidget {
     super.key,
     required this.set,
     required this.isCurrent,
+    this.keypadSortKey,
     required this.weightUnit,
     required this.onToggleComplete,
     required this.onWeightChanged,
@@ -31,6 +32,11 @@ class StrengthSetRow extends StatelessWidget {
 
   final SessionSet set;
   final bool isCurrent;
+
+  /// Base position in the keypad's entry order; weight takes this slot and
+  /// reps the next, so `Next` runs weight -> reps -> the following set's
+  /// weight. Null keeps the system keyboard (the keypad is session-only).
+  final int? keypadSortKey;
   final String weightUnit;
   final VoidCallback onToggleComplete;
   final ValueChanged<double?> onWeightChanged;
@@ -72,6 +78,8 @@ class StrengthSetRow extends StatelessWidget {
                 label: 'Weight',
                 value: set.weight,
                 allowDecimal: true,
+                keypadSortKey: keypadSortKey,
+                keypadTag: set.id,
                 // No `suffix` here: `dense: true` drops `suffixText`
                 // entirely (design system — "no box chrome" in set rows),
                 // so passing it would be a parameter silently ignored by
@@ -91,6 +99,8 @@ class StrengthSetRow extends StatelessWidget {
             child: NumericField(
               label: 'Reps',
               value: set.reps,
+              keypadSortKey: keypadSortKey == null ? null : keypadSortKey! + 1,
+              keypadTag: set.id,
               dense: true,
               style: numeralStyle,
               onChanged: (v) => onRepsChanged(v?.toInt()),

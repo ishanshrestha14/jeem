@@ -8,11 +8,13 @@ import '../../../core/services/keep_screen_on_setting.dart';
 import '../../../core/services/wakelock_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatting.dart';
+import '../../../core/widgets/app_keypad.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../db/app_database.dart';
 import '../providers/active_session_controller.dart';
 import 'session_settings_sheet.dart';
 import 'widgets/rest_bar.dart';
+import 'widgets/rir_picker.dart';
 import 'widgets/session_exercise_card.dart';
 import 'widgets/session_progress_header.dart';
 
@@ -36,24 +38,26 @@ class ActiveSessionScreen extends ConsumerStatefulWidget {
 
 class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen>
     with WidgetsBindingObserver {
+  /// Owns which set value the in-app keypad is editing. Lives on the screen
+  /// rather than in a provider: it is pure view state, meaningless once this
+  /// route is gone, and nothing outside it needs to observe it.
+  final AppKeypadController _keypad = AppKeypadController();
   // One GlobalKey per exercise so a later task can
   // `Scrollable.ensureVisible` the focused target.
   final Map<String, GlobalKey> _cardKeys = {};
 
+  /// At most one entry: the session list is a **single-open accordion**
+  /// (S-006), so expanding an exercise collapses whatever was open. A set is
+  /// still the right type — it keeps the "nothing open" state expressible,
+  /// which a nullable id would too, but without special-casing removal.
+  /// Single source of truth for what is expanded. `build()` reads only this,
+  /// never `state.currentTarget` — that indirection is what makes the typing
+  /// guard's defer work. Consulting the live target would spring the new
+  /// card open the instant auto-focus moved, defeating the guard even though
+  /// the scroll was correctly held back. [_applyTargetChange] and hydration
+  /// are the only writers.
   final Set<String> _expandedIds = {};
   bool _expandedHydrated = false;
-
-  // The exercise id the screen currently treats as "the current target" for
-  // forcing a card open (`SessionExerciseCard.expanded`) — updated only by
-  // [_applyTargetChange]/hydration, never read straight off
-  // `state.currentTarget` in `build()`. That indirection is what makes the
-  // typing guard's defer actually work: `build()` force-expands whatever
-  // this holds regardless of `_expandedIds`, so if it tracked the live
-  // controller value directly, a deferred move would still visibly expand
-  // the new target's card the moment auto-focus set it (defeating the
-  // guard entirely) even though `_expandedIds`/scroll were correctly held
-  // back.
-  String? _appliedCurrentExerciseId;
 
   Timer? _ticker;
 
@@ -146,6 +150,7 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen>
     _clearCatchUpListener();
     WidgetsBinding.instance.removeObserver(this);
     _wakelock.disable();
+    _keypad.dispose();
     super.dispose();
   }
 
@@ -283,11 +288,11 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen>
 
   void _applyTargetChange(String? previousExerciseId, String newExerciseId) {
     setState(() {
-      _appliedCurrentExerciseId = newExerciseId;
-      if (previousExerciseId != null && previousExerciseId != newExerciseId) {
-        _expandedIds.remove(previousExerciseId);
-      }
-      _expandedIds.add(newExerciseId);
+      // Auto-advance is also single-open: whatever the user had open gives
+      // way to the exercise the session has moved on to.
+      _expandedIds
+        ..clear()
+        ..add(newExerciseId);
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -336,6 +341,21 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen>
     );
   }
 
+  /// Opens the RIR picker for the set the keypad is currently editing, so RIR
+  /// can be logged without leaving the pad. The row's own RIR control still
+  /// exists; this is the same action reachable from where the thumb already is.
+  Future<void> _handleKeypadRir(Object? tag) async {
+    final setId = tag as String?;
+    if (setId == null) return;
+    final selected = await showRirPicker(context);
+    if (selected == null || !mounted) return;
+    await ref.read(activeSessionControllerProvider.notifier).updateSetValues(
+          setId,
+          rir: selected.value,
+          clearRir: selected.value == null,
+        );
+  }
+
   Widget _buildScaffold(BuildContext context, ActiveSessionState state) {
     final session = state.session;
     final weightUnit = session.session.weightUnit;
@@ -346,22 +366,35 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen>
       _expandedHydrated = true;
       final current = state.currentTarget;
       if (current != null) {
-        _expandedIds.add(current.sessionExerciseId);
-        _appliedCurrentExerciseId = current.sessionExerciseId;
+        _expandedIds
+          ..clear()
+          ..add(current.sessionExerciseId);
       }
     }
 
     final completed =
         session.exercises.where((e) => e.isComplete).toList(growable: false);
     final pending = pendingExercises(session);
-    // Deliberately NOT `state.currentTarget?.sessionExerciseId` — see
-    // `_appliedCurrentExerciseId`'s doc comment. Using the live value here
-    // would force a card open the instant auto-focus set it, bypassing the
-    // typing guard's defer.
-    final currentExerciseId = _appliedCurrentExerciseId;
+    // Note: expansion reads `_expandedIds` only. It is written by
+    // `_applyTargetChange`, which is what the typing guard defers — so the
+    // live `state.currentTarget` still must not be consulted here, or a card
+    // would spring open the instant auto-focus moved, bypassing that defer.
 
-    return Scaffold(
+    // The scope has to sit above the Scaffold so every set row below can find
+    // it — including rows inside the completed-exercises ExpansionTile.
+    return AppKeypadScope(
+      controller: _keypad,
+      child: Scaffold(
       appBar: AppBar(
+        // A downward chevron, not a back arrow: this does not go *back*, it
+        // minimises the session to the Workout-in-Progress bar, and the route
+        // animates down to meet it. A back arrow would promise the wrong
+        // thing about where the session goes.
+        leading: IconButton(
+          icon: const Icon(Icons.keyboard_arrow_down),
+          tooltip: 'Minimise workout',
+          onPressed: () => context.pop(),
+        ),
         title: Row(
           children: [
             Expanded(
@@ -444,8 +477,16 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen>
                     key: ValueKey(pending[i].exercise.id),
                     cardKey: _keyFor(pending[i].exercise.id),
                     entry: pending[i],
-                    expanded: _expandedIds.contains(pending[i].exercise.id) ||
-                        pending[i].exercise.id == currentExerciseId,
+                    // 1000 apart so no exercise's sets can ever run into the
+                    // next exercise's slice, whatever the set count.
+                    keypadSortKeyBase: (i + 1) * 1000,
+                    // Purely `_expandedIds`: previously this also OR'd in the
+                    // current exercise, which would have kept that card open
+                    // even after the user expanded a different one — the
+                    // opposite of single-open. `_expandedIds` is seeded with
+                    // the current exercise on hydrate and kept in step by
+                    // `_applyTargetChange`, so nothing is lost.
+                    expanded: _expandedIds.contains(pending[i].exercise.id),
                     weightUnit: weightUnit,
                     currentSetId: currentSetId,
                     // Only the current (pending index 0) exercise gets "Do
@@ -457,8 +498,14 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen>
                     // front with "Do next".
                     onDoNext: i > 0 ? () => controller.reorder(i, 0) : null,
                     onToggleExpand: () => setState(() {
-                      if (!_expandedIds.remove(pending[i].exercise.id)) {
-                        _expandedIds.add(pending[i].exercise.id);
+                      final id = pending[i].exercise.id;
+                      // Collapse-then-open: only one exercise is ever
+                      // expanded, so the whole routine stays scannable
+                      // instead of turning into a wall of set tables.
+                      if (!_expandedIds.remove(id)) {
+                        _expandedIds
+                          ..clear()
+                          ..add(id);
                       }
                     }),
                   ),
@@ -467,9 +514,24 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen>
           ),
         ],
       ),
-      bottomNavigationBar: state.rest.isActive || state.restJustFinished
-          ? const RestBar()
-          : null,
+      // Rest bar above, keypad below. Both can be up at once — a set is
+      // commonly edited while the previous set's rest runs — and the rest
+      // countdown must never end up hidden behind the pad. When CMP-016 moves
+      // rest into the top bar this collapses to just the keypad.
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (state.rest.isActive || state.restJustFinished) const RestBar(),
+          AnimatedBuilder(
+            animation: _keypad,
+            builder: (context, _) => AppKeypad(
+              controller: _keypad,
+              onRir: _handleKeypadRir,
+            ),
+          ),
+        ],
+      ),
+      ),
     );
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gymflow/core/widgets/app_keypad.dart';
 import 'package:gymflow/features/sessions/providers/active_session_controller.dart';
 
 /// Pumps frames until a Drift-backed StreamProvider has delivered its first
@@ -81,5 +82,29 @@ Future<void> pumpUntilGone(
   for (var i = 0; i < maxFrames; i++) {
     if (finder.evaluate().isEmpty) return;
     await tester.pump(step);
+  }
+}
+
+/// Enters [value] into a set field the way a user now does: tap the field to
+/// raise the in-app keypad, then tap its keys.
+///
+/// `tester.enterText` cannot be used on these fields any more — T-003 made
+/// them `readOnly` so the OS keyboard stays down, and `enterText` drives the
+/// platform text input, which a read-only field ignores.
+Future<void> typeOnKeypad(
+  WidgetTester tester,
+  Finder field,
+  String value,
+) async {
+  await tester.tap(field);
+  await tester.pumpAndSettle();
+  for (final character in value.split('')) {
+    final key = find.descendant(
+      of: find.byType(AppKeypad),
+      matching: find.text(character),
+    );
+    expect(key, findsOneWidget, reason: 'keypad should offer "$character"');
+    await tester.tap(key);
+    await tester.pump();
   }
 }

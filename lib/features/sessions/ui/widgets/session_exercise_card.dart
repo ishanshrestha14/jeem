@@ -80,6 +80,7 @@ class SessionExerciseCard extends ConsumerWidget {
     this.cardKey,
     required this.entry,
     required this.expanded,
+    this.keypadSortKeyBase,
     required this.weightUnit,
     required this.currentSetId,
     required this.onToggleExpand,
@@ -90,6 +91,11 @@ class SessionExerciseCard extends ConsumerWidget {
   final GlobalKey? cardKey;
   final SessionExerciseWithSets entry;
   final bool expanded;
+
+  /// Start of this exercise's slice of the keypad entry order. Sets take two
+  /// slots each (weight, reps), so the base is spaced far enough apart that
+  /// exercises never interleave. Null keeps the system keyboard.
+  final int? keypadSortKeyBase;
   final String weightUnit;
   final String? currentSetId;
   final VoidCallback onToggleExpand;
@@ -178,6 +184,9 @@ class SessionExerciseCard extends ConsumerWidget {
                           ? StrengthSetRow(
                               set: set,
                               isCurrent: set.id == currentSetId,
+                              keypadSortKey: keypadSortKeyBase == null
+                                  ? null
+                                  : keypadSortKeyBase! + i * 2,
                               weightUnit: weightUnit,
                               onToggleComplete: () => set.completedAt == null
                                   ? controller.completeSet(set.id)
