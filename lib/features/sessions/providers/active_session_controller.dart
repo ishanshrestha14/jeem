@@ -339,7 +339,21 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     final set = current.session.setById(setId);
     if (set == null) return;
 
-    await repo.updateSet(set.copyWith(completedAt: Value(now)));
+    // CMP-015: a pending row shows its snapshotted plan muted, so completing
+    // an untouched set has to mean "I did what was planned" — otherwise the
+    // one-tap the muted value invites would log nothing and undercount volume.
+    // Only *empty* logged columns are filled: anything typed wins, and a set
+    // with no plan stays empty exactly as before. A planned rep range logs its
+    // lower bound (the honest floor of what was asked for).
+    await repo.updateSet(set.copyWith(
+      completedAt: Value(now),
+      weight: set.weight == null && set.plannedWeight != null
+          ? Value(set.plannedWeight)
+          : const Value.absent(),
+      reps: set.reps == null && set.plannedReps != null
+          ? Value(set.plannedReps)
+          : const Value.absent(),
+    ));
 
     // Awaits the setting's own resolved value rather than
     // `.valueOrNull ?? true` — the `AsyncNotifier` backing it may still be

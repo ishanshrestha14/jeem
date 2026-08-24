@@ -14,6 +14,15 @@ String formatWeight(double? w) {
   return w == w.roundToDouble() ? w.toStringAsFixed(0) : w.toString();
 }
 
+/// The reps half of a set prescription, as a set row hints it: `8`, `8-10`,
+/// or null when nothing was planned. Null rather than `''` so a caller can
+/// hand it straight to `hintText`, where an empty string would still reserve
+/// a (blank) hint.
+String? formatPlannedReps(int? reps, int? repsMax) {
+  if (reps == null) return null;
+  return repsMax == null ? '$reps' : '$reps-$repsMax';
+}
+
 /// null -> "—", 2.0 -> "2", 1.5 -> "1.5".
 String formatRir(double? rir) => rir == null ? '—' : formatWeight(rir);
 

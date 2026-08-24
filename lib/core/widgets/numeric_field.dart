@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../theme/semantic_colors.dart';
 import 'app_keypad.dart';
 
 class NumericField extends StatefulWidget {
@@ -16,6 +17,7 @@ class NumericField extends StatefulWidget {
     this.autofocus = false,
     this.dense = false,
     this.style,
+    this.hintText,
     this.keypadSortKey,
     this.keypadTag,
   });
@@ -37,6 +39,12 @@ class NumericField extends StatefulWidget {
   /// Overrides the default 18/tabular style — set rows pass the condensed
   /// numeral style.
   final TextStyle? style;
+
+  /// Shown, muted, while the field is empty. Session set rows pass the
+  /// routine's snapshotted plan here (CMP-015), so a pending row reads as
+  /// what you *meant* to do without claiming it as logged — a hint is not a
+  /// value, and nothing is persisted until the set is completed or edited.
+  final String? hintText;
 
   /// Opts this field into the in-app keypad, when one is in scope. The value
   /// is its position in the entry order, which `Next` walks. Null (the
@@ -173,6 +181,19 @@ class _NumericFieldState extends State<NumericField> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final resolvedStyle = widget.style ??
+        const TextStyle(
+          fontSize: 18,
+          fontFeatures: [FontFeature.tabularFigures()],
+        );
+    // The hint wears the field's own numerals so it lines up with a logged
+    // value character-for-character, recoloured to `muted`. Falls back to the
+    // ambient hint colour where the app's `SemanticColors` extension isn't
+    // installed (a bare `ThemeData` in a test harness).
+    final hintStyle = resolvedStyle.copyWith(
+      color: theme.extension<SemanticColors>()?.muted ?? theme.hintColor,
+    );
     return TextField(
       controller: _controller,
       focusNode: _focusNode,
@@ -183,11 +204,7 @@ class _NumericFieldState extends State<NumericField> {
       readOnly: _usesAppKeypad,
       showCursor: _usesAppKeypad ? true : null,
       textAlign: TextAlign.center,
-      style: widget.style ??
-          const TextStyle(
-            fontSize: 18,
-            fontFeatures: [FontFeature.tabularFigures()],
-          ),
+      style: resolvedStyle,
       keyboardType: TextInputType.numberWithOptions(decimal: widget.allowDecimal),
       inputFormatters: [
         FilteringTextInputFormatter.allow(
@@ -195,15 +212,17 @@ class _NumericFieldState extends State<NumericField> {
         ),
       ],
       decoration: widget.dense
-          ? const InputDecoration(
+          ? InputDecoration(
               isDense: true,
+              hintText: widget.hintText,
+              hintStyle: hintStyle,
               // Vertical padding only — it adds no box chrome (still no
               // border, no label, no horizontal inset), but it lifts the
               // field's *tappable* height from ~33dp of bare glyph box to
               // ≥48dp, which PRD §16.3/§24.4 require of every input. The
               // set row is 56dp tall regardless (the done control sets
               // that), so this costs no layout.
-              contentPadding: EdgeInsets.symmetric(vertical: 8),
+              contentPadding: const EdgeInsets.symmetric(vertical: 8),
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
@@ -211,6 +230,8 @@ class _NumericFieldState extends State<NumericField> {
           : InputDecoration(
               labelText: widget.label,
               suffixText: widget.suffix,
+              hintText: widget.hintText,
+              hintStyle: hintStyle,
             ),
       // In keypad mode the controller listener already emits; keeping this
       // as well would double-fire on the rare hardware-keyboard edit.

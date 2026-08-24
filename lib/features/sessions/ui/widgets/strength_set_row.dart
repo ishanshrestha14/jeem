@@ -77,6 +77,13 @@ class StrengthSetRow extends StatelessWidget {
               child: NumericField(
                 label: 'Weight',
                 value: set.weight,
+                // CMP-015: the routine's snapshotted plan, muted, while the
+                // field is empty. Completing an untouched row logs it (see
+                // `ActiveSessionController.completeSet`), so a set that goes
+                // to plan costs one tap and no typing.
+                hintText: set.plannedWeight == null
+                    ? null
+                    : formatWeight(set.plannedWeight),
                 allowDecimal: true,
                 keypadSortKey: keypadSortKey,
                 keypadTag: set.id,
@@ -99,6 +106,9 @@ class StrengthSetRow extends StatelessWidget {
             child: NumericField(
               label: 'Reps',
               value: set.reps,
+              // A planned range hints as `8-10`; completion logs its lower
+              // bound, which is what the row was asked for at minimum.
+              hintText: formatPlannedReps(set.plannedReps, set.plannedRepsMax),
               keypadSortKey: keypadSortKey == null ? null : keypadSortKey! + 1,
               keypadTag: set.id,
               dense: true,

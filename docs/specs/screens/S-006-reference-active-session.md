@@ -280,3 +280,8 @@ refusal to nag.
   set table (Previous / pre-filled Kg / target rep range / green completed row / + Add Set), the
   top-bar rest-timer slot, the 3-step finish flow, and the ad-hoc empty state. Resolved 3 open
   questions, opened 5. Raised S-023, S-024, CMP-011–CMP-014.
+- 2026-08-24 — [T-008](../../tickets/T-008-plan-prefill.md) built the pre-filled `Kg`/`Reps` cells.
+  **Deviation:** the muted value is a *hint*, materialised into the logged columns when the set is
+  completed, rather than a value pre-written at session start — the one-tap behaviour this spec
+  requires, without an abandoned session claiming lifts nobody did. `Previous` and the green
+  completed-row tint remain unbuilt.
