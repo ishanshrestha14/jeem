@@ -1,6 +1,6 @@
 # T-002 — Set prescription on templates (schema v3)
 
-- **Status:** Blocked — awaiting `ref-S004-library-routine-edit.png`
+- **Status:** **Done** (2026-08-24) — `flutter analyze` clean, 250 tests pass.
 - **Priority:** Must
 - **Effort:** L
 - **Specs:** CMP-017, CMP-015, S-006, S-010

@@ -344,24 +344,65 @@ default | pressed | disabled | loading | selected | error
 
 ---
 
-## 6. Current status (2026-08-23)
+## 6. Known gaps in these docs
+
+Two of the three spec folders are empty. Neither is an oversight to be quietly fixed — each has a
+reason, recorded here so a fresh session does not mistake absence for loss.
+
+### `specs/flows/` — empty, never derived
+
+The brief lists a `derive flows` step (start session; log + complete set; rest timer + auto-advance;
+reorder mid-session; create/edit template; exercise info; finish + summary). **It was never
+invoked.** Work went screenshot → spec → gap → ticket instead, and the tickets carried the flow
+detail inline (T-003's `Next` chaining, T-002's snapshot rules, T-001's minimise/resume).
+
+What that cost: there is no single document describing a whole task end to end, so the acceptance
+criteria for "start a session" live scattered across four tickets. Worth doing before the next
+round of session work.
+
+### `specs/components/` — empty, tracked elsewhere
+
+CMP-001..CMP-027 are registered with behaviour, source surface and our Flutter mapping in
+[`04-ui-patterns.md`](research/reference-app/04-ui-patterns.md), and several are now **built**
+(CMP-001 the WIP bar, CMP-018 the keypad, CMP-020 the week strip, CMP-011 initials tiles). The
+per-component template in §5.3 was never used, because the pattern table was enough to drive
+implementation.
+
+What that cost: built components have no spec of their own — no props table, no state list, no
+do/don't. That matters more now that they are being reused rather than invented.
+
+### Neither blocks anything
+
+Every implemented ticket references the surface spec and ADR it came from. These gaps affect how
+easy the *next* piece of work is to pick up, not whether the current state is understood.
+
+## 7. Current status (2026-08-24)
 
 | Type | Count |
 |---|---|
-| S (surfaces) | 27 registered (11 reference · 16 ours) — **11 written specs** |
-| FL (flows) | 0 |
-| CMP (components) | 27 candidates — 0 written specs |
+| S (surfaces) | 29 registered (13 reference · 16 ours) — **13 written specs** |
+| FL (flows) | **0 — never derived.** See §6 |
+| CMP (components) | 27 candidates — **0 written specs.** See §6 |
 | F (features) | 0 |
-| T (tickets) | 7 — 6 done, 1 blocked (T-002) |
+| T (tickets) | 7 — **all done** |
 | ADR (decisions) | 6 |
 
-**Last updated:** **You tab rebuilt** against S-005 (T-007) — Workout log week strip and lifetime
-personal records. 243 tests pass.
+**Last updated:** **T-002 shipped** (schema v6) — per-set prescription on routines, snapshotted
+into sessions. Every Must on the roadmap is done. 250 tests pass, `flutter analyze` clean.
+
+**Where the code is:** `main`, latest commit `52a099d`. Schema **v6**. Five-tab shell
+(Home · Explore · Workout · Library · You) live; Library and You rebuilt against S-004/S-005.
 
 **Screenshot workflow:** paste into any note under `docs/`; Obsidian writes the PNG to disk and I
 rename it into `screenshots/` under its manifest name.
 
-**Next step:** two paths, either order:
-1. `ref-S004-library-routine-edit.png` — unblocks **T-002** (the schema change). The last blocker.
-2. Fill the new tabs: Library and You are deliberately thin. **T-002** (prescription schema) is the
-   last Must, still waiting on `ref-S004-library-routine-edit.png`.
+**Next step (a fresh session starts here):**
+
+1. **CMP-015 — pre-fill live session rows from the plan.** The payoff for T-002's schema: session
+   set rows arrive carrying `plannedWeight`/`plannedReps`, muted, so a to-plan set is one tap.
+2. **`Previous` column** (S-006) — last session's best set beside each row. Independent of 1.
+3. **Workout tab (S-003) and Home (S-001)** are the two surfaces still drifted from their specs.
+4. Consider closing the §6 gaps — flows especially, before more session work.
+
+**Build/run:** see [`BUILD_ENVIRONMENT.md`](BUILD_ENVIRONMENT.md). `flutter run -d macos` is the
+fast loop; `flutter build apk --release` for the phone.
