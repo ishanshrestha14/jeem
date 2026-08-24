@@ -9,7 +9,9 @@ import '../../../../core/widgets/numeric_field.dart';
 import '../../../../db/app_database.dart';
 import '../../../exercises/ui/exercise_info_sheet.dart';
 import '../../providers/active_session_controller.dart';
+import '../../providers/previous_best_provider.dart';
 import 'duration_set_row.dart';
+import 'previous_best_line.dart';
 import 'strength_set_row.dart';
 
 /// `SET / KG / REPS / RIR` (or `SET / DURATION`) column headers, rendered
@@ -168,6 +170,15 @@ class SessionExerciseCard extends ConsumerWidget {
                 ],
               ),
               if (expanded) ...[
+                // S-006's `Previous`, once per exercise rather than per row —
+                // it is the best set of the last session, so it is the same
+                // value on every row. Absent entirely when there is no
+                // history for this exercise.
+                PreviousBestLine(
+                  best: ref.watch(previousBestProvider)[
+                      exercise.exerciseId ?? exercise.name],
+                  weightUnit: weightUnit,
+                ),
                 const SizedBox(height: 8),
                 _ColumnHeaders(
                   isDuration: exercise.loggingType != LoggingType.strengthWeightRepsRir,

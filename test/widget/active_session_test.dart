@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:drift/drift.dart' show OrderingTerm;
+import 'package:drift/drift.dart' show OrderingTerm, Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -665,6 +665,52 @@ void main() {
     await tester.pumpAndSettle();
     // The sheet actually opened, so the icon was genuinely reachable.
     expect(find.text('Strength'), findsWidgets);
+
+    await disposeAndDrainTimers(tester, container: container);
+  });
+
+  testWidgets(
+      "the previous session's best set is shown above the rows (S-006)",
+      (tester) async {
+    final templates = TemplateRepository(db);
+    final exercises = ExerciseRepository(db);
+    final sessions = SessionRepository(db);
+    final t = await templates.createTemplate(name: 'Push');
+    final bench = await exercises.create(
+        name: 'Bench Press', loggingType: LoggingType.strengthWeightRepsRir);
+    await templates.addExercise(
+        templateId: t.id, exerciseId: bench.id, targetSets: 2);
+
+    // A finished session to be the history: 60x8 and 70x6, the latter the
+    // better set on estimated 1RM.
+    final past = await sessions.startFromTemplate(t.id, weightUnit: 'kg');
+    final pastSets = await (db.select(db.sessionSets)
+          ..orderBy([(x) => OrderingTerm(expression: x.setIndex)]))
+        .get();
+    for (final (i, row) in pastSets.indexed) {
+      await sessions.updateSet(row.copyWith(
+        weight: Value(i == 0 ? 60.0 : 70.0),
+        reps: Value(i == 0 ? 8 : 6),
+        completedAt: Value(DateTime.now()),
+      ));
+    }
+    await sessions.finishSession(past.id);
+
+    // Then today's session from the same routine.
+    await sessions.startFromTemplate(t.id, weightUnit: 'kg');
+
+    await tester.pumpWidget(harness());
+    await pumpUntilSessionData(tester);
+
+    // Joins today's snapshot to the finished one by `exerciseId` — the whole
+    // point of the lookup, and the half a unit test on the pure function
+    // cannot reach.
+    // One more frame: `pumpUntilSessionData` returns as soon as the *session*
+    // spinner clears, and `historyProvider` — a separate stream — emits a
+    // frame later. The line legitimately appears then, which is also what
+    // happens on device.
+    await tester.pump();
+    expect(find.text('Last \u00b7 70kg x 6'), findsOneWidget);
 
     await disposeAndDrainTimers(tester, container: container);
   });

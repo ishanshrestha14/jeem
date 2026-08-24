@@ -285,3 +285,9 @@ refusal to nag.
   completed, rather than a value pre-written at session start — the one-tap behaviour this spec
   requires, without an abandoned session claiming lifts nobody did. `Previous` and the green
   completed-row tint remain unbuilt.
+- 2026-08-24 — [T-009](../../tickets/T-009-previous-best.md) built `Previous`. **Deviation:** one
+  muted `Last · 70kg x 6` line per exercise rather than a per-row column — the value is the best set
+  of the last session, so this spec already notes it is identical down every row, and our set row
+  carries a RIR column the reference moved onto its keypad. Absent rather than `—` with no history.
+  "Best" is the highest estimated 1RM (ADR-004); "last session" is the most recent one that
+  *contained* the exercise. Only the green completed-row tint of CMP-015 remains unbuilt.

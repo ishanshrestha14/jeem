@@ -126,7 +126,7 @@ Detail: [`04-ui-patterns.md`](research/reference-app/04-ui-patterns.md). "Candid
 | CMP-012 | Workout summary card | Candidate |
 | CMP-013 | Delta chip | Candidate |
 | CMP-014 | First-run onboarding card | Candidate |
-| CMP-015 | **Set table row** (Previous · pre-filled · green complete) | **Partly built** — plan pre-fill shipped ([T-008](tickets/T-008-plan-prefill.md)); `Previous` and the green completed-row tint outstanding |
+| CMP-015 | **Set table row** (Previous · pre-filled · green complete) | **Mostly built** — plan pre-fill ([T-008](tickets/T-008-plan-prefill.md)) and `Previous` ([T-009](tickets/T-009-previous-best.md)); only the green completed-row tint is outstanding |
 | CMP-016 | Top-bar rest slot | Candidate |
 | CMP-017 | **Per-exercise prescription editor** (sets · reps/range · RIR · weight) | Candidate |
 | CMP-018 | **In-session numeric keypad** (RIR key, Next chaining) | Candidate |
@@ -158,8 +158,9 @@ Next free CMP-ID: **CMP-028**.
 | [T-006](tickets/T-006-programs.md) | Programs: a container above routines (schema v5) | **Done** (schema v5) | L | S-004 |
 | [T-007](tickets/T-007-you-overview.md) | Rebuild the You tab against S-005 | **Done** | M | S-005, ADR-004 |
 | [T-008](tickets/T-008-plan-prefill.md) | Pre-fill live session rows from the plan | **Done** | M | S-006, CMP-015 |
+| [T-009](tickets/T-009-previous-best.md) | `Previous`: last session's best set | **Done** | M | S-006, CMP-015, ADR-004 |
 
-Next free T-ID: **T-009**.
+Next free T-ID: **T-010**.
 
 ### Decisions (ADR)
 | ID | Title | Status |
@@ -385,14 +386,16 @@ easy the *next* piece of work is to pick up, not whether the current state is un
 | FL (flows) | **0 — never derived.** See §6 |
 | CMP (components) | 27 candidates — **0 written specs.** See §6 |
 | F (features) | 0 |
-| T (tickets) | 8 — **all done** |
+| T (tickets) | 9 — **all done** |
 | ADR (decisions) | 6 |
 
-**Last updated:** **T-008 shipped** — pending session rows now show the routine's plan muted, and
-completing an untouched row logs it, so a set that goes to plan is one tap and no typing. No schema
-change; it spends what T-002 (schema v6) persisted. 260 tests pass, `flutter analyze` clean.
+**Last updated:** **T-008 and T-009 shipped** — the session screen now shows both kinds of prior
+information S-006 asks for: the routine's *plan*, muted and one tap from being logged, and what you
+actually did *last time* (`Last · 70kg x 6`). Neither needed a schema change; both spend what T-002
+(schema v6) persisted. 275 tests pass, `flutter analyze` clean.
 
-**Where the code is:** branch `t-008-plan-prefill`, off `main` at `53b67ee`. Schema **v6**. Five-tab shell
+**Where the code is:** branch `t-008-plan-prefill` (carries T-008 and T-009), off `main` at
+`53b67ee`. Schema **v6**. Five-tab shell
 (Home · Explore · Workout · Library · You) live; Library and You rebuilt against S-004/S-005.
 
 **Screenshot workflow:** paste into any note under `docs/`; Obsidian writes the PNG to disk and I
@@ -400,11 +403,13 @@ rename it into `screenshots/` under its manifest name.
 
 **Next step (a fresh session starts here):**
 
-1. **`Previous` column** (S-006) — last session's best set beside each row. The other half of
-   CMP-015, and the one remaining progressive-overload affordance we have no equivalent for.
-2. **Green completed-row tint** (S-006) — the rest of CMP-015, cosmetic and small.
-3. **Workout tab (S-003) and Home (S-001)** are the two surfaces still drifted from their specs.
-4. Consider closing the §6 gaps — flows especially, before more session work.
+1. **Green completed-row tint** (S-006) — the last unbuilt piece of CMP-015. Small and cosmetic:
+   set state legible at arm's length.
+2. **Workout tab (S-003) and Home (S-001)** are the two surfaces still drifted from their specs.
+3. Consider closing the §6 gaps — flows especially, before more session work. Both T-008 and T-009
+   again carried their flow detail inline in the ticket.
+4. **RIR onto the keypad** (CMP-018 specs an `RIR` key) would free the set row's fifth column, and
+   is the precondition for `Previous` becoming a per-row column as S-006 draws it.
 
 **Build/run:** see [`BUILD_ENVIRONMENT.md`](BUILD_ENVIRONMENT.md). `flutter run -d macos` is the
 fast loop; `flutter build apk --release` for the phone.
