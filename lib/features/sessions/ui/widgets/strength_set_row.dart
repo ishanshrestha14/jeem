@@ -7,6 +7,7 @@ import '../../../../core/utils/formatting.dart';
 import '../../../../core/widgets/numeric_field.dart';
 import '../../../../db/app_database.dart';
 import 'set_badge.dart';
+import 'set_row_decoration.dart';
 
 /// A single strength set row: number, weight, reps, RIR and a 56dp complete
 /// control — sized for one-thumb use mid-workout (PRD §17). Ledger-line
@@ -135,11 +136,11 @@ class StrengthSetRow extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-        decoration: BoxDecoration(
-          color: isCurrent ? semantic.surfaceHigh : Colors.transparent,
-          border: isCurrent
-              ? Border(left: BorderSide(color: theme.colorScheme.onSurface, width: 3))
-              : null,
+        decoration: setRowDecoration(
+          semantic,
+          isCurrent: isCurrent,
+          isComplete: _isComplete,
+          currentEdgeColor: theme.colorScheme.onSurface,
         ),
         child: row,
       ),

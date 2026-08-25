@@ -64,7 +64,8 @@ they do not push a screen.** An expanded exercise reveals, top to bottom:
 | ✓ | Circular check button | **Green filled** when complete; **grey filled** when pending. Always a solid circle — never an empty checkbox |
 
 - The **completed row is tinted green** across its full width — set state is legible from arm's
-  length, which is the whole point.
+  length, which is the whole point. *(Ours adopts the full-width wash and not the colour: chalk at
+  5%, per the design system — [T-010](../../tickets/T-010-completed-row-wash.md).)*
 - **`+ Add Set`** — full-width muted button below the table, so set count is editable per session.
 
 ### Where the pre-filled values come from — **the routine, not history**
@@ -291,3 +292,7 @@ refusal to nag.
   carries a RIR column the reference moved onto its keypad. Absent rather than `—` with no history.
   "Best" is the highest estimated 1RM (ADR-004); "last session" is the most recent one that
   *contained* the exercise. Only the green completed-row tint of CMP-015 remains unbuilt.
+- 2026-08-25 — [T-010](../../tickets/T-010-completed-row-wash.md) built the completed-row wash,
+  closing CMP-015. **Deviation:** the wash is **chalk at 5%, not green** — the design system's first
+  principle reserves colour for "live", and `success` is already deliberately chalk. A row that is
+  both current and complete takes the current treatment.

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 class SemanticColors extends ThemeExtension<SemanticColors> {
   const SemanticColors({
     required this.success,
+    required this.completedRow,
     required this.rest,
     required this.warning,
     required this.danger,
@@ -15,6 +16,17 @@ class SemanticColors extends ThemeExtension<SemanticColors> {
   /// Completed state. Deliberately chalk, NOT green (design system: colour
   /// is scarce and means "live"; a tick in a paper log, not a status light).
   final Color success;
+
+  /// A completed set row's full-width wash — [success] at ~5%.
+  ///
+  /// S-006 draws this green. Ours is chalk, because colour here is scarce and
+  /// means "live" (design system §1); this is the same tick-in-a-paper-log
+  /// idea as [success], spread across the row so completion reads as a block
+  /// at arm's length rather than as one 24dp disc.
+  ///
+  /// Deliberately faint: the logged numerals must stay the loudest thing in
+  /// the row.
+  final Color completedRow;
 
   /// The one saturated colour in the app: a running rest timer.
   final Color rest;
@@ -37,6 +49,7 @@ class SemanticColors extends ThemeExtension<SemanticColors> {
 
   static const dark = SemanticColors(
     success: Color(0xFFEDEAE3),
+    completedRow: Color(0x0DEDEAE3),
     rest: Color(0xFF4CC9F0),
     warning: Color(0xFFFFB627),
     danger: Color(0xFFE63946),
@@ -48,6 +61,7 @@ class SemanticColors extends ThemeExtension<SemanticColors> {
   @override
   SemanticColors copyWith({
     Color? success,
+    Color? completedRow,
     Color? rest,
     Color? warning,
     Color? danger,
@@ -57,6 +71,7 @@ class SemanticColors extends ThemeExtension<SemanticColors> {
   }) =>
       SemanticColors(
         success: success ?? this.success,
+        completedRow: completedRow ?? this.completedRow,
         rest: rest ?? this.rest,
         warning: warning ?? this.warning,
         danger: danger ?? this.danger,
@@ -70,6 +85,7 @@ class SemanticColors extends ThemeExtension<SemanticColors> {
     if (other is! SemanticColors) return this;
     return SemanticColors(
       success: Color.lerp(success, other.success, t)!,
+      completedRow: Color.lerp(completedRow, other.completedRow, t)!,
       rest: Color.lerp(rest, other.rest, t)!,
       warning: Color.lerp(warning, other.warning, t)!,
       danger: Color.lerp(danger, other.danger, t)!,

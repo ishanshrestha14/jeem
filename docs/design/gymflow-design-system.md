@@ -30,6 +30,7 @@ field names so existing call sites keep compiling, and add the two new ones.
 | `chalk` (onSurface) | `#EDEAE3` | Primary text and numerals. Warm off-white, not pure white. |
 | `muted` | `#767C86` | Column headers, secondary labels, inactive digits. |
 | `success` | `#EDEAE3` | Completed state. Deliberately chalk, NOT green. |
+| `completedRow` *(new)* | `#EDEAE3` @ 5% | A completed set row's full-width wash. The same chalk as `success`, spread thin — see "Completed row" below. |
 | `rest` | `#4CC9F0` | Running rest timer. Cool = recovery. The one saturated colour. |
 | `warning` | `#FFB627` | Paused state only. |
 | `danger` | `#E63946` | Destructive actions only. |
@@ -101,9 +102,15 @@ Structure per row:
   `child:`) rendering only the value text (`2`, `1.5`, `—`). No arrow chrome, no border.
 - **Current row**: `surfaceHigh` background, plus a 3px `chalk` bar on the leading edge.
   No border box.
-- **Completed row**: numerals stay full `chalk` (values remain legible and editable —
-  PRD §17); the done control becomes a filled `chalk` disc with an `ink` glyph.
-  Dim only the set-number cell, not the values.
+- **Completed row**: a full-width `completedRow` wash (`chalk` at 5%); numerals stay
+  full `chalk` (values remain legible and editable — PRD §17); the done control becomes
+  a filled `chalk` disc with an `ink` glyph. Dim only the set-number cell, not the values.
+  The wash is what makes set state readable at arm's length; it is deliberately faint,
+  because the numerals must stay the loudest thing in the row. S-006 draws this green —
+  we do not, per §1: colour is scarce and means "live"
+  ([T-010](../tickets/T-010-completed-row-wash.md)).
+- **A row that is both current and complete** takes the *current* treatment. "Where you
+  are" is the more specific signal, and the filled disc still marks the row done.
 - **Done control**: 56×56 hit area, a 24px ring (`muted`, 1.5px) when pending, a
   filled `chalk` disc when complete. No Material checkbox.
 - **Row separators**: 1px `line`, inset to start at the KG column so the set-number
