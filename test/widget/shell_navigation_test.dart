@@ -83,9 +83,9 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(harness());
-    // The app boots on Home (`/` -> `/home`); with no templates yet it shows
-    // the "point at Workout" empty state.
-    await pumpUntilData(tester, until: find.text('Go to Workout'));
+    // The app boots on Home (`/` -> `/home`), whose weekly summary heading is
+    // present whether or not anything has been logged.
+    await pumpUntilData(tester, until: find.text('Your weekly summary'));
 
     for (final label in ['HOME', 'EXPLORE', 'WORKOUT', 'LIBRARY', 'YOU']) {
       expect(find.text(label), findsOneWidget, reason: '$label destination');
@@ -125,7 +125,7 @@ void main() {
     // than re-showing a loading spinner.
     await tester.tap(find.text('HOME'));
     await tester.pump();
-    expect(find.text('Go to Workout'), findsOneWidget);
+    expect(find.text('Your weekly summary'), findsOneWidget);
 
     await disposeAndDrainTimers(tester, container: container);
   });
@@ -187,7 +187,7 @@ void main() {
     // hero tag they are two heroes sharing one tag, and the assertion fires
     // the moment a route transition runs a hero search.
     await tester.pumpWidget(harness());
-    await pumpUntilData(tester, until: find.text('Go to Workout'));
+    await pumpUntilData(tester, until: find.text('Your weekly summary'));
 
     await tester.tap(find.text('EXPLORE'));
     await pumpUntilData(tester, until: find.widgetWithText(AppBar, 'Exercises'));

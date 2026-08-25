@@ -81,3 +81,8 @@ not "Profile", and `Workout` uses a **`+` in a circle**, styling the training ta
 ## Revision log
 - 2026-08-23 — created from `ref-S001-home-populated.png` + `ref-S006-session-minimised-wip-bar.png`;
   verified WIP bar wording/anatomy and the 5-tab bottom nav; scoped out the social layer.
+- 2026-08-25 — built as [T-015](../../tickets/T-015-home-tab.md), replacing our Quick-start/Last-workout
+  Home (S-007). **Deviations:** no FAB (the Workout tab is the launchpad and the first-run card
+  carries the start button); sessions render as rows rather than feed posts, the post framing being
+  the social layer this spec already scopes out; the summary shows no `See more`, having nowhere to
+  go. Per-session `Records 🏅 N` deferred — it needs the third open question below answered first.

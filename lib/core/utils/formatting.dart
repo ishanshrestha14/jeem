@@ -14,6 +14,20 @@ String formatWeight(double? w) {
   return w == w.roundToDouble() ? w.toStringAsFixed(0) : w.toString();
 }
 
+/// Midnight on the Sunday of [day]'s week.
+///
+/// The app's week runs **Sunday to Saturday** so the strip and the summary do
+/// not shift under you mid-week the way a rolling seven days would. Shared by
+/// CMP-020's week strip and S-001's weekly summary — two definitions of "this
+/// week" that disagreed would be a real bug, and an invisible one.
+///
+/// `DateTime.weekday` is 1..7 with Sunday as 7, so `% 7` maps Sunday to an
+/// offset of 0 rather than -6.
+DateTime weekStart(DateTime day) {
+  final midnight = DateTime(day.year, day.month, day.day);
+  return midnight.subtract(Duration(days: midnight.weekday % 7));
+}
+
 /// "Today", "Yesterday", "2 days ago", or the date itself past a month.
 ///
 /// Compares **calendar days**, not elapsed hours: a session logged at 11pm

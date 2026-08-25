@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/semantic_colors.dart';
+import '../../../../core/utils/formatting.dart';
 
 /// CMP-020: seven dots under weekday initials, one per day of the current
 /// week, filled on days that have a completed workout (S-005).
@@ -21,13 +22,11 @@ class WeekDotStrip extends StatelessWidget {
 
   static const _initials = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-  /// Midnight on the Sunday of [day]'s week. `DateTime.weekday` is 1..7 with
-  /// Sunday as 7, so Sunday maps to an offset of 0 rather than -6.
-  static DateTime startOfWeek(DateTime day) {
-    final midnight = DateTime(day.year, day.month, day.day);
-    final offset = midnight.weekday % 7;
-    return midnight.subtract(Duration(days: offset));
-  }
+  /// The shared definition in `core/utils/formatting.dart`, re-exposed under
+  /// the name this widget's tests already use. Aliased rather than
+  /// reimplemented: this strip and S-001's weekly summary disagreeing about
+  /// which week you are in would be a real bug, and an invisible one.
+  static const startOfWeek = weekStart;
 
   static DateTime dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
@@ -35,7 +34,7 @@ class WeekDotStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final semantic = theme.extension<SemanticColors>()!;
-    final start = startOfWeek(today);
+    final start = weekStart(today);
     final trained = {for (final d in trainedDays) dateOnly(d)};
     final todayOnly = dateOnly(today);
 

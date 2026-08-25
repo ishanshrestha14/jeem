@@ -68,7 +68,7 @@ Full detail, counterparts and gaps: [`02-screen-inventory.md`](research/referenc
 
 | ID | Source | Title | Type | Status |
 |---|---|---|---|---|
-| S-001 | reference | Home | screen | **Draft — [spec](specs/screens/S-001-reference-home.md)** |
+| S-001 | reference | Home | screen | **Implemented — [spec](specs/screens/S-001-reference-home.md)** |
 | S-002 | reference | Explore | screen, tabbed | **Draft — [spec](specs/screens/S-002-reference-explore.md)** |
 | S-003 | reference | Workout | screen | **Implemented — [spec](specs/screens/S-003-reference-workout-tab.md)** |
 | S-004 | reference | Library | screen | **Draft — [spec](specs/screens/S-004-reference-library.md)** |
@@ -124,13 +124,13 @@ Detail: [`04-ui-patterns.md`](research/reference-app/04-ui-patterns.md). "Candid
 | CMP-005 | Week strip / date header | Candidate |
 | CMP-006 | Suggested-routine card | Candidate |
 | CMP-007 | Insights block | Candidate |
-| CMP-008 | Weekly summary header | Candidate |
+| CMP-008 | Weekly summary header | **Built** — [T-015](tickets/T-015-home-tab.md) |
 | CMP-009 | Sub-tab bar within a primary tab | Candidate |
 | CMP-010 | Utility buttons in the top bar | Candidate |
 | CMP-011 | Initials tile (routine thumbnail) | Candidate |
 | CMP-012 | Workout summary card | Candidate |
-| CMP-013 | Delta chip | Candidate |
-| CMP-014 | First-run onboarding card | Candidate |
+| CMP-013 | Delta chip | **Built** — [T-015](tickets/T-015-home-tab.md) |
+| CMP-014 | First-run onboarding card | **Built** — [T-015](tickets/T-015-home-tab.md) |
 | CMP-015 | **Set table row** (Previous · pre-filled · completed wash) | **Built** — [T-008](tickets/T-008-plan-prefill.md) plan pre-fill, [T-009](tickets/T-009-previous-best.md) `Previous`, [T-010](tickets/T-010-completed-row-wash.md) completed-row wash (chalk, not green) |
 | CMP-016 | Top-bar rest slot | Candidate |
 | CMP-017 | **Per-exercise prescription editor** (sets · reps/range · RIR · weight) | Candidate |
@@ -169,8 +169,9 @@ Next free CMP-ID: **CMP-028**.
 | [T-012](tickets/T-012-adhoc-sessions.md) | Ad-hoc sessions + add exercises mid-session | **Done** | M | S-006, CMP-004 |
 | [T-013](tickets/T-013-workout-tab.md) | Workout tab rebuilt against S-003 | **Done** | L | S-003, CMP-005 |
 | [T-014](tickets/T-014-delete-logged-workout.md) | Delete a logged workout (+ FAB hero-tag fix) | **Done** | S | S-003, S-019 |
+| [T-015](tickets/T-015-home-tab.md) | Rebuild Home against S-001 | **Done** | M | S-001, CMP-008, CMP-013 |
 
-Next free T-ID: **T-015**.
+Next free T-ID: **T-016**.
 
 ### Decisions (ADR)
 | ID | Title | Status |
@@ -396,14 +397,13 @@ easy the *next* piece of work is to pick up, not whether the current state is un
 | FL (flows) | **0 — never derived.** See §6 |
 | CMP (components) | 27 candidates — **0 written specs.** See §6 |
 | F (features) | 0 |
-| T (tickets) | 14 — **all done** |
+| T (tickets) | 15 — **all done** |
 | ADR (decisions) | 6 |
 
-**Last updated:** **T-012, T-013 and T-014 shipped.** Sessions no longer need a routine — the
-Workout tab is now S-003's day launchpad and its FAB starts an empty ad-hoc session you add exercises
-to as you go. Logged workouts can now be deleted, from that tab and from History. Fixed a
-**pre-existing** FAB hero-tag collision that could throw on any route push. No schema change.
-339 tests pass, `flutter analyze` clean.
+**Last updated:** **T-015 shipped — every reference surface now matches its spec.** Home is a recap
+(weekly summary with week-on-week deltas, then the last five workouts) instead of a fourth routine
+list. Before it, T-012/T-013/T-014 gave us ad-hoc sessions, the S-003 Workout tab and workout
+deletion. No schema change in any of the four. 350 tests pass, `flutter analyze` clean.
 
 **Where the code is:** `main`, tracking `origin/main` at
 `git@github.com:ishanshrestha14/jeem.git`. Schema **v6**. Local commits may be ahead of the remote. Five-tab shell
@@ -414,9 +414,10 @@ rename it into `screenshots/` under its manifest name.
 
 **Next step (a fresh session starts here):**
 
-1. **Home (S-001)** — the last surface still drifted from its spec: weekly summary header over the
-   session list. The Workout tab's inconsistency from T-011 is gone, since the routine list it
-   affected no longer exists.
+1. **No reference surface is drifted any more** — S-001 through S-006 and S-030 are all built. The
+   backlog is now the deferred pieces rather than a gap: per-session `Records 🏅 N` on Home (needs a
+   decision on what window a record counts against), the estimated duration and muscle summary on
+   S-030, and Insights on S-003.
 2. Consider closing the §6 gaps — flows especially. T-008, T-009 and T-010 each carried their flow
    detail inline in the ticket again, which is the drift §6 warns about.
 3. **RIR onto the keypad** (CMP-018 specs an `RIR` key) would free the set row's fifth column, and
