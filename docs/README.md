@@ -70,7 +70,7 @@ Full detail, counterparts and gaps: [`02-screen-inventory.md`](research/referenc
 |---|---|---|---|---|
 | S-001 | reference | Home | screen | **Draft — [spec](specs/screens/S-001-reference-home.md)** |
 | S-002 | reference | Explore | screen, tabbed | **Draft — [spec](specs/screens/S-002-reference-explore.md)** |
-| S-003 | reference | Workout | screen | **Draft — [spec](specs/screens/S-003-reference-workout-tab.md)** |
+| S-003 | reference | Workout | screen | **Implemented — [spec](specs/screens/S-003-reference-workout-tab.md)** |
 | S-004 | reference | Library | screen | **Draft — [spec](specs/screens/S-004-reference-library.md)** |
 | S-005 | reference | You | screen, tabbed | **Draft — [spec](specs/screens/S-005-reference-you-tab.md)** |
 | S-006 | reference | Active session | screen | **Draft — [spec](specs/screens/S-006-reference-active-session.md)** |
@@ -167,7 +167,7 @@ Next free CMP-ID: **CMP-028**.
 | [T-010](tickets/T-010-completed-row-wash.md) | Completed-row wash — closes CMP-015 | **Done** | S | S-006, CMP-015 |
 | [T-011](tickets/T-011-routine-detail.md) | Routine detail screen + play button | **Done** | M | S-030, S-004, CMP-011 |
 | [T-012](tickets/T-012-adhoc-sessions.md) | Ad-hoc sessions + add exercises mid-session | **Done** | M | S-006, CMP-004 |
-| [T-013](tickets/T-013-workout-tab.md) | Workout tab rebuilt against S-003 | **Not started** | L | S-003, CMP-005 |
+| [T-013](tickets/T-013-workout-tab.md) | Workout tab rebuilt against S-003 | **Done** | L | S-003, CMP-005 |
 
 Next free T-ID: **T-014**.
 
@@ -395,16 +395,16 @@ easy the *next* piece of work is to pick up, not whether the current state is un
 | FL (flows) | **0 — never derived.** See §6 |
 | CMP (components) | 27 candidates — **0 written specs.** See §6 |
 | F (features) | 0 |
-| T (tickets) | 13 — 12 done, 1 not started |
+| T (tickets) | 13 — **all done** |
 | ADR (decisions) | 6 |
 
-**Last updated:** **T-011 shipped** — routines now open a read-only detail screen (S-030) whose
-primary action is Start workout, with Edit demoted to ⋮, and routine rows carry a play button in the
-Library and inside programs. Before it, CMP-015 was closed by T-008/T-009/T-010. No schema change in
-any of the four. 310 tests pass, `flutter analyze` clean.
+**Last updated:** **T-012 and T-013 shipped.** Sessions no longer need a routine — the Workout tab
+is now S-003's day launchpad (date, week strip, today's workouts, suggestions) and its FAB starts an
+empty ad-hoc session you add exercises to as you go. The old routine list is gone, which also ends
+the Library duplication. No schema change. 326 tests pass, `flutter analyze` clean.
 
 **Where the code is:** `main`, tracking `origin/main` at
-`git@github.com:ishanshrestha14/jeem.git` (added 2026-08-25). Schema **v6**. Five-tab shell
+`git@github.com:ishanshrestha14/jeem.git`. Schema **v6**. Local commits may be ahead of the remote. Five-tab shell
 (Home · Explore · Workout · Library · You) live; Library and You rebuilt against S-004/S-005.
 
 **Screenshot workflow:** paste into any note under `docs/`; Obsidian writes the PNG to disk and I
@@ -412,10 +412,9 @@ rename it into `screenshots/` under its manifest name.
 
 **Next step (a fresh session starts here):**
 
-1. **Workout tab (S-003) and Home (S-001)** — the two surfaces still drifted from their specs, and
-   now the largest remaining piece of the teardown. Both have written specs waiting. Note the Workout
-   tab still opens the **editor** when a routine is tapped; T-011 changed only the Library and
-   programs, so that surface is now inconsistent with them.
+1. **Home (S-001)** — the last surface still drifted from its spec: weekly summary header over the
+   session list. The Workout tab's inconsistency from T-011 is gone, since the routine list it
+   affected no longer exists.
 2. Consider closing the §6 gaps — flows especially. T-008, T-009 and T-010 each carried their flow
    detail inline in the ticket again, which is the drift §6 warns about.
 3. **RIR onto the keypad** (CMP-018 specs an `RIR` key) would free the set row's fifth column, and

@@ -95,3 +95,9 @@ than leaving a stale "do this next" prompt. Fewer decisions after the work is do
 
 ## Revision log
 - 2026-08-23 — created from `ref-S003-workout-tab-empty.png` + `ref-S003-workout-tab-logged.png`.
+- 2026-08-25 — built as [T-013](../../tickets/T-013-workout-tab.md), replacing our routine-list
+  Workout tab (S-008). **Deviations:** the week strip shows weekday initials and a trained dot rather
+  than dates, reusing CMP-020's Sunday–Saturday week from the You tab — two contradictory week models
+  would be worse than differing from the reference; no Insights row (we have no recovery or streak
+  model and will not invent one); no avatar or calendar icon, neither having a destination here.
+  Suggestions rank least-recently-performed first, never-performed leading.

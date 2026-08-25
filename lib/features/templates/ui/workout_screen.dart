@@ -5,212 +5,249 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/semantic_colors.dart';
-import '../../../core/widgets/confirm_dialog.dart';
-import '../../../core/widgets/empty_state.dart';
+import '../../../core/utils/formatting.dart';
+import '../../history/providers/history_providers.dart';
+import '../../profile/ui/widgets/week_dot_strip.dart';
+import '../../sessions/data/session_models.dart';
 import '../data/template_models.dart';
-import '../data/template_repository.dart';
+import '../domain/workout_day.dart';
 import '../providers/template_providers.dart';
 import 'start_workout_action.dart';
 
-/// The Workout tab: the list of workout templates a session is started
-/// from. Formerly `HomeScreen` (`home_screen.dart`) when this was the
-/// Workouts destination — renamed to reflect its place in the Home / Workout
-/// / History / Profile IA. Behaviour (template cards, FAB, overflow menu,
-/// Start button and its disabled-with-helper-text state) is unchanged; only
-/// the resume-in-progress banner moved to the Home tab (it reads
-/// `activeSessionProvider` directly there) and the exercise library moved
-/// behind the `EXERCISES` header action below rather than being a peer tab.
+/// S-003 — the day launchpad. Answers one question, *what am I doing today?*,
+/// and gets you into a session in as few taps as possible.
+///
+/// Deliberately **not** a routine list any more: routines live in the Library
+/// (S-004) with their own detail screen since T-011, and keeping a second copy
+/// here made the two tabs near-duplicates.
 class WorkoutScreen extends ConsumerWidget {
   const WorkoutScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final summaries = ref.watch(templateSummariesProvider);
+    final theme = Theme.of(context);
+    final semantic = theme.extension<SemanticColors>()!;
+    final today = DateTime.now();
+
+    final history = ref.watch(historyProvider).valueOrNull ?? const [];
+    final routines =
+        ref.watch(templateSummariesProvider).valueOrNull ?? const [];
+
+    final todays = sessionsOn(history, day: today);
+    final suggestions = suggestedRoutines(routines);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Workout'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Center(
-              child: _ExercisesAction(
-                // Explore is a tab now, so this switches branch rather than
-                // pushing a second copy of the library on top of Workout.
-                onTap: () => context.go('/explore'),
-              ),
-            ),
-          ),
-        ],
+        centerTitle: true,
+        title: Text(DateFormat('MMMM d').format(today)),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/templates/new'),
-        icon: const Icon(Icons.add),
-        label: const Text('New workout'),
+        onPressed: () => startAdHocWorkout(context, ref),
+        icon: const Icon(Icons.play_arrow),
+        label: const Text('Start new workout'),
       ),
-      body: summaries.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
-        data: (rows) {
-          if (rows.isEmpty) {
-            return EmptyState(
-              icon: Icons.fitness_center,
-              title: 'No workouts yet',
-              message:
-                  'Build a template with your exercises so you can start a workout in seconds.',
-              actionLabel: 'Create your first workout',
-              onAction: () => context.push('/templates/new'),
-            );
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
-            itemCount: rows.length,
-            itemBuilder: (_, i) => _TemplateCard(summary: rows[i]),
-          );
-        },
-      ),
-    );
-  }
-}
-
-/// Header micro-label action that pushes the exercise library — exercises
-/// are material for building workouts, not a peer destination, so they live
-/// one tap away from here rather than in the bottom nav (docs/design/
-/// gymflow-design-system.md micro-label style: 11px, w600, letterSpacing
-/// 1.2, uppercase, `muted`).
-class _ExercisesAction extends StatelessWidget {
-  const _ExercisesAction({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final muted = Theme.of(context).extension<SemanticColors>()!.muted;
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-        child: Text(
-          'EXERCISES',
-          style: AppTheme.columnHeader.copyWith(color: muted),
-        ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+        children: [
+          WeekDotStrip(
+            today: today,
+            trainedDays: {
+              for (final s in history) s.session.endedAt ?? s.session.startedAt,
+            },
+          ),
+          Divider(color: semantic.line, height: 32),
+          if (todays.isEmpty) ...[
+            Text('No workouts today', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 12),
+            const _StartRow(),
+          ] else ...[
+            Text('Workouts', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 8),
+            for (final s in todays) _SessionCard(session: s),
+            const SizedBox(height: 8),
+            const _StartRow(label: 'Log another workout'),
+          ],
+          // The suggestion disappears once you have trained today. The
+          // reference does this too, and it is the better behaviour: a stale
+          // "do this next" prompt after the work is done is one more decision
+          // for no reason.
+          if (todays.isEmpty && suggestions.isNotEmpty) ...[
+            Divider(color: semantic.line, height: 32),
+            Text('Suggested routines', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 12),
+            for (final s in suggestions.take(3)) _SuggestionRow(summary: s),
+          ],
+        ],
       ),
     );
   }
 }
 
-class _TemplateCard extends ConsumerWidget {
-  const _TemplateCard({required this.summary});
+/// The full-width row CTA S-003 uses instead of a button: a whole tappable
+/// row, so it reads as the surface's one obvious next move.
+class _StartRow extends ConsumerWidget {
+  const _StartRow({this.label = 'Start new workout'});
 
-  final TemplateSummary summary;
-
-  String _pluralise(int count, String noun) =>
-      count == 1 ? '1 $noun' : '$count ${noun}s';
+  final String label;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final muted = theme.extension<SemanticColors>()!.muted;
-    final template = summary.template;
-    final canStart = summary.exerciseCount > 0;
-
-    var metadata =
-        '${_pluralise(summary.exerciseCount, 'exercise')} · ${_pluralise(summary.totalSets, 'set')}';
-    if (summary.lastPerformedAt != null) {
-      metadata +=
-          ' · Last: ${DateFormat.MMMd().format(summary.lastPerformedAt!)}';
-    }
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: () => context.push('/templates/${template.id}'),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+    final semantic = theme.extension<SemanticColors>()!;
+    return InkWell(
+      onTap: () => startAdHocWorkout(context, ref),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: semantic.surfaceHigh,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.play_arrow),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: Text(template.name, style: theme.textTheme.titleLarge),
-                  ),
-                  PopupMenuButton<_TemplateAction>(
-                    onSelected: (action) =>
-                        _handleAction(context, ref, action),
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(
-                        value: _TemplateAction.edit,
-                        child: Text('Edit'),
-                      ),
-                      PopupMenuItem(
-                        value: _TemplateAction.duplicate,
-                        child: Text('Duplicate'),
-                      ),
-                      PopupMenuItem(
-                        value: _TemplateAction.delete,
-                        child: Text('Delete'),
-                      ),
-                    ],
+                  Text(label, style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Add exercises and start logging',
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: semantic.muted),
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                metadata,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: FilledButton(
-                  onPressed: canStart
-                      ? () => startWorkout(context, ref, template.id)
-                      : null,
-                  child: const Text('Start'),
-                ),
-              ),
-              if (!canStart) ...[
-                const SizedBox(height: 4),
-                Text(
-                  'Add an exercise before you can start',
-                  style: theme.textTheme.bodySmall?.copyWith(color: muted),
-                ),
-              ],
-            ],
-          ),
+            ),
+            Icon(Icons.chevron_right, color: semantic.muted),
+          ],
         ),
       ),
     );
   }
+}
 
-  Future<void> _handleAction(
-    BuildContext context,
-    WidgetRef ref,
-    _TemplateAction action,
-  ) async {
-    final repo = ref.read(templateRepositoryProvider);
-    switch (action) {
-      case _TemplateAction.edit:
-        context.push('/templates/${summary.template.id}');
-      case _TemplateAction.duplicate:
-        await repo.duplicateTemplate(summary.template.id);
-      case _TemplateAction.delete:
-        final confirmed = await confirmDestructive(
-          context,
-          title: 'Delete "${summary.template.name}"?',
-          message:
-              'This removes the workout template. This cannot be undone.',
-          confirmLabel: 'Delete',
-        );
-        if (confirmed) {
-          await repo.deleteTemplate(summary.template.id);
-        }
-    }
+/// One session logged today: name, when, and the two numbers worth seeing.
+class _SessionCard extends StatelessWidget {
+  const _SessionCard({required this.session});
+
+  final ActiveSession session;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final semantic = theme.extension<SemanticColors>()!;
+    final workout = session.session;
+    final endedAt = workout.endedAt;
+    final duration = endedAt == null
+        ? Duration.zero
+        : endedAt.difference(workout.startedAt) -
+            Duration(seconds: workout.pausedSeconds);
+    final volume = session.completedVolume;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(workout.name, style: theme.textTheme.titleMedium),
+                const SizedBox(height: 2),
+                Text(
+                  'Today at ${DateFormat.jm().format(endedAt ?? workout.startedAt)}',
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: semantic.muted),
+                ),
+              ],
+            ),
+          ),
+          _Stat(label: 'Duration', value: mmss(duration)),
+          const SizedBox(width: 20),
+          _Stat(
+            label: 'Volume',
+            value: '${volume.round()} ${workout.weightUnit}',
+          ),
+        ],
+      ),
+    );
   }
 }
 
-enum _TemplateAction { edit, duplicate, delete }
+class _Stat extends StatelessWidget {
+  const _Stat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final semantic = theme.extension<SemanticColors>()!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label,
+            style: AppTheme.columnHeader.copyWith(color: semantic.muted)),
+        const SizedBox(height: 2),
+        Text(value, style: theme.textTheme.titleMedium),
+      ],
+    );
+  }
+}
+
+/// A suggested routine: tapping opens its detail screen (S-030), the play
+/// button starts it outright — the same pair of affordances the Library gives
+/// a routine, so a routine behaves the same wherever it is offered.
+class _SuggestionRow extends ConsumerWidget {
+  const _SuggestionRow({required this.summary});
+
+  final TemplateSummary summary;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final semantic = theme.extension<SemanticColors>()!;
+    final last = summary.lastPerformedAt;
+
+    return InkWell(
+      onTap: () => context.push('/templates/${summary.template.id}/detail'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(summary.template.name,
+                      style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 2),
+                  Text(
+                    last == null
+                        ? 'Never performed'
+                        : 'Last performed: ${relativeDay(last)}',
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: semantic.muted),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.play_arrow),
+              tooltip: 'Start ${summary.template.name}',
+              onPressed: () =>
+                  startWorkout(context, ref, summary.template.id),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

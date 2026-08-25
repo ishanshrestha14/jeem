@@ -18,8 +18,7 @@ import 'pump_helpers.dart';
 /// You IA (ADR-005): the five destinations render (in that order) and switch
 /// the visible
 /// screen (`StatefulShellRoute.indexedStack` keeps each tab's own
-/// navigation/scroll state), the Workout tab's `EXERCISES` header action
-/// pushes the exercise library, and — the guard this whole change exists
+/// navigation/scroll state) and — the guard this whole change exists
 /// for — the pushed, full-screen active session route does NOT show the
 /// shell's nav bar. That absence was deletion-verified by temporarily
 /// nesting `/session` inside the shell in `lib/app/router.dart`, confirming
@@ -107,8 +106,11 @@ void main() {
     await pumpUntilData(tester, until: find.widgetWithText(AppBar, 'Exercises'));
 
     await tester.tap(find.text('WORKOUT'));
-    await pumpUntilData(tester, until: find.text('Create your first workout'));
-    expect(find.widgetWithText(AppBar, 'Workout'), findsOneWidget);
+    // Since T-013 this tab is S-003's day launchpad: its top bar carries the
+    // date, not the word "Workout", so the empty-state heading is what
+    // identifies it.
+    await pumpUntilData(tester, until: find.text('No workouts today'));
+    expect(find.text('No workouts today'), findsOneWidget);
 
     await tester.tap(find.text('LIBRARY'));
     await pumpUntilData(tester, until: find.widgetWithText(AppBar, 'Library'));
@@ -124,21 +126,6 @@ void main() {
     await tester.tap(find.text('HOME'));
     await tester.pump();
     expect(find.text('Go to Workout'), findsOneWidget);
-
-    await disposeAndDrainTimers(tester, container: container);
-  });
-
-  testWidgets("the Workout tab's EXERCISES action opens the library",
-      (tester) async {
-    await tester.pumpWidget(harness());
-    await pumpUntilData(tester, until: find.text('Go to Workout'));
-
-    await tester.tap(find.text('WORKOUT'));
-    await pumpUntilData(tester, until: find.text('Create your first workout'));
-
-    await tester.tap(find.text('EXERCISES'));
-    await pumpUntilData(tester, until: find.text('Create an exercise'));
-    expect(find.widgetWithText(AppBar, 'Exercises'), findsOneWidget);
 
     await disposeAndDrainTimers(tester, container: container);
   });
