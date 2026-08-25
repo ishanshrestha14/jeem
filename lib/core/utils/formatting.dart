@@ -14,6 +14,28 @@ String formatWeight(double? w) {
   return w == w.roundToDouble() ? w.toStringAsFixed(0) : w.toString();
 }
 
+/// "Today", "Yesterday", "2 days ago", or the date itself past a month.
+///
+/// Compares **calendar days**, not elapsed hours: a session logged at 11pm
+/// last night should read "Yesterday" at 1am, which is how anyone describing
+/// it would say it. A date in the future (clock skew, an edited session)
+/// clamps to "Today" rather than rendering negative days.
+String relativeDay(DateTime when, {DateTime? now}) {
+  final today = now ?? DateTime.now();
+  final a = DateTime(today.year, today.month, today.day);
+  final b = DateTime(when.year, when.month, when.day);
+  final days = a.difference(b).inDays;
+  if (days <= 0) return 'Today';
+  if (days == 1) return 'Yesterday';
+  if (days <= 30) return '$days days ago';
+  return '${when.day} ${_months[when.month - 1]} ${when.year}';
+}
+
+const _months = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
 /// The reps half of a set prescription, as a set row hints it: `8`, `8-10`,
 /// or null when nothing was planned. Null rather than `''` so a caller can
 /// hand it straight to `hintText`, where an empty string would still reserve

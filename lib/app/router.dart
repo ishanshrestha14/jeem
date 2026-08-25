@@ -12,6 +12,7 @@ import '../features/sessions/ui/active_session_screen.dart';
 import '../features/sessions/ui/session_reorder_screen.dart';
 import '../features/sessions/ui/session_summary_screen.dart';
 import '../features/settings/ui/settings_screen.dart';
+import '../features/templates/ui/routine_detail_screen.dart';
 import '../features/templates/ui/template_editor_screen.dart';
 import '../features/templates/ui/workout_screen.dart';
 import 'app_shell.dart';
@@ -121,6 +122,14 @@ GoRouter createAppRouter() => GoRouter(
           path: '/templates/:id',
           builder: (_, s) =>
               TemplateEditorScreen(templateId: s.pathParameters['id']),
+        ),
+        // S-030. Deliberately below `/templates/:id` and not a child of it:
+        // the editor is still its own destination, reached from this
+        // screen's ⋮ menu.
+        GoRoute(
+          path: '/templates/:id/detail',
+          builder: (_, s) =>
+              RoutineDetailScreen(templateId: s.pathParameters['id']!),
         ),
         GoRoute(
           path: '/session',

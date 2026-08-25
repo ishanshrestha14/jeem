@@ -95,8 +95,13 @@ Full detail, counterparts and gaps: [`02-screen-inventory.md`](research/referenc
 | S-025 | reference | Exercise detail | screen, tabbed | **Draft — [spec](specs/screens/S-025-reference-exercise-detail.md)** |
 | S-026 | reference | Exercise browser / picker | modal | **Draft — [spec](specs/screens/S-026-reference-exercise-browser.md)** |
 | S-027 | reference | "Create Exercise" form | screen | **Draft — [spec](specs/screens/S-027-reference-create-exercise.md)** |
+| S-028 | reference | "Create Routine" / routine builder | screen | **Draft — [spec](specs/screens/S-028-reference-create-routine.md)** |
+| S-029 | reference | Routine exercise menu | bottom sheet | **Draft — [spec](specs/screens/S-029-reference-routine-exercise-menu.md)** |
+| S-030 | reference | Routine detail | screen | **Implemented — [spec](specs/screens/S-030-reference-routine-detail.md)** |
 
-Next free S-ID: **S-028**.
+Next free S-ID: **S-031**.
+
+S-028 and S-029 were written during T-002 but never added to this table — corrected 2026-08-25.
 
 `Status: Implemented` on our rows means the surface exists in `lib/`; it does **not** mean a written
 spec exists. No `specs/screens/` files have been authored yet.
@@ -160,8 +165,9 @@ Next free CMP-ID: **CMP-028**.
 | [T-008](tickets/T-008-plan-prefill.md) | Pre-fill live session rows from the plan | **Done** | M | S-006, CMP-015 |
 | [T-009](tickets/T-009-previous-best.md) | `Previous`: last session's best set | **Done** | M | S-006, CMP-015, ADR-004 |
 | [T-010](tickets/T-010-completed-row-wash.md) | Completed-row wash — closes CMP-015 | **Done** | S | S-006, CMP-015 |
+| [T-011](tickets/T-011-routine-detail.md) | Routine detail screen + play button | **Done** | M | S-030, S-004, CMP-011 |
 
-Next free T-ID: **T-011**.
+Next free T-ID: **T-012**.
 
 ### Decisions (ADR)
 | ID | Title | Status |
@@ -383,19 +389,19 @@ easy the *next* piece of work is to pick up, not whether the current state is un
 
 | Type | Count |
 |---|---|
-| S (surfaces) | 29 registered (13 reference · 16 ours) — **13 written specs** |
+| S (surfaces) | 30 registered (14 reference · 16 ours) — **16 written specs** |
 | FL (flows) | **0 — never derived.** See §6 |
 | CMP (components) | 27 candidates — **0 written specs.** See §6 |
 | F (features) | 0 |
-| T (tickets) | 10 — **all done** |
+| T (tickets) | 11 — **all done** |
 | ADR (decisions) | 6 |
 
-**Last updated:** **CMP-015 is closed** — T-008 (the plan, muted and one tap from being logged),
-T-009 (`Last · 70kg x 6`, what you actually did last time) and T-010 (the completed-row wash,
-**chalk not green** — see the ticket). The highest-detail pattern in the reference teardown is now
-fully built. No schema change in any of the three. 281 tests pass, `flutter analyze` clean.
+**Last updated:** **T-011 shipped** — routines now open a read-only detail screen (S-030) whose
+primary action is Start workout, with Edit demoted to ⋮, and routine rows carry a play button in the
+Library and inside programs. Before it, CMP-015 was closed by T-008/T-009/T-010. No schema change in
+any of the four. 310 tests pass, `flutter analyze` clean.
 
-**Where the code is:** branch `t-008-plan-prefill` (carries T-008, T-009 and T-010), off `main` at
+**Where the code is:** branch `t-008-plan-prefill` (carries T-008 through T-011), off `main` at
 `53b67ee`. Schema **v6**. Five-tab shell
 (Home · Explore · Workout · Library · You) live; Library and You rebuilt against S-004/S-005.
 
@@ -405,7 +411,9 @@ rename it into `screenshots/` under its manifest name.
 **Next step (a fresh session starts here):**
 
 1. **Workout tab (S-003) and Home (S-001)** — the two surfaces still drifted from their specs, and
-   now the largest remaining piece of the teardown. Both have written specs waiting.
+   now the largest remaining piece of the teardown. Both have written specs waiting. Note the Workout
+   tab still opens the **editor** when a routine is tapped; T-011 changed only the Library and
+   programs, so that surface is now inconsistent with them.
 2. Consider closing the §6 gaps — flows especially. T-008, T-009 and T-010 each carried their flow
    detail inline in the ticket again, which is the drift §6 warns about.
 3. **RIR onto the keypad** (CMP-018 specs an `RIR` key) would free the set row's fifth column, and

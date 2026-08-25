@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/semantic_colors.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../library/ui/library_screen.dart' show RoutinePlayButton;
 import '../../templates/providers/template_providers.dart';
 import '../data/program_repository.dart';
 import '../providers/program_providers.dart';
@@ -126,12 +127,26 @@ class _ProgramEditorScreenState extends ConsumerState<ProgramEditorScreen> {
                   minTileHeight: 56,
                   leading: const Icon(Icons.drag_handle),
                   title: Text(entry.template.name),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.close),
-                    tooltip: 'Remove from program',
-                    onPressed: () => ref
-                        .read(programRepositoryProvider)
-                        .removeRoutine(entry.membership.id),
+                  // Same tap target and same play button as the Library
+                  // (T-011): a routine behaves identically wherever it is
+                  // listed, and this screen is where you actually pick one.
+                  onTap: () => context
+                      .push('/templates/${entry.template.id}/detail'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      RoutinePlayButton(
+                        templateId: entry.template.id,
+                        name: entry.template.name,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        tooltip: 'Remove from program',
+                        onPressed: () => ref
+                            .read(programRepositoryProvider)
+                            .removeRoutine(entry.membership.id),
+                      ),
+                    ],
                   ),
                 );
               },

@@ -1,3 +1,4 @@
+import '../../../core/utils/formatting.dart';
 import '../../../db/app_database.dart';
 
 class TemplateExerciseWithExercise {
@@ -76,3 +77,72 @@ class TemplateSummary {
   final int totalSets;
   final DateTime? lastPerformedAt;
 }
+
+/// One exercise's whole prescription on a single line, the way the routine
+/// detail screen (S-030) lists it: `3 sets · 6 reps · 60kg`.
+///
+/// Where the planned sets differ, each part shows its **span** —
+/// `6-10 reps`, `60-80kg` — rather than the word "varied". The numbers are
+/// the reason you are reading the row: a routine that ramps 60 to 80kg should
+/// say so before you start it.
+///
+/// Parts with nothing planned are dropped, so a routine with no prescription
+/// yet is honestly just its set count. Duration-logged exercises show seconds
+/// in place of reps and weight.
+///
+/// Distinct from [describeTemplateSet], which describes *one* set for the
+/// editor's collapsed row.
+String describeTemplateExercise(
+  TemplateExerciseWithExercise te, {
+  String unit = 'kg',
+}) {
+  final sets = te.sets;
+  if (sets.isEmpty) return 'No sets';
+
+  final parts = <String>['${sets.length} ${sets.length == 1 ? 'set' : 'sets'}'];
+
+  if (te.loggingType == LoggingType.durationOnly) {
+    final durations = [
+      for (final s in sets)
+        if (s.durationSeconds != null) s.durationSeconds!,
+    ];
+    if (durations.isNotEmpty) {
+      parts.add(_span(
+        durations.reduce((a, b) => a < b ? a : b),
+        durations.reduce((a, b) => a > b ? a : b),
+        formatDurationSeconds,
+      ));
+    }
+    return parts.join(' · ');
+  }
+
+  // Both bounds of a set's own range widen the span, so a single set planned
+  // as 6-8 reads `6-8 reps` exactly as two sets of 6 and 8 would.
+  final reps = <int>[
+    for (final s in sets) ...[
+      if (s.reps != null) s.reps!,
+      if (s.repsMax != null) s.repsMax!,
+    ],
+  ];
+  if (reps.isNotEmpty) {
+    final lo = reps.reduce((a, b) => a < b ? a : b);
+    final hi = reps.reduce((a, b) => a > b ? a : b);
+    parts.add('${_span(lo, hi, (v) => '$v')} reps');
+  }
+
+  final weights = [
+    for (final s in sets)
+      if (s.weight != null) s.weight!,
+  ];
+  if (weights.isNotEmpty) {
+    final lo = weights.reduce((a, b) => a < b ? a : b);
+    final hi = weights.reduce((a, b) => a > b ? a : b);
+    parts.add('${_span(lo, hi, formatWeight)}$unit');
+  }
+
+  return parts.join(' · ');
+}
+
+/// `60` when the bounds agree, `60-80` when they do not.
+String _span<T>(T lo, T hi, String Function(T) format) =>
+    lo == hi ? format(lo) : '${format(lo)}-${format(hi)}';

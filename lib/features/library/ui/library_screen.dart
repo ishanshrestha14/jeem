@@ -10,6 +10,7 @@ import '../../exercises/providers/exercise_providers.dart';
 import '../../programs/providers/program_providers.dart';
 import '../../templates/data/template_models.dart';
 import '../../templates/providers/template_providers.dart';
+import '../../templates/ui/start_workout_action.dart';
 
 /// The Library tab — "your library": everything you made (S-004).
 ///
@@ -247,7 +248,15 @@ class _RoutineList extends ConsumerWidget {
                 title: s.template.name,
                 subtitle: '${s.exerciseCount} '
                     '${s.exerciseCount == 1 ? 'exercise' : 'exercises'}',
-                onTap: () => context.push('/templates/${s.template.id}'),
+                trailing: RoutinePlayButton(
+                  templateId: s.template.id,
+                  name: s.template.name,
+                ),
+                // The detail screen (S-030), not the editor: you start a
+                // routine far more often than you edit it, and Edit is one
+                // tap away in that screen's ⋮ menu.
+                onTap: () =>
+                    context.push('/templates/${s.template.id}/detail'),
               ),
           ],
         );
@@ -329,12 +338,18 @@ class LibraryRow extends StatelessWidget {
     required this.title,
     required this.onTap,
     this.subtitle,
+    this.trailing,
   });
 
   final Widget tile;
   final String title;
   final String? subtitle;
   final VoidCallback onTap;
+
+  /// Optional action at the end of the row. Routine rows put a play button
+  /// here so a routine can be started without opening anything; programs and
+  /// exercises pass nothing and render exactly as before.
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -371,9 +386,33 @@ class LibraryRow extends StatelessWidget {
                 ],
               ),
             ),
+            ?trailing,
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Starts [name] straight from its row (T-011). Goes through the shared
+/// [startWorkout], so an already-running session offers resume-or-discard
+/// here exactly as it does from every other entry point.
+class RoutinePlayButton extends ConsumerWidget {
+  const RoutinePlayButton({
+    super.key,
+    required this.templateId,
+    required this.name,
+  });
+
+  final String templateId;
+  final String name;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return IconButton(
+      icon: const Icon(Icons.play_arrow),
+      tooltip: 'Start $name',
+      onPressed: () => startWorkout(context, ref, templateId),
     );
   }
 }
