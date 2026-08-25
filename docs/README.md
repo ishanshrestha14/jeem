@@ -401,8 +401,8 @@ primary action is Start workout, with Edit demoted to ⋮, and routine rows carr
 Library and inside programs. Before it, CMP-015 was closed by T-008/T-009/T-010. No schema change in
 any of the four. 310 tests pass, `flutter analyze` clean.
 
-**Where the code is:** `main`, latest commit `643d350` (T-008 through T-011 merged 2026-08-25).
-Schema **v6**. No git remote is configured yet. Five-tab shell
+**Where the code is:** `main`, tracking `origin/main` at
+`git@github.com:ishanshrestha14/jeem.git` (added 2026-08-25). Schema **v6**. Five-tab shell
 (Home · Explore · Workout · Library · You) live; Library and You rebuilt against S-004/S-005.
 
 **Screenshot workflow:** paste into any note under `docs/`; Obsidian writes the PNG to disk and I
