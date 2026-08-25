@@ -14,6 +14,7 @@ import 'package:gymflow/features/sessions/ui/active_session_screen.dart';
 import 'package:gymflow/features/sessions/ui/session_summary_screen.dart';
 import 'package:gymflow/features/sessions/ui/widgets/duration_set_row.dart';
 import 'package:gymflow/features/sessions/ui/widgets/rest_bar.dart';
+import 'package:gymflow/features/sessions/ui/widgets/session_exercise_card.dart';
 import 'package:gymflow/features/sessions/ui/widgets/strength_set_row.dart';
 import 'package:gymflow/features/templates/data/template_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -270,6 +271,11 @@ void main() {
     expect(find.byTooltip('Complete set'), findsNWidgets(2));
     expect(find.byTooltip('Mark incomplete'), findsNothing);
 
+    // Scrolled into view first: since T-012 the list carries the
+    // Add exercises / More block below the last card (S-006), so on the
+    // 800x600 test surface the set rows no longer all sit above the fold.
+    await tester.ensureVisible(find.byTooltip('Complete set').first);
+    await tester.pump();
     await tester.tap(find.byTooltip('Complete set').first);
     await pumpUntilSessionData(tester);
 
@@ -711,6 +717,66 @@ void main() {
     // happens on device.
     await tester.pump();
     expect(find.text('Last \u00b7 70kg x 6'), findsOneWidget);
+
+    await disposeAndDrainTimers(tester, container: container);
+  });
+
+  testWidgets('an empty ad-hoc session offers Add exercises and More (S-006)',
+      (tester) async {
+    await SessionRepository(db).startAdHoc(weightUnit: 'kg');
+
+    await tester.pumpWidget(harness());
+    await pumpUntilSessionData(tester);
+
+    expect(find.text('Add exercises'), findsOneWidget);
+    expect(find.text('More'), findsOneWidget);
+    // No list to render, and no empty-state illustration: the two actions
+    // standing in the void are the whole surface (S-006).
+    expect(find.byType(SessionExerciseCard), findsNothing);
+
+    await disposeAndDrainTimers(tester, container: container);
+  });
+
+  testWidgets('Add exercises puts the chosen exercise into the live session',
+      (tester) async {
+    await SessionRepository(db).startAdHoc(weightUnit: 'kg');
+    await ExerciseRepository(db).create(
+        name: 'Barbell Row', loggingType: LoggingType.strengthWeightRepsRir);
+
+    await tester.pumpWidget(harness());
+    await pumpUntilSessionData(tester);
+
+    await tester.tap(find.text('Add exercises'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Barbell Row').last);
+    // The controller reloads the session over a drift stream, which needs
+    // real async turns — the reason this file has its own pump helper.
+    await pumpUntilSessionData(tester);
+
+    expect(find.byType(SessionExerciseCard), findsOneWidget);
+    expect(find.byType(StrengthSetRow), findsOneWidget);
+
+    await disposeAndDrainTimers(tester, container: container);
+  });
+
+  testWidgets('a session with exercises still offers Add exercises (CMP-004)',
+      (tester) async {
+    final templates = TemplateRepository(db);
+    final exercises = ExerciseRepository(db);
+    final t = await templates.createTemplate(name: 'Push');
+    final e = await exercises.create(
+        name: 'Press', loggingType: LoggingType.strengthWeightRepsRir);
+    await templates.addExercise(
+        templateId: t.id, exerciseId: e.id, targetSets: 1);
+    await SessionRepository(db).startFromTemplate(t.id, weightUnit: 'kg');
+
+    await tester.pumpWidget(harness());
+    await pumpUntilSessionData(tester);
+
+    // Below the cards, not instead of them — adding is available whether or
+    // not the session started empty.
+    expect(find.byType(SessionExerciseCard), findsOneWidget);
+    expect(find.text('Add exercises'), findsOneWidget);
 
     await disposeAndDrainTimers(tester, container: container);
   });

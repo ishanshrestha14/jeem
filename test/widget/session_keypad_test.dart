@@ -103,7 +103,7 @@ void main() {
     );
     await tester.ensureVisible(expandPress);
     await tester.pump();
-    await tester.tap(expandPress);
+    await tapVisible(tester, expandPress);
     await tester.pumpAndSettle();
 
     // Expanding the second collapses the first (S-006: single-open).
@@ -129,7 +129,7 @@ void main() {
     await tester.pumpWidget(harness());
     await pumpUntilSessionData(tester);
 
-    await tester.tap(weightField(0));
+    await tapVisible(tester, weightField(0));
     await tester.pumpAndSettle();
 
     expect(keypadKey('1'), findsOneWidget);
@@ -145,11 +145,11 @@ void main() {
     await tester.pumpWidget(harness());
     await pumpUntilSessionData(tester);
 
-    await tester.tap(weightField(0));
+    await tapVisible(tester, weightField(0));
     await tester.pumpAndSettle();
     expect(keypadKey('.'), findsOneWidget);
 
-    await tester.tap(repsField(0));
+    await tapVisible(tester, repsField(0));
     await tester.pumpAndSettle();
     // Withheld rather than rejected: a fractional rep is unreachable, so no
     // error message is ever needed.
@@ -204,7 +204,7 @@ void main() {
     // so the next keypress overwrites. The field carries the routine's plan,
     // and the common edit is "not that", not "append a digit". (Tapping a
     // field that already has focus just moves the caret, as anywhere else.)
-    await tester.tap(repsField(0));
+    await tapVisible(tester, repsField(0));
     await tester.pumpAndSettle();
     await typeOnKeypad(tester, weightField(0), '9');
     await pumpUntilSessionData(tester);
@@ -257,7 +257,7 @@ void main() {
     await tester.pumpWidget(harness());
     await pumpUntilSessionData(tester);
 
-    await tester.tap(weightField(0));
+    await tapVisible(tester, weightField(0));
     await tester.pumpAndSettle();
     expect(keypadKey('1'), findsOneWidget);
 
@@ -277,7 +277,7 @@ void main() {
     await tester.pumpWidget(harness());
     await pumpUntilSessionData(tester);
 
-    await tester.tap(weightField(0));
+    await tapVisible(tester, weightField(0));
     await tester.pumpAndSettle();
     await tester.tap(keypadKey('RIR'));
     await tester.pumpAndSettle();
@@ -312,7 +312,7 @@ void main() {
     await tester.pumpWidget(harness());
     await pumpUntilSessionData(tester);
 
-    await tester.tap(find.byTooltip('Complete set').first);
+    await tapVisible(tester, find.byTooltip('Complete set').first);
     await pumpUntilSessionData(tester);
 
     await typeOnKeypad(tester, weightField(0), '70');

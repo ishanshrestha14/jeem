@@ -120,7 +120,7 @@ Detail: [`04-ui-patterns.md`](research/reference-app/04-ui-patterns.md). "Candid
 | CMP-001 | Minimised-session bar ("WIP" bar) | Candidate |
 | CMP-002 | Live session stats strip (duration · volume · sets) | Candidate |
 | CMP-003 | Set-completion-triggered rest timer | Candidate |
-| CMP-004 | Add-exercise affordance inside a live session | Candidate |
+| CMP-004 | Add-exercise affordance inside a live session | **Built** — [T-012](tickets/T-012-adhoc-sessions.md) |
 | CMP-005 | Week strip / date header | Candidate |
 | CMP-006 | Suggested-routine card | Candidate |
 | CMP-007 | Insights block | Candidate |
@@ -166,8 +166,10 @@ Next free CMP-ID: **CMP-028**.
 | [T-009](tickets/T-009-previous-best.md) | `Previous`: last session's best set | **Done** | M | S-006, CMP-015, ADR-004 |
 | [T-010](tickets/T-010-completed-row-wash.md) | Completed-row wash — closes CMP-015 | **Done** | S | S-006, CMP-015 |
 | [T-011](tickets/T-011-routine-detail.md) | Routine detail screen + play button | **Done** | M | S-030, S-004, CMP-011 |
+| [T-012](tickets/T-012-adhoc-sessions.md) | Ad-hoc sessions + add exercises mid-session | **Done** | M | S-006, CMP-004 |
+| [T-013](tickets/T-013-workout-tab.md) | Workout tab rebuilt against S-003 | **Not started** | L | S-003, CMP-005 |
 
-Next free T-ID: **T-012**.
+Next free T-ID: **T-014**.
 
 ### Decisions (ADR)
 | ID | Title | Status |
@@ -393,7 +395,7 @@ easy the *next* piece of work is to pick up, not whether the current state is un
 | FL (flows) | **0 — never derived.** See §6 |
 | CMP (components) | 27 candidates — **0 written specs.** See §6 |
 | F (features) | 0 |
-| T (tickets) | 11 — **all done** |
+| T (tickets) | 13 — 12 done, 1 not started |
 | ADR (decisions) | 6 |
 
 **Last updated:** **T-011 shipped** — routines now open a read-only detail screen (S-030) whose

@@ -296,3 +296,7 @@ refusal to nag.
   closing CMP-015. **Deviation:** the wash is **chalk at 5%, not green** — the design system's first
   principle reserves colour for "live", and `success` is already deliberately chalk. A row that is
   both current and complete takes the current treatment.
+- 2026-08-25 — [T-012](../../tickets/T-012-adhoc-sessions.md) built the ad-hoc empty session and the
+  **Add exercises / More** bottom actions (CMP-004), on empty and populated sessions alike. `More`
+  opens our session settings sheet (S-017), resolving that mapping. An ad-hoc session is named
+  `Workout`; added exercises arrive with one empty set and no prescription, since nothing planned them.

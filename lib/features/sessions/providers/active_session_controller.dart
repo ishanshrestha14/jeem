@@ -332,6 +332,23 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
   /// focuses whatever comes next. Because this always recomputes rather than
   /// patching, completing a set while already resting correctly restarts
   /// rest from the new set (PRD §18.4).
+  /// Appends [exerciseId] to the running session (CMP-004) and re-emits.
+  ///
+  /// The reload is what makes the new exercise's set the current target when
+  /// nothing else is pending — [_emit] recomputes focus from the reloaded
+  /// session, so adding the first exercise to an empty ad-hoc session leaves
+  /// it immediately logbable, and adding one to a session whose sets were all
+  /// complete puts the session back in progress.
+  Future<void> addExercise(String exerciseId) async {
+    final current = await _ready();
+    await _repo.addExerciseToSession(
+      sessionId: current.session.session.id,
+      exerciseId: exerciseId,
+    );
+    final reloaded = await _reload(current.session.session.id);
+    _emit(reloaded, current.rest);
+  }
+
   Future<void> completeSet(String setId) async {
     final current = await _ready();
     final repo = _repo;

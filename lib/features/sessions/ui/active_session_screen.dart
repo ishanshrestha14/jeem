@@ -11,6 +11,7 @@ import '../../../core/utils/formatting.dart';
 import '../../../core/widgets/app_keypad.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../db/app_database.dart';
+import '../../exercises/ui/exercise_picker_sheet.dart';
 import '../providers/active_session_controller.dart';
 import 'session_settings_sheet.dart';
 import 'widgets/rest_bar.dart';
@@ -356,6 +357,16 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen>
         );
   }
 
+  /// Opens the exercise picker and appends the choice to the live session.
+  /// Cancelling changes nothing.
+  Future<void> _handleAddExercise() async {
+    final exerciseId = await showExercisePickerSheet(context);
+    if (exerciseId == null || !mounted) return;
+    await ref
+        .read(activeSessionControllerProvider.notifier)
+        .addExercise(exerciseId);
+  }
+
   Widget _buildScaffold(BuildContext context, ActiveSessionState state) {
     final session = state.session;
     final weightUnit = session.session.weightUnit;
@@ -468,6 +479,17 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen>
                 ],
               ),
             ),
+          // S-006's bottom actions. On an empty ad-hoc session they are the
+          // whole surface, centred in the void; with exercises they sit below
+          // the last card (CMP-004), so adding one is available whether or not
+          // the session started empty.
+          if (session.exercises.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: _SessionBottomActions(onAdd: _handleAddExercise),
+              ),
+            ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
             sliver: SliverList.list(
@@ -509,6 +531,10 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen>
                       }
                     }),
                   ),
+                if (session.exercises.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _SessionBottomActions(onAdd: _handleAddExercise),
+                ],
               ],
             ),
           ),
@@ -710,4 +736,42 @@ class _ProgressHeaderDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant _ProgressHeaderDelegate oldDelegate) =>
       oldDelegate.session != session;
+}
+
+/// S-006's bottom actions: **Add exercises** filled and high-emphasis over
+/// **More** muted and low-emphasis. `More` opens the session settings sheet
+/// (S-017), which is what S-006 maps it to.
+class _SessionBottomActions extends ConsumerWidget {
+  const _SessionBottomActions({required this.onAdd});
+
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: FilledButton(
+              onPressed: onAdd,
+              child: const Text('Add exercises'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: FilledButton.tonal(
+              onPressed: () => showSessionSettingsSheet(context, ref),
+              child: const Text('More'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

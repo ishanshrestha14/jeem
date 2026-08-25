@@ -21,6 +21,112 @@ class SessionRepository {
   /// [TemplateExercise] config row) plus `targetSets` [SessionSet] rows
   /// seeded with the config's `defaultRir`/`defaultDurationSeconds`. Once
   /// written, none of this reads from the template again.
+  /// Starts a session with no routine behind it and nothing in it yet —
+  /// S-006's ad-hoc empty session. Exercises arrive through
+  /// [addExerciseToSession] as the workout is discovered.
+  ///
+  /// Named `Workout` rather than date-stamped: every surface that lists a
+  /// session already shows its timestamp beside the name, so a date here
+  /// would say the same thing twice. The name is editable in session
+  /// settings.
+  Future<WorkoutSession> startAdHoc({required String weightUnit}) async {
+    final now = DateTime.now();
+    final session = WorkoutSession(
+      id: newId(),
+      templateId: null,
+      name: 'Workout',
+      weightUnit: weightUnit,
+      status: SessionStatus.active,
+      // No routine to inherit these from, so take the same defaults a fresh
+      // routine carries.
+      autoFocusNextSet: true,
+      autoFocusNextExercise: true,
+      startedAt: now,
+      endedAt: null,
+      pausedSeconds: 0,
+      pausedAt: null,
+      notes: null,
+      restStatus: RestTimerStatus.idle,
+      restEndsAt: null,
+      restRemainingSeconds: null,
+      restTotalSeconds: null,
+      restAfterSetId: null,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    );
+    await _db.into(_db.workoutSessions).insert(session);
+    return session;
+  }
+
+  /// Appends [exerciseId] to a live session with a single empty set (CMP-004).
+  ///
+  /// **Appended, never inserted**: adding an exercise mid-session must not
+  /// reorder what you are in the middle of.
+  ///
+  /// One set, not the three a routine defaults to — you add an exercise
+  /// because you are about to do it, and how many sets it takes is discovered
+  /// as you go. It carries no prescription because nothing planned it: the
+  /// `planned*` columns stay null and the row's plan hint (T-008) shows
+  /// nothing, which is the truth.
+  Future<void> addExerciseToSession({
+    required String sessionId,
+    required String exerciseId,
+  }) async {
+    await _db.transaction(() async {
+      final exercise = await (_db.select(_db.exercises)
+            ..where((e) => e.id.equals(exerciseId) & e.deletedAt.isNull()))
+          .getSingle();
+
+      final existing = await (_db.select(_db.sessionExercises)
+            ..where((t) =>
+                t.sessionId.equals(sessionId) & t.deletedAt.isNull()))
+          .get();
+      final sortOrder = existing.isEmpty
+          ? 0
+          : existing.map((e) => e.sortOrder).reduce((a, b) => a > b ? a : b) + 1;
+
+      final now = DateTime.now();
+      final sessionExercise = SessionExercise(
+        id: newId(),
+        sessionId: sessionId,
+        exerciseId: exercise.id,
+        name: exercise.name,
+        description: exercise.description,
+        notes: exercise.notes,
+        imagePath: exercise.imagePath,
+        loggingType: exercise.loggingType,
+        sortOrder: sortOrder,
+        // 90s — the same default `TemplateRepository.addExercise` gives an
+        // exercise with no rest of its own. Adjustable per exercise from the
+        // rest chip once it is in the session.
+        restSeconds: 90,
+        targetSets: 1,
+        sessionNotes: null,
+        createdAt: now,
+        updatedAt: now,
+        deletedAt: null,
+      );
+      await _db.into(_db.sessionExercises).insert(sessionExercise);
+      await _db.into(_db.sessionSets).insert(SessionSet(
+            id: newId(),
+            sessionExerciseId: sessionExercise.id,
+            setIndex: 0,
+            plannedWeight: null,
+            plannedReps: null,
+            plannedRepsMax: null,
+            weight: null,
+            reps: null,
+            rir: null,
+            durationSeconds: null,
+            completedAt: null,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: null,
+          ));
+    });
+  }
+
   Future<WorkoutSession> startFromTemplate(
     String templateId, {
     required String weightUnit,

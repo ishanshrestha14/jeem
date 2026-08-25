@@ -14,6 +14,7 @@ import 'package:gymflow/features/templates/data/template_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../db/test_database.dart';
 import '../session_feedback_fakes.dart';
+import 'pump_helpers.dart';
 
 /// See the doc comment above `pumpUntilSessionData` in
 /// `active_session_test.dart` for the full reproduction evidence of why
@@ -117,7 +118,7 @@ void main() {
     await tester.pumpWidget(harness());
     await pumpUntilSessionData(tester);
 
-    await tester.tap(find.byTooltip('Complete set').first);
+    await tapVisible(tester, find.byTooltip('Complete set').first);
     await pumpUntilSessionData(tester);
   }
 

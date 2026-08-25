@@ -85,6 +85,19 @@ Future<void> pumpUntilGone(
   }
 }
 
+/// Taps [finder] after scrolling it into view.
+///
+/// Since T-012 the session list carries the Add exercises / More block below
+/// the last card (S-006), so on the 800x600 test surface a set row is not
+/// necessarily above the fold. A bare `tester.tap` on an off-screen widget
+/// warns and misses rather than failing outright, which surfaces later as a
+/// confusing assertion about state that never changed.
+Future<void> tapVisible(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await tester.pump();
+  await tester.tap(finder);
+}
+
 /// Enters [value] into a set field the way a user now does: tap the field to
 /// raise the in-app keypad, then tap its keys.
 ///
@@ -96,6 +109,11 @@ Future<void> typeOnKeypad(
   Finder field,
   String value,
 ) async {
+  // Scrolled into view first: since T-012 the session list carries the
+  // Add exercises / More block below the last card (S-006), so on the
+  // 800x600 test surface a set field is not necessarily above the fold.
+  await tester.ensureVisible(field);
+  await tester.pump();
   await tester.tap(field);
   await tester.pumpAndSettle();
   for (final character in value.split('')) {
