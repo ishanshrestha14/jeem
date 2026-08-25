@@ -157,4 +157,39 @@ void main() {
     expect(find.text('Edit'), findsOneWidget);
     await disposeAndDrainTimers(tester);
   });
+
+  testWidgets('a long routine scrolls, and Start stays reachable',
+      (tester) async {
+    tester.view.physicalSize = const Size(400, 600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final templates = TemplateRepository(db);
+    final exercises = ExerciseRepository(db);
+    final t = await templates.createTemplate(name: 'Long');
+    for (var i = 0; i < 15; i++) {
+      final e = await exercises.create(
+          name: 'Move $i', loggingType: LoggingType.strengthWeightRepsRir);
+      await templates.addExercise(
+          templateId: t.id, exerciseId: e.id, targetSets: 3);
+    }
+
+    await tester.pumpWidget(harness(t.id));
+    await pumpUntilData(tester, until: find.text('Long'));
+
+    expect(tester.takeException(), isNull, reason: 'no RenderFlex overflow');
+    // Start is pinned outside the scroll view, so it is reachable however
+    // long the routine is.
+    expect(find.widgetWithText(FilledButton, 'Start workout'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Move 14'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Move 14'), findsOneWidget);
+
+    await disposeAndDrainTimers(tester);
+  });
 }

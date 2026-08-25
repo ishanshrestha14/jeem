@@ -168,8 +168,9 @@ Next free CMP-ID: **CMP-028**.
 | [T-011](tickets/T-011-routine-detail.md) | Routine detail screen + play button | **Done** | M | S-030, S-004, CMP-011 |
 | [T-012](tickets/T-012-adhoc-sessions.md) | Ad-hoc sessions + add exercises mid-session | **Done** | M | S-006, CMP-004 |
 | [T-013](tickets/T-013-workout-tab.md) | Workout tab rebuilt against S-003 | **Done** | L | S-003, CMP-005 |
+| [T-014](tickets/T-014-delete-logged-workout.md) | Delete a logged workout (+ FAB hero-tag fix) | **Done** | S | S-003, S-019 |
 
-Next free T-ID: **T-014**.
+Next free T-ID: **T-015**.
 
 ### Decisions (ADR)
 | ID | Title | Status |
@@ -395,13 +396,14 @@ easy the *next* piece of work is to pick up, not whether the current state is un
 | FL (flows) | **0 — never derived.** See §6 |
 | CMP (components) | 27 candidates — **0 written specs.** See §6 |
 | F (features) | 0 |
-| T (tickets) | 13 — **all done** |
+| T (tickets) | 14 — **all done** |
 | ADR (decisions) | 6 |
 
-**Last updated:** **T-012 and T-013 shipped.** Sessions no longer need a routine — the Workout tab
-is now S-003's day launchpad (date, week strip, today's workouts, suggestions) and its FAB starts an
-empty ad-hoc session you add exercises to as you go. The old routine list is gone, which also ends
-the Library duplication. No schema change. 326 tests pass, `flutter analyze` clean.
+**Last updated:** **T-012, T-013 and T-014 shipped.** Sessions no longer need a routine — the
+Workout tab is now S-003's day launchpad and its FAB starts an empty ad-hoc session you add exercises
+to as you go. Logged workouts can now be deleted, from that tab and from History. Fixed a
+**pre-existing** FAB hero-tag collision that could throw on any route push. No schema change.
+339 tests pass, `flutter analyze` clean.
 
 **Where the code is:** `main`, tracking `origin/main` at
 `git@github.com:ishanshrestha14/jeem.git`. Schema **v6**. Local commits may be ahead of the remote. Five-tab shell

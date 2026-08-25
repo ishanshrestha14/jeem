@@ -53,6 +53,9 @@ class _ExerciseListScreenState extends ConsumerState<ExerciseListScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Exercises')),
       floatingActionButton: FloatingActionButton.extended(
+        // Unique per the note on the Workout tab's FAB: two default-tagged FABs
+        // alive at once collide during a route transition.
+        heroTag: 'exercise-create-fab',
         onPressed: () => context.push('/exercises/new'),
         icon: const Icon(Icons.add),
         label: const Text('New exercise'),

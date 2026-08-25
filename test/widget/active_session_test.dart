@@ -780,4 +780,56 @@ void main() {
 
     await disposeAndDrainTimers(tester, container: container);
   });
+
+  testWidgets('the empty-session actions survive a short screen',
+      (tester) async {
+    // `SliverFillRemaining(hasScrollBody: false)` centres the two buttons in
+    // the void, and would overflow rather than scroll if the viewport were
+    // shorter than they are.
+    tester.view.physicalSize = const Size(400, 500);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await SessionRepository(db).startAdHoc(weightUnit: 'kg');
+
+    await tester.pumpWidget(harness());
+    await pumpUntilSessionData(tester);
+
+    expect(tester.takeException(), isNull, reason: 'no RenderFlex overflow');
+    expect(find.text('Add exercises'), findsOneWidget);
+
+    await disposeAndDrainTimers(tester, container: container);
+  });
+
+  testWidgets('a long session scrolls to its bottom actions', (tester) async {
+    tester.view.physicalSize = const Size(400, 600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final templates = TemplateRepository(db);
+    final exercises = ExerciseRepository(db);
+    final t = await templates.createTemplate(name: 'Long');
+    for (var i = 0; i < 10; i++) {
+      final e = await exercises.create(
+          name: 'Move $i', loggingType: LoggingType.strengthWeightRepsRir);
+      await templates.addExercise(
+          templateId: t.id, exerciseId: e.id, targetSets: 3);
+    }
+    await SessionRepository(db).startFromTemplate(t.id, weightUnit: 'kg');
+
+    await tester.pumpWidget(harness());
+    await pumpUntilSessionData(tester);
+
+    expect(tester.takeException(), isNull, reason: 'no RenderFlex overflow');
+    await tester.scrollUntilVisible(
+      find.text('Add exercises'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Add exercises'), findsOneWidget);
+
+    await disposeAndDrainTimers(tester, container: container);
+  });
 }

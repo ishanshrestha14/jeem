@@ -488,6 +488,29 @@ class SessionRepository {
     );
   }
 
+  /// Removes a logged workout from the app.
+  ///
+  /// A **soft** delete, like every other delete here: the row keeps its sets
+  /// and is merely stamped `deletedAt`. Because `_fetchCompletedSessions`
+  /// filters on that column, one write takes the workout out of history, the
+  /// week strips, `Previous` (T-009) and the personal-record pass at once —
+  /// all of which are derived from completed sessions rather than stored.
+  ///
+  /// That means deleting a workout can *change your records*: if this session
+  /// held your best lift, the record hands back to the next best. Correct, but
+  /// invisible, which is why the confirmation says so.
+  ///
+  /// An unknown id is a no-op rather than an error — the caller is a menu on a
+  /// row that may already have been deleted elsewhere.
+  Future<void> deleteSession(String id) async {
+    final now = DateTime.now();
+    await (_db.update(_db.workoutSessions)..where((t) => t.id.equals(id)))
+        .write(WorkoutSessionsCompanion(
+      deletedAt: Value(now),
+      updatedAt: Value(now),
+    ));
+  }
+
   Future<void> cancelSession(String id) async {
     final now = DateTime.now();
     await (_db.update(_db.workoutSessions)..where((t) => t.id.equals(id)))

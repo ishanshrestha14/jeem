@@ -240,7 +240,14 @@ void main() {
     // Give the (absent) per-row template watch a beat to settle.
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.byIcon(Icons.more_vert), findsNothing);
+    // The menu itself stays: Duplicate needs a surviving template, but Delete
+    // applies to any logged workout — an ad-hoc session has no template at all
+    // and must still be removable.
+    expect(find.byIcon(Icons.more_vert), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    expect(find.text('Duplicate this workout as a template'), findsNothing);
+    expect(find.text('Delete'), findsOneWidget);
 
     await disposeAndDrainTimers(tester);
   });
@@ -265,7 +272,41 @@ void main() {
     await pumpUntilData(tester, until: find.text('Push'));
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.byIcon(Icons.more_vert), findsNothing);
+    // The menu itself stays: Duplicate needs a surviving template, but Delete
+    // applies to any logged workout — an ad-hoc session has no template at all
+    // and must still be removable.
+    expect(find.byIcon(Icons.more_vert), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    expect(find.text('Duplicate this workout as a template'), findsNothing);
+    expect(find.text('Delete'), findsOneWidget);
+
+    await disposeAndDrainTimers(tester);
+  });
+
+  testWidgets('a logged workout can be deleted from history', (tester) async {
+    final templates = TemplateRepository(db);
+    final exercises = ExerciseRepository(db);
+    final sessions = SessionRepository(db);
+    final t = await templates.createTemplate(name: 'Push');
+    final e = await exercises.create(
+        name: 'Bench', loggingType: LoggingType.strengthWeightRepsRir);
+    await templates.addExercise(
+        templateId: t.id, exerciseId: e.id, targetSets: 1);
+    final s = await sessions.startFromTemplate(t.id, weightUnit: 'kg');
+    await sessions.finishSession(s.id);
+
+    await tester.pumpWidget(harness());
+    await pumpUntilData(tester, until: find.text('Push'));
+
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete workout'));
+    await pumpUntilGone(tester, find.text('Push'));
+
+    expect(find.text('Push'), findsNothing);
 
     await disposeAndDrainTimers(tester);
   });

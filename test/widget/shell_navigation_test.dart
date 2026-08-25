@@ -179,4 +179,44 @@ void main() {
 
     await disposeAndDrainTimers(tester, container: container);
   });
+
+  testWidgets('two tabs each with a FAB do not collide on a route push',
+      (tester) async {
+    // `StatefulShellRoute.indexedStack` keeps every tab alive at once, so
+    // Explore's and Workout's FABs are in the tree together. With the default
+    // hero tag they are two heroes sharing one tag, and the assertion fires
+    // the moment a route transition runs a hero search.
+    await tester.pumpWidget(harness());
+    await pumpUntilData(tester, until: find.text('Go to Workout'));
+
+    await tester.tap(find.text('EXPLORE'));
+    await pumpUntilData(tester, until: find.widgetWithText(AppBar, 'Exercises'));
+    await tester.tap(find.text('WORKOUT'));
+    await pumpUntilData(tester, until: find.text('No workouts today'));
+
+    // Starting an ad-hoc session pushes /session — a real transition, and the
+    // cheapest one to reach with no seeded data.
+    await tester.tap(find.widgetWithText(FloatingActionButton, 'Start new workout'));
+    await pumpUntilSessionData(tester);
+
+    expect(tester.takeException(), isNull);
+
+    // The structural cause, asserted directly: reproducing the runtime
+    // assertion depends on hero-search timing during a transition, but two
+    // FABs sharing one tag is the defect whatever the timing.
+    // `skipOffstage: false` is the point: the inactive tab's Scaffold is
+    // offstage, not unmounted, so its FAB is still a hero in this subtree —
+    // and invisible to a default finder.
+    final tags = tester
+        .widgetList<FloatingActionButton>(
+            find.byType(FloatingActionButton, skipOffstage: false))
+        .map((f) => f.heroTag)
+        .toList();
+    expect(tags, everyElement(isNotNull),
+        reason: 'a null tag is the shared default');
+    expect(tags.toSet(), hasLength(tags.length),
+        reason: 'every live FAB needs its own hero tag');
+
+    await disposeAndDrainTimers(tester, container: container);
+  });
 }

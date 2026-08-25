@@ -4,8 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/utils/formatting.dart';
+import '../../../db/app_database.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../sessions/data/session_models.dart';
+import '../../sessions/data/session_repository.dart';
 import '../../templates/data/template_repository.dart';
 import '../../templates/providers/template_providers.dart';
 import '../providers/history_providers.dart';
@@ -83,18 +86,24 @@ class _HistoryTile extends ConsumerWidget {
       subtitle: Text(subtitle),
       onTap: () =>
           context.push('/session/summary/${workout.id}?readOnly=true'),
-      trailing: canDuplicate
-          ? PopupMenuButton<_HistoryAction>(
-              onSelected: (action) =>
-                  _handleAction(context, ref, action, templateId!),
-              itemBuilder: (_) => const [
-                PopupMenuItem(
-                  value: _HistoryAction.duplicateTemplate,
-                  child: Text('Duplicate this workout as a template'),
-                ),
-              ],
-            )
-          : null,
+      // Unconditional now: Duplicate needs a surviving template, but Delete
+      // applies to any logged workout — including an ad-hoc one, which has no
+      // template at all and would otherwise have no menu.
+      trailing: PopupMenuButton<_HistoryAction>(
+        onSelected: (action) =>
+            _handleAction(context, ref, action, workout, templateId),
+        itemBuilder: (_) => [
+          if (canDuplicate)
+            const PopupMenuItem(
+              value: _HistoryAction.duplicateTemplate,
+              child: Text('Duplicate this workout as a template'),
+            ),
+          const PopupMenuItem(
+            value: _HistoryAction.delete,
+            child: Text('Delete'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -102,10 +111,25 @@ class _HistoryTile extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     _HistoryAction action,
-    String templateId,
+    WorkoutSession workout,
+    String? templateId,
   ) async {
     switch (action) {
+      case _HistoryAction.delete:
+        // Records, `Previous` and every volume total are derived from
+        // completed sessions rather than stored, so deleting one re-derives
+        // them. Correct, but invisible — hence the copy.
+        final ok = await confirmDestructive(
+          context,
+          title: 'Delete this workout?',
+          message: 'Its sets, and any records it set, will be removed from '
+              'your history.',
+          confirmLabel: 'Delete workout',
+        );
+        if (!ok) return;
+        await ref.read(sessionRepositoryProvider).deleteSession(workout.id);
       case _HistoryAction.duplicateTemplate:
+        if (templateId == null) return;
         final repo = ref.read(templateRepositoryProvider);
         final copy = await repo.duplicateTemplate(templateId);
         if (!context.mounted) return;
@@ -114,4 +138,4 @@ class _HistoryTile extends ConsumerWidget {
   }
 }
 
-enum _HistoryAction { duplicateTemplate }
+enum _HistoryAction { duplicateTemplate, delete }

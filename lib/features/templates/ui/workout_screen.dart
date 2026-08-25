@@ -5,10 +5,13 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/semantic_colors.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/utils/formatting.dart';
+import '../../../db/app_database.dart';
 import '../../history/providers/history_providers.dart';
 import '../../profile/ui/widgets/week_dot_strip.dart';
 import '../../sessions/data/session_models.dart';
+import '../../sessions/data/session_repository.dart';
 import '../data/template_models.dart';
 import '../domain/workout_day.dart';
 import '../providers/template_providers.dart';
@@ -42,6 +45,10 @@ class WorkoutScreen extends ConsumerWidget {
         title: Text(DateFormat('MMMM d').format(today)),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        // The shell keeps every tab alive in an IndexedStack, so this FAB and
+        // Explore's are heroes in one subtree. Sharing the default tag makes a
+        // route push throw "multiple heroes that share the same tag".
+        heroTag: 'workout-start-fab',
         onPressed: () => startAdHocWorkout(context, ref),
         icon: const Icon(Icons.play_arrow),
         label: const Text('Start new workout'),
@@ -130,13 +137,13 @@ class _StartRow extends ConsumerWidget {
 }
 
 /// One session logged today: name, when, and the two numbers worth seeing.
-class _SessionCard extends StatelessWidget {
+class _SessionCard extends ConsumerWidget {
   const _SessionCard({required this.session});
 
   final ActiveSession session;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final semantic = theme.extension<SemanticColors>()!;
     final workout = session.session;
@@ -172,9 +179,34 @@ class _SessionCard extends StatelessWidget {
             label: 'Volume',
             value: '${volume.round()} ${workout.weightUnit}',
           ),
+          PopupMenuButton<String>(
+            onSelected: (_) => _confirmDelete(context, ref, workout),
+            itemBuilder: (_) => const [
+              PopupMenuItem<String>(value: 'delete', child: Text('Delete')),
+            ],
+          ),
         ],
       ),
     );
+  }
+
+  /// Deleting a logged workout also re-derives records, `Previous` and every
+  /// volume total, since all of those are computed from completed sessions
+  /// rather than stored. That is correct but invisible, so the copy says it.
+  Future<void> _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    WorkoutSession workout,
+  ) async {
+    final ok = await confirmDestructive(
+      context,
+      title: 'Delete this workout?',
+      message: 'Its sets, and any records it set, will be removed from your '
+          'history.',
+      confirmLabel: 'Delete workout',
+    );
+    if (!ok) return;
+    await ref.read(sessionRepositoryProvider).deleteSession(workout.id);
   }
 }
 
