@@ -91,3 +91,6 @@ half the library. See **T-005**.
   by name from our own taxonomy, which is what the reference's own legend falls back to; no animated
   demonstration or YouTube/Share chips. The in-session ℹ deliberately still opens the S-013 sheet
   rather than this screen.
+- 2026-08-26 — [T-019](../../tickets/T-019-in-session-info.md): the in-session ℹ now opens this
+  screen rather than the S-013 sheet, so an exercise has one surface everywhere. The sheet remains as
+  the fallback for a session snapshot carrying no `exerciseId`, which has no detail screen to open.

@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:gymflow/core/theme/app_theme.dart';
 import 'package:gymflow/db/app_database.dart';
 import 'package:gymflow/features/exercises/data/exercise_repository.dart';
+import 'package:gymflow/features/exercises/ui/exercise_detail_screen.dart';
 import 'package:gymflow/features/sessions/providers/active_session_controller.dart';
 import 'package:gymflow/features/sessions/ui/active_session_screen.dart';
 import 'package:gymflow/features/sessions/ui/session_summary_screen.dart';
@@ -163,6 +164,12 @@ void main() {
             sessionId: s.pathParameters['id']!,
             readOnly: s.uri.queryParameters['readOnly'] == 'true',
           ),
+        ),
+        // T-019: the in-session ℹ pushes the exercise detail screen.
+        GoRoute(
+          path: '/exercises/:id/detail',
+          builder: (_, s) =>
+              ExerciseDetailScreen(exerciseId: s.pathParameters['id']!),
         ),
       ],
     );
@@ -645,7 +652,7 @@ void main() {
         templateId: t.id, exerciseId: e.id, targetSets: 2);
     await sessions.startFromTemplate(t.id, weightUnit: 'kg');
 
-    await tester.pumpWidget(harness());
+    await tester.pumpWidget(routedHarness());
     await pumpUntilSessionData(tester);
 
     // Nothing overflowed while laying the header row out.
@@ -668,9 +675,11 @@ void main() {
     expect(infoRect.right, lessThanOrEqualTo(320));
     expect(infoRect.width, greaterThan(0));
     await tester.tap(infoFinder);
-    await tester.pumpAndSettle();
-    // The sheet actually opened, so the icon was genuinely reachable.
-    expect(find.text('Strength'), findsWidgets);
+    await pumpUntilData(tester, until: find.byType(ExerciseDetailScreen));
+    // The detail screen actually opened, so the icon was genuinely reachable.
+    // (It used to assert the info *sheet* opened; T-019 moved ℹ to the
+    // detail screen, which is why this harness is now the routed one.)
+    expect(find.byType(ExerciseDetailScreen), findsOneWidget);
 
     await disposeAndDrainTimers(tester, container: container);
   });
@@ -829,6 +838,60 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Add exercises'), findsOneWidget);
+
+    await disposeAndDrainTimers(tester, container: container);
+  });
+
+
+  testWidgets('the in-session ℹ opens the exercise detail screen',
+      (tester) async {
+    final templates = TemplateRepository(db);
+    final exercises = ExerciseRepository(db);
+    final t = await templates.createTemplate(name: 'Push');
+    final e = await exercises.create(
+        name: 'Bench Press', loggingType: LoggingType.strengthWeightRepsRir);
+    await templates.addExercise(
+        templateId: t.id, exerciseId: e.id, targetSets: 1);
+    await SessionRepository(db).startFromTemplate(t.id, weightUnit: 'kg');
+
+    await tester.pumpWidget(routedHarness());
+    await pumpUntilSessionData(tester);
+
+    await tester.tap(find.byTooltip('Exercise info'));
+    await pumpUntilData(tester, until: find.byType(ExerciseDetailScreen));
+
+    expect(find.byType(ExerciseDetailScreen), findsOneWidget);
+    expect(find.text('About'), findsOneWidget);
+
+    await disposeAndDrainTimers(tester, container: container);
+  });
+
+  testWidgets('ℹ falls back to the sheet when the exercise is gone',
+      (tester) async {
+    // A session snapshots its exercises by value, so a session can outlive the
+    // exercise it was built from — and then there is no detail screen to open.
+    // The snapshot still carries the description, so the sheet still works.
+    final templates = TemplateRepository(db);
+    final exercises = ExerciseRepository(db);
+    final t = await templates.createTemplate(name: 'Push');
+    final e = await exercises.create(
+        name: 'Bench Press',
+        loggingType: LoggingType.strengthWeightRepsRir,
+        description: 'Press the bar.');
+    await templates.addExercise(
+        templateId: t.id, exerciseId: e.id, targetSets: 1);
+    await SessionRepository(db).startFromTemplate(t.id, weightUnit: 'kg');
+    await (db.update(db.sessionExercises))
+        .write(const SessionExercisesCompanion(exerciseId: Value(null)));
+
+    await tester.pumpWidget(routedHarness());
+    await pumpUntilSessionData(tester);
+
+    await tester.tap(find.byTooltip('Exercise info'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ExerciseDetailScreen), findsNothing);
+    expect(find.text('Press the bar.'), findsOneWidget);
 
     await disposeAndDrainTimers(tester, container: container);
   });

@@ -36,9 +36,9 @@ largest remaining capability gap now the session loop is done.
 - **Tap opens the detail, Edit in ⋮** (owner-confirmed 2026-08-26), the same shape routines got in
   [T-011](T-011-routine-detail.md). Exercises behaving differently from routines is the split that
   caused the T-011/T-013 tangle.
-- **The in-session ℹ keeps the S-013 sheet.** *Not owner-confirmed — my assumption*, and the one
-  decision here that was never answered. Reasoning: mid-set you want a glance, and pushing a tabbed
-  screen navigates away from a running workout. Worth revisiting if it feels wrong in use.
+- **The in-session ℹ opens this screen** (owner-confirmed 2026-08-26, after the fact). Shipped in
+  T-018 as the S-013 sheet — my assumption, since the question went unanswered — and corrected
+  immediately in [T-019](T-019-in-session-info.md). One surface for an exercise everywhere.
 - **A session where the exercise was skipped is omitted from History**, not shown blank. A set you
   did not log is not something you did, and a blank row is a puzzle rather than information.
 
@@ -77,7 +77,7 @@ largest remaining capability gap now the session loop is done.
 - [ ] History shows past sessions; a never-done exercise says so.
 - [ ] Records match the You tab for the same exercise.
 - [ ] ⋮ → Edit opens the editor and saving returns correctly.
-- [ ] The ℹ inside a live session still opens the sheet, not this screen.
+- [ ] The ℹ inside a live session opens this screen (changed by T-019).
 
 ## Revision log
 - 2026-08-26 — created and shipped. Panes and tap target confirmed by the owner; the in-session ℹ

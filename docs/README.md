@@ -187,8 +187,9 @@ Next free CMP-ID: **CMP-028**.
 | [T-016](tickets/T-016-missing-routine.md) | Starting a deleted routine crashed | **Done** | S | FL-001 |
 | [T-017](tickets/T-017-restore-routine-delete.md) | Restore routine Delete and Duplicate | **Done** | S | S-030 |
 | [T-018](tickets/T-018-exercise-detail.md) | Exercise detail screen (About · History · Records) | **Done** | M | S-025, ADR-004 |
+| [T-019](tickets/T-019-in-session-info.md) | In-session ℹ opens the exercise detail | **Done** | S | S-025, S-013 |
 
-Next free T-ID: **T-019**.
+Next free T-ID: **T-020**.
 
 ### Decisions (ADR)
 | ID | Title | Status |
@@ -430,14 +431,14 @@ easy the *next* piece of work is to pick up, not whether the current state is un
 | FL (flows) | **4 written** — the session lifecycle. Routine-building and programs still underived |
 | CMP (components) | 27 registered — **14 built, 4 specced.** See §6 |
 | F (features) | 0 |
-| T (tickets) | 18 — **all done** |
+| T (tickets) | 19 — **all done** |
 | ADR (decisions) | 6 |
 
 **Last updated:** **T-015 shipped — every primary tab now matches its spec** (not every reference
 surface; seven remain, see below). Home is a recap
 (weekly summary with week-on-week deltas, then the last five workouts) instead of a fourth routine
 list. Before it, T-012/T-013/T-014 gave us ad-hoc sessions, the S-003 Workout tab and workout
-deletion. No schema change in any of the four. 368 tests pass, `flutter analyze` clean.
+deletion. No schema change in any of the four. 370 tests pass, `flutter analyze` clean.
 
 **Where the code is:** `main`, tracking `origin/main` at
 `git@github.com:ishanshrestha14/jeem.git`. Schema **v6**. Local commits may be ahead of the remote. Five-tab shell

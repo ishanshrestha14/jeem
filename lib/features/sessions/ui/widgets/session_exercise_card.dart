@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/semantic_colors.dart';
@@ -149,14 +150,30 @@ class SessionExerciseCard extends ConsumerWidget {
                   IconButton(
                     icon: const Icon(Icons.info_outline),
                     tooltip: 'Exercise info',
-                    onPressed: () => showExerciseInfoSheet(
-                      context,
-                      name: exercise.name,
-                      loggingType: exercise.loggingType,
-                      description: exercise.description,
-                      notes: exercise.notes,
-                      imagePath: exercise.imagePath,
-                    ),
+                    // Opens the full detail screen (S-025), so an exercise has
+                    // one surface everywhere — including History, which is
+                    // worth reaching mid-workout.
+                    //
+                    // Falls back to the sheet when the session's snapshot has
+                    // no `exerciseId`: a session outlives the exercise it was
+                    // built from, and there is no detail screen for one that no
+                    // longer exists. The snapshot still carries the text, so
+                    // the sheet still says something useful.
+                    onPressed: () {
+                      final id = exercise.exerciseId;
+                      if (id != null) {
+                        context.push('/exercises/$id/detail');
+                        return;
+                      }
+                      showExerciseInfoSheet(
+                        context,
+                        name: exercise.name,
+                        loggingType: exercise.loggingType,
+                        description: exercise.description,
+                        notes: exercise.notes,
+                        imagePath: exercise.imagePath,
+                      );
+                    },
                   ),
                   ActionChip(
                     label: Text(formatDurationSeconds(exercise.restSeconds)),
