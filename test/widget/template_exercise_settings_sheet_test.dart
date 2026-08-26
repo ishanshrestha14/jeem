@@ -63,4 +63,93 @@ void main() {
     expect(received, isNotNull);
     expect(received!.notes, 'Warm up first');
   });
+
+  testWidgets('Replace exercise is offered, and reports the choice upward',
+      (tester) async {
+    // The sheet is presentational: it owns no database. "Replace exercise" is
+    // an action the routine editor performs, so the sheet's job is to ask for
+    // it — the same shape as `onChanged`.
+    final config = TemplateExercise(
+      id: 'te1',
+      templateId: 't1',
+      exerciseId: 'e1',
+      sortOrder: 0,
+      restSeconds: 90,
+      notes: null,
+      createdAt: DateTime(2024),
+      updatedAt: DateTime(2024),
+      deletedAt: null,
+    );
+
+    var replaceRequested = 0;
+
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.dark(),
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: Center(
+            child: FilledButton(
+              onPressed: () => showTemplateExerciseSettings(
+                context,
+                config: config,
+                loggingType: LoggingType.strengthWeightRepsRir,
+                onChanged: (_) {},
+                onReplace: () => replaceRequested++,
+              ),
+              child: const Text('Open settings'),
+            ),
+          ),
+        ),
+      ),
+    ));
+
+    await tester.tap(find.text('Open settings'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Replace exercise'), findsOneWidget);
+    await tester.tap(find.text('Replace exercise'));
+    await tester.pumpAndSettle();
+
+    expect(replaceRequested, 1);
+  });
+
+  testWidgets('the action is absent when no handler is given', (tester) async {
+    // The sheet opens from more than one place; only the routine editor can
+    // replace an exercise, so the row appears only where it works.
+    final config = TemplateExercise(
+      id: 'te1',
+      templateId: 't1',
+      exerciseId: 'e1',
+      sortOrder: 0,
+      restSeconds: 90,
+      notes: null,
+      createdAt: DateTime(2024),
+      updatedAt: DateTime(2024),
+      deletedAt: null,
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.dark(),
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: Center(
+            child: FilledButton(
+              onPressed: () => showTemplateExerciseSettings(
+                context,
+                config: config,
+                loggingType: LoggingType.strengthWeightRepsRir,
+                onChanged: (_) {},
+              ),
+              child: const Text('Open settings'),
+            ),
+          ),
+        ),
+      ),
+    ));
+
+    await tester.tap(find.text('Open settings'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Replace exercise'), findsNothing);
+  });
 }

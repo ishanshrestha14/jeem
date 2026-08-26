@@ -365,6 +365,63 @@ class TemplateRepository {
         .get();
   }
 
+  /// Swaps which exercise a routine row points at, **keeping its prescribed
+  /// sets** — S-029's "Replace exercise".
+  ///
+  /// The problem it solves is the machine being taken: you want the same plan
+  /// against a different movement, not to rebuild it set by set. Position in
+  /// the routine is untouched, because a replacement takes the place of what
+  /// it replaced.
+  ///
+  /// **Numbers that cannot transfer are cleared.** Swapping a strength
+  /// exercise for a duration one leaves weight and reps meaningless — they
+  /// would render as nonsense in the set table and snapshot into the next
+  /// session. The set *count* survives, because "three sets" is still what you
+  /// planned; only the numbers that no longer apply are dropped.
+  ///
+  /// Throws if [newExerciseId] does not exist, before writing anything.
+  Future<void> replaceExercise(
+    String templateExerciseId,
+    String newExerciseId,
+  ) async {
+    await _db.transaction(() async {
+      final replacement = await (_db.select(_db.exercises)
+            ..where((e) => e.id.equals(newExerciseId) & e.deletedAt.isNull()))
+          .getSingle();
+
+      final row = await (_db.select(_db.templateExercises)
+            ..where((t) => t.id.equals(templateExerciseId)))
+          .getSingle();
+      final previous = await (_db.select(_db.exercises)
+            ..where((e) => e.id.equals(row.exerciseId)))
+          .getSingleOrNull();
+
+      final now = DateTime.now();
+      await (_db.update(_db.templateExercises)
+            ..where((t) => t.id.equals(templateExerciseId)))
+          .write(TemplateExercisesCompanion(
+        exerciseId: Value(replacement.id),
+        updatedAt: Value(now),
+      ));
+
+      if (previous?.loggingType == replacement.loggingType) return;
+
+      // The logging type changed, so half the prescription no longer means
+      // anything. Clear only that half.
+      final toDuration = replacement.loggingType == LoggingType.durationOnly;
+      await (_db.update(_db.templateSets)
+            ..where((t) => t.templateExerciseId.equals(templateExerciseId)))
+          .write(TemplateSetsCompanion(
+        weight: toDuration ? const Value(null) : const Value.absent(),
+        reps: toDuration ? const Value(null) : const Value.absent(),
+        repsMax: toDuration ? const Value(null) : const Value.absent(),
+        durationSeconds:
+            toDuration ? const Value.absent() : const Value(null),
+        updatedAt: Value(now),
+      ));
+    });
+  }
+
   Future<TemplateSet> addSet(String templateExerciseId) async {
     final existing = await setsFor(templateExerciseId);
     final now = DateTime.now();

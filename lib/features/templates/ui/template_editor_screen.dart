@@ -352,6 +352,30 @@ class _TemplateEditorScreenState extends ConsumerState<TemplateEditorScreen> {
   }
 }
 
+/// S-029's "Replace exercise": pick a different movement, keep the prescribed
+/// sets. The gym problem is the machine being taken — you want the same plan
+/// against something else, not to rebuild it set by set.
+Future<void> _replaceExercise(
+  BuildContext context,
+  WidgetRef ref,
+  TemplateExerciseWithExercise item,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final replacementId = await showExercisePickerSheet(context);
+  if (replacementId == null || replacementId == item.exercise.id) return;
+
+  await ref
+      .read(templateRepositoryProvider)
+      .replaceExercise(item.config.id, replacementId);
+
+  // Says what happened rather than leaving the row to silently change under
+  // you — and names the swap, since the row you were looking at is now a
+  // different exercise.
+  messenger.showSnackBar(
+    SnackBar(content: Text('${item.exercise.name} replaced')),
+  );
+}
+
 class _ExerciseRow extends ConsumerWidget {
   const _ExerciseRow({
     required super.key,
@@ -439,6 +463,7 @@ class _ExerciseRow extends ConsumerWidget {
               onChanged: (updated) => ref
                   .read(templateRepositoryProvider)
                   .updateTemplateExercise(updated),
+              onReplace: () => _replaceExercise(context, ref, item),
             ),
           ),
           IconButton(

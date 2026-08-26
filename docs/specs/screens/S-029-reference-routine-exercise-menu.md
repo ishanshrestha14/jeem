@@ -42,3 +42,11 @@ Video (network), supersets (new model, new session behaviour).
 
 ## Revision log
 - 2026-08-23 — created from `ref-S029-routine-exercise-menu.png`.
+
+## Revision log
+- 2026-08-26 — reviewed against our S-010 sheet, and **Replace exercise** built as
+  [T-022](../../tickets/T-022-replace-exercise.md) — the one action here that was a genuine gap
+  rather than a new concept. Warm-up sets, supersets and per-exercise weight units are model changes
+  and stay out of scope; "video & history" is partly answered by S-025's History pane (T-018). This
+  spec's observation that the sheet should hold *actions* while the numbers live on the surface is
+  now true of ours too: T-002 moved sets/reps/RIR out of it and into the planned-sets table.

@@ -190,8 +190,9 @@ Next free CMP-ID: **CMP-028**.
 | [T-019](tickets/T-019-in-session-info.md) | In-session ℹ opens the exercise detail | **Done** | S | S-025, S-013 |
 | [T-020](tickets/T-020-finish-form.md) | Editable finish form: name + duration | **Done** | S | S-023, FL-003 |
 | [T-021](tickets/T-021-body-part-filter.md) | Filter the exercise library by body part | **Done** | S | S-026, ADR-006 |
+| [T-022](tickets/T-022-replace-exercise.md) | Replace an exercise in a routine | **Done** | S | S-029, S-028 |
 
-Next free T-ID: **T-022**.
+Next free T-ID: **T-023**.
 
 ### Decisions (ADR)
 | ID | Title | Status |
@@ -433,14 +434,14 @@ easy the *next* piece of work is to pick up, not whether the current state is un
 | FL (flows) | **4 written** — the session lifecycle. Routine-building and programs still underived |
 | CMP (components) | 27 registered — **14 built, 4 specced.** See §6 |
 | F (features) | 0 |
-| T (tickets) | 21 — **all done** |
+| T (tickets) | 22 — **all done** |
 | ADR (decisions) | 6 |
 
 **Last updated:** **T-015 shipped — every primary tab now matches its spec** (not every reference
 surface; seven remain, see below). Home is a recap
 (weekly summary with week-on-week deltas, then the last five workouts) instead of a fourth routine
 list. Before it, T-012/T-013/T-014 gave us ad-hoc sessions, the S-003 Workout tab and workout
-deletion. No schema change in any of the four. 383 tests pass, `flutter analyze` clean.
+deletion. No schema change in any of the four. 391 tests pass, `flutter analyze` clean.
 
 **Where the code is:** `main`, tracking `origin/main` at
 `git@github.com:ishanshrestha14/jeem.git`. Schema **v6**. Local commits may be ahead of the remote. Five-tab shell
@@ -461,9 +462,9 @@ rename it into `screenshots/` under its manifest name.
    | S-024 celebration/share | — | **Deliberately not adopted** (00-overview §5) |
    | ~~S-025 exercise detail~~ | **Built** — [T-018](tickets/T-018-exercise-detail.md) | Progress chart still deferred (needs charting) |
    | S-026 exercise browser | S-011/S-014 | Body-part filtering built ([T-021](tickets/T-021-body-part-filter.md)); `Recent Performed` mid-session and the card grid still open |
-   | S-027 create exercise | S-012 | Unreviewed against the spec |
-   | S-028 create routine | S-009 | Improved by T-002; unreviewed against the spec |
-   | S-029 routine exercise menu | S-010 | Unreviewed against the spec |
+   | S-027 create exercise | S-012 | **Reviewed 2026-08-26 — no gap.** Its finding (body parts ≠ muscles) was already built by T-004/T-005 |
+   | S-028 create routine | S-009 | **Reviewed 2026-08-26 — no gap worth building.** Its finding (per-set prescription) shipped as T-002; inline-vs-sheet expansion is a recorded deviation |
+   | S-029 routine exercise menu | S-010 | **Reviewed 2026-08-26.** Replace exercise built ([T-022](tickets/T-022-replace-exercise.md)); warm-up sets, supersets and per-exercise units are new concepts, not gaps |
 
 2. Deferred decisions rather than gaps: per-session `Records 🏅 N` on Home (needs a decision on what
    window a record counts against), the estimated duration and muscle summary on S-030, Insights on

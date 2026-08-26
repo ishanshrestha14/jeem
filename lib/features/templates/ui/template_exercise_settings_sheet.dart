@@ -16,6 +16,7 @@ Future<void> showTemplateExerciseSettings(
   required TemplateExercise config,
   required LoggingType loggingType,
   required ValueChanged<TemplateExercise> onChanged,
+  VoidCallback? onReplace,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -25,6 +26,7 @@ Future<void> showTemplateExerciseSettings(
       config: config,
       loggingType: loggingType,
       onChanged: onChanged,
+      onReplace: onReplace,
     ),
   );
 }
@@ -34,11 +36,18 @@ class _TemplateExerciseSettingsSheet extends StatefulWidget {
     required this.config,
     required this.loggingType,
     required this.onChanged,
+    this.onReplace,
   });
 
   final TemplateExercise config;
   final LoggingType loggingType;
   final ValueChanged<TemplateExercise> onChanged;
+
+  /// Swap which exercise this routine row points at, keeping its prescribed
+  /// sets (S-029). Null where replacing is not possible — this sheet opens
+  /// from more than one place, and only the routine editor can do it, so the
+  /// row appears only where it works.
+  final VoidCallback? onReplace;
 
   @override
   State<_TemplateExerciseSettingsSheet> createState() =>
@@ -136,6 +145,23 @@ class _TemplateExerciseSettingsSheetState
               maxLines: 5,
               onChanged: _onNotesChanged,
             ),
+            if (widget.onReplace != null) ...[
+              const SizedBox(height: 8),
+              // An *action*, not configuration — S-029's observation is that
+              // the sheet should hold what you do rarely while the numbers
+              // stay on the surface. Closes the sheet first: the picker is a
+              // sheet too, and stacking two is worse than replacing one.
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.swap_horiz),
+                title: const Text('Replace exercise'),
+                subtitle: const Text('Keeps the sets you have planned'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  widget.onReplace!();
+                },
+              ),
+            ],
           ],
         ),
       ),
