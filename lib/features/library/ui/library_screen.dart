@@ -315,7 +315,10 @@ class _ExerciseList extends ConsumerWidget {
                 tile: InitialsTile(name: e.name),
                 title: e.name,
                 subtitle: _subtitleFor(e, bodyParts[e.id] ?? const []),
-                onTap: () => context.push('/exercises/${e.id}'),
+                // The detail screen (S-025), not the editor — the same shape
+                // routines got in T-011. You look at an exercise far more
+                // often than you edit it.
+                onTap: () => context.push('/exercises/${e.id}/detail'),
               ),
           ],
         );

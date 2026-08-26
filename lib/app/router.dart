@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/dashboard/ui/home_screen.dart';
+import '../features/exercises/ui/exercise_detail_screen.dart';
 import '../features/exercises/ui/exercise_editor_screen.dart';
 import '../features/exercises/ui/exercise_list_screen.dart';
 import '../features/history/ui/history_screen.dart';
@@ -104,6 +105,13 @@ GoRouter createAppRouter() => GoRouter(
           path: '/exercises/:id',
           builder: (_, s) =>
               ExerciseEditorScreen(exerciseId: s.pathParameters['id']),
+        ),
+        // S-025, mirroring `/templates/:id/detail`: the editor keeps its own
+        // route and is reached from this screen's ⋮.
+        GoRoute(
+          path: '/exercises/:id/detail',
+          builder: (_, s) =>
+              ExerciseDetailScreen(exerciseId: s.pathParameters['id']!),
         ),
         GoRoute(
           path: '/programs/new',

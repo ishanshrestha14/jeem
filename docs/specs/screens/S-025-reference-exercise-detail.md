@@ -83,3 +83,11 @@ half the library. See **T-005**.
 - 2026-08-23 — added `ref-S025-exercise-detail-target-muscles.png`: **primary is plural** (two listed),
   named legend under the figures, and the tab strip is five tabs (+ Records, Leaderboard). Raised
   T-005 to correct the v3 schema.
+
+## Revision log
+- 2026-08-26 — built as [T-018](../../tickets/T-018-exercise-detail.md) with three panes:
+  **About · History · Records**. **Deviations:** no `Progress` pane (charting is new to this codebase
+  and deferred), no `Leaderboard` (social, out of scope); no anatomical figures — muscles are listed
+  by name from our own taxonomy, which is what the reference's own legend falls back to; no animated
+  demonstration or YouTube/Share chips. The in-session ℹ deliberately still opens the S-013 sheet
+  rather than this screen.

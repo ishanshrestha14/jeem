@@ -92,7 +92,7 @@ Full detail, counterparts and gaps: [`02-screen-inventory.md`](research/referenc
 | S-022 | ours | Notification permission prompt | overlay | Implemented |
 | S-023 | reference | "Finish Workout" form | screen | **Draft — [spec](specs/screens/S-023-reference-finish-workout-form.md)** |
 | S-024 | reference | Post-save celebration / share | modal | **Draft — [spec](specs/screens/S-024-reference-celebration-share.md)** |
-| S-025 | reference | Exercise detail | screen, tabbed | **Draft — [spec](specs/screens/S-025-reference-exercise-detail.md)** |
+| S-025 | reference | Exercise detail | screen, tabbed | **Implemented — [spec](specs/screens/S-025-reference-exercise-detail.md)** |
 | S-026 | reference | Exercise browser / picker | modal | **Draft — [spec](specs/screens/S-026-reference-exercise-browser.md)** |
 | S-027 | reference | "Create Exercise" form | screen | **Draft — [spec](specs/screens/S-027-reference-create-exercise.md)** |
 | S-028 | reference | "Create Routine" / routine builder | screen | **Draft — [spec](specs/screens/S-028-reference-create-routine.md)** |
@@ -186,8 +186,9 @@ Next free CMP-ID: **CMP-028**.
 | [T-015](tickets/T-015-home-tab.md) | Rebuild Home against S-001 | **Done** | M | S-001, CMP-008, CMP-013 |
 | [T-016](tickets/T-016-missing-routine.md) | Starting a deleted routine crashed | **Done** | S | FL-001 |
 | [T-017](tickets/T-017-restore-routine-delete.md) | Restore routine Delete and Duplicate | **Done** | S | S-030 |
+| [T-018](tickets/T-018-exercise-detail.md) | Exercise detail screen (About · History · Records) | **Done** | M | S-025, ADR-004 |
 
-Next free T-ID: **T-018**.
+Next free T-ID: **T-019**.
 
 ### Decisions (ADR)
 | ID | Title | Status |
@@ -429,13 +430,14 @@ easy the *next* piece of work is to pick up, not whether the current state is un
 | FL (flows) | **4 written** — the session lifecycle. Routine-building and programs still underived |
 | CMP (components) | 27 registered — **14 built, 4 specced.** See §6 |
 | F (features) | 0 |
-| T (tickets) | 17 — **all done** |
+| T (tickets) | 18 — **all done** |
 | ADR (decisions) | 6 |
 
-**Last updated:** **T-015 shipped — every reference surface now matches its spec.** Home is a recap
+**Last updated:** **T-015 shipped — every primary tab now matches its spec** (not every reference
+surface; seven remain, see below). Home is a recap
 (weekly summary with week-on-week deltas, then the last five workouts) instead of a fourth routine
 list. Before it, T-012/T-013/T-014 gave us ad-hoc sessions, the S-003 Workout tab and workout
-deletion. No schema change in any of the four. 357 tests pass, `flutter analyze` clean.
+deletion. No schema change in any of the four. 368 tests pass, `flutter analyze` clean.
 
 **Where the code is:** `main`, tracking `origin/main` at
 `git@github.com:ishanshrestha14/jeem.git`. Schema **v6**. Local commits may be ahead of the remote. Five-tab shell
@@ -446,10 +448,23 @@ rename it into `screenshots/` under its manifest name.
 
 **Next step (a fresh session starts here):**
 
-1. **No reference surface is drifted any more** — S-001 through S-006 and S-030 are all built. The
-   backlog is now the deferred pieces rather than a gap: per-session `Records 🏅 N` on Home (needs a
-   decision on what window a record counts against), the estimated duration and muscle summary on
-   S-030, and Insights on S-003.
+1. **The five primary tabs match their specs** — S-001..S-006 and S-030 are built. **Seven reference
+   specs are still unbuilt-against**, and an earlier claim here that "no reference surface is
+   drifted" was wrong: it counted only the tabs.
+
+   | Spec | Our counterpart | Gap |
+   |---|---|---|
+   | S-023 finish form | S-018, read-only | Theirs is editable before saving |
+   | S-024 celebration/share | — | **Deliberately not adopted** (00-overview §5) |
+   | ~~S-025 exercise detail~~ | **Built** — [T-018](tickets/T-018-exercise-detail.md) | Progress chart still deferred (needs charting) |
+   | S-026 exercise browser | S-011/S-014 | No filter strip, no filter-count badge |
+   | S-027 create exercise | S-012 | Unreviewed against the spec |
+   | S-028 create routine | S-009 | Improved by T-002; unreviewed against the spec |
+   | S-029 routine exercise menu | S-010 | Unreviewed against the spec |
+
+2. Deferred decisions rather than gaps: per-session `Records 🏅 N` on Home (needs a decision on what
+   window a record counts against), the estimated duration and muscle summary on S-030, Insights on
+   S-003, and whether `deleteTemplate` should be a soft delete (T-016).
 2. Consider closing the §6 gaps — flows especially. T-008, T-009 and T-010 each carried their flow
    detail inline in the ticket again, which is the drift §6 warns about.
 3. **RIR onto the keypad** (CMP-018 specs an `RIR` key) would free the set row's fifth column, and
