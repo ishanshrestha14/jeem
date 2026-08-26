@@ -9,7 +9,7 @@ import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/utils/formatting.dart';
 import '../../../db/app_database.dart';
 import '../../history/providers/history_providers.dart';
-import '../../profile/ui/widgets/week_dot_strip.dart';
+import '../../../core/widgets/week_dot_strip.dart';
 import '../../sessions/data/session_models.dart';
 import '../../sessions/data/session_repository.dart';
 import '../data/template_models.dart';

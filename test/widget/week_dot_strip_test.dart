@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gymflow/core/theme/app_theme.dart';
-import 'package:gymflow/features/profile/ui/widgets/week_dot_strip.dart';
+import 'package:gymflow/core/widgets/week_dot_strip.dart';
 
 /// CMP-020: the week runs Sunday to Saturday (the owner's week), so "this
 /// week" does not shift under you mid-week.

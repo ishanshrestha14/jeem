@@ -8,7 +8,7 @@ import '../../../core/utils/formatting.dart';
 import '../../history/providers/history_providers.dart';
 import '../../records/data/personal_records.dart';
 import '../../records/providers/records_providers.dart';
-import 'widgets/week_dot_strip.dart';
+import '../../../core/widgets/week_dot_strip.dart';
 
 /// The You tab: what accumulates *because* you trained (S-005).
 ///

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/theme/semantic_colors.dart';
-import '../../../../core/utils/formatting.dart';
+import '../theme/app_theme.dart';
+import '../theme/semantic_colors.dart';
+import '../utils/formatting.dart';
 
 /// CMP-020: seven dots under weekday initials, one per day of the current
 /// week, filled on days that have a completed workout (S-005).

@@ -119,30 +119,34 @@ programs flows.
 
 ### Components (CMP)
 
-Detail: [`04-ui-patterns.md`](research/reference-app/04-ui-patterns.md). "Candidate" = identified, not yet specced.
+Detail: [`04-ui-patterns.md`](research/reference-app/04-ui-patterns.md). "Candidate" = identified,
+not yet built. **Built** = in `lib/`; a linked spec means it also has a written contract.
+
+Four have specs — the ones used across more than one surface, or complex enough that a props/states
+table earns its keep. The rest are built or identified but unspecced; see §6.
 
 | ID | Title | Status |
 |---|---|---|
-| CMP-001 | Minimised-session bar ("WIP" bar) | Candidate |
-| CMP-002 | Live session stats strip (duration · volume · sets) | Candidate |
-| CMP-003 | Set-completion-triggered rest timer | Candidate |
+| CMP-001 | Minimised-session bar ("WIP" bar) | **Built** — [T-001](tickets/T-001-wip-bar.md) |
+| CMP-002 | Live session stats strip (duration · volume · sets) | **Built** — `session_progress_header.dart` |
+| CMP-003 | Set-completion-triggered rest timer | **Built** — `rest_bar.dart`, `rest_timer.dart` |
 | CMP-004 | Add-exercise affordance inside a live session | **Built** — [T-012](tickets/T-012-adhoc-sessions.md) |
-| CMP-005 | Week strip / date header | Candidate |
-| CMP-006 | Suggested-routine card | Candidate |
+| CMP-005 | Week strip / date header | **Built** — satisfied by CMP-020 + S-003's date bar (T-013) |
+| CMP-006 | Suggested-routine card | **Built** — [T-013](tickets/T-013-workout-tab.md) |
 | CMP-007 | Insights block | Candidate |
 | CMP-008 | Weekly summary header | **Built** — [T-015](tickets/T-015-home-tab.md) |
 | CMP-009 | Sub-tab bar within a primary tab | Candidate |
 | CMP-010 | Utility buttons in the top bar | Candidate |
-| CMP-011 | Initials tile (routine thumbnail) | Candidate |
-| CMP-012 | Workout summary card | Candidate |
+| CMP-011 | Initials tile (routine thumbnail) | **Built — [spec](specs/components/CMP-011-initials-tile.md)** |
+| CMP-012 | Workout summary card | **Built** — three variants (Home, Workout tab, History); not yet one component |
 | CMP-013 | Delta chip | **Built** — [T-015](tickets/T-015-home-tab.md) |
 | CMP-014 | First-run onboarding card | **Built** — [T-015](tickets/T-015-home-tab.md) |
-| CMP-015 | **Set table row** (Previous · pre-filled · completed wash) | **Built** — [T-008](tickets/T-008-plan-prefill.md) plan pre-fill, [T-009](tickets/T-009-previous-best.md) `Previous`, [T-010](tickets/T-010-completed-row-wash.md) completed-row wash (chalk, not green) |
+| CMP-015 | **Set table row** ([spec](specs/components/CMP-015-set-table-row.md)) | **Built** — [T-008](tickets/T-008-plan-prefill.md) plan pre-fill, [T-009](tickets/T-009-previous-best.md) `Previous`, [T-010](tickets/T-010-completed-row-wash.md) completed-row wash (chalk, not green) |
 | CMP-016 | Top-bar rest slot | Candidate |
 | CMP-017 | **Per-exercise prescription editor** (sets · reps/range · RIR · weight) | Candidate |
-| CMP-018 | **In-session numeric keypad** (RIR key, Next chaining) | Candidate |
+| CMP-018 | **In-session numeric keypad** ([spec](specs/components/CMP-018-numeric-keypad.md)) | Candidate |
 | CMP-019 | Stat chart card (metric · value · delta · range · line chart) | Candidate |
-| CMP-020 | Week dot-strip (workout log) | Candidate |
+| CMP-020 | Week dot-strip (workout log) | **Built — [spec](specs/components/CMP-020-week-dot-strip.md)** |
 | CMP-021 | Personal-record row | Candidate |
 | CMP-022 | Taxonomy grid cell (muscle / equipment) | Candidate |
 | CMP-023 | Action chip row | Candidate |
@@ -389,16 +393,22 @@ Deriving them was worth it immediately, and for two things rather than one:
 
 Still underived: build/edit a routine, exercise info, and the programs flows.
 
-### `specs/components/` — empty, tracked elsewhere
+### `specs/components/` — partly closed (2026-08-26)
 
-CMP-001..CMP-027 are registered with behaviour, source surface and our Flutter mapping in
-[`04-ui-patterns.md`](research/reference-app/04-ui-patterns.md), and several are now **built**
-(CMP-001 the WIP bar, CMP-018 the keypad, CMP-020 the week strip, CMP-011 initials tiles). The
-per-component template in §5.3 was never used, because the pattern table was enough to drive
-implementation.
+Four specs written: CMP-011, CMP-015, CMP-018, CMP-020 — chosen because they are used across more
+than one surface, or dense enough that a props/states table earns its keep. Writing them was not
+just recording:
 
-What that cost: built components have no spec of their own — no props table, no state list, no
-do/don't. That matters more now that they are being reused rather than invented.
+- **The registry was wrong.** Ten components were marked "Candidate" while being built and shipped —
+  CMP-001, CMP-002, CMP-003, CMP-005, CMP-006, CMP-011, CMP-012, CMP-020 among them. Corrected.
+- **Two shared components lived in the wrong place.** `InitialsTile` sat inside `library_screen.dart`
+  and was imported by S-030 *from another feature's screen file*; `WeekDotStrip` sat under
+  `features/profile/` and was imported by the Workout tab. Both moved to `core/widgets/`. Writing
+  "Our implementation: …" is what exposed it — the honest answer was embarrassing.
+
+The remaining components are single-use or thin, and a spec for each would be ceremony. Worth writing
+one the next time a component is picked up for a second surface — that is the moment the contract
+matters.
 
 ### Neither blocks anything
 
@@ -411,7 +421,7 @@ easy the *next* piece of work is to pick up, not whether the current state is un
 |---|---|
 | S (surfaces) | 30 registered (14 reference · 16 ours) — **16 written specs** |
 | FL (flows) | **4 written** — the session lifecycle. Routine-building and programs still underived |
-| CMP (components) | 27 candidates — **0 written specs.** See §6 |
+| CMP (components) | 27 registered — **14 built, 4 specced.** See §6 |
 | F (features) | 0 |
 | T (tickets) | 17 — **all done** |
 | ADR (decisions) | 6 |

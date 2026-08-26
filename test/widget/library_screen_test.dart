@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gymflow/core/theme/app_theme.dart';
 import 'package:gymflow/db/app_database.dart';
 import 'package:gymflow/features/exercises/data/exercise_repository.dart';
+import 'package:gymflow/core/widgets/initials_tile.dart';
 import 'package:gymflow/features/library/ui/library_screen.dart';
 import 'package:gymflow/features/programs/data/program_repository.dart';
 import 'package:gymflow/features/templates/data/template_repository.dart';
