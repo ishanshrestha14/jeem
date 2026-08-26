@@ -127,6 +127,13 @@ class SessionRepository {
     });
   }
 
+  /// Thrown by [startFromTemplate] when the routine is gone.
+  ///
+  /// `TemplateRepository.deleteTemplate` is a **hard** delete, so a routine can
+  /// vanish between being listed and being started — from a stale list, or a
+  /// detail screen left open while it is deleted elsewhere. Callers need
+  /// something they can catch and explain; drift's bare
+  /// `StateError: No element` is not an explanation.
   Future<WorkoutSession> startFromTemplate(
     String templateId, {
     required String weightUnit,
@@ -134,7 +141,8 @@ class SessionRepository {
     return _db.transaction(() async {
       final template = await (_db.select(_db.workoutTemplates)
             ..where((t) => t.id.equals(templateId) & t.deletedAt.isNull()))
-          .getSingle();
+          .getSingleOrNull();
+      if (template == null) throw RoutineNotFound(templateId);
 
       final templateExerciseRows = await (_db.select(_db.templateExercises)
             ..where((t) =>
@@ -528,6 +536,17 @@ class SessionRepository {
       restAfterSetId: const Value(null),
     ));
   }
+}
+
+/// The routine a session was asked to start from no longer exists. See
+/// [SessionRepository.startFromTemplate].
+class RoutineNotFound implements Exception {
+  const RoutineNotFound(this.templateId);
+
+  final String templateId;
+
+  @override
+  String toString() => 'RoutineNotFound($templateId)';
 }
 
 final sessionRepositoryProvider = Provider<SessionRepository>(

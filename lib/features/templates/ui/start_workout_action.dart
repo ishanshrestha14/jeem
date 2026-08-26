@@ -23,11 +23,24 @@ Future<void> startWorkout(
   WidgetRef ref,
   String templateId,
 ) async {
+  // Captured before the first await: `ScaffoldMessenger.of` must not cross an
+  // async gap, and the resume-or-discard dialog below is one.
+  final messenger = ScaffoldMessenger.of(context);
   final repo = ref.read(sessionRepositoryProvider);
   if (!await _resolveRunningSession(context, ref, repo)) return;
 
   final weightUnit = ref.read(settingsProvider).weightUnit;
-  await repo.startFromTemplate(templateId, weightUnit: weightUnit);
+  try {
+    await repo.startFromTemplate(templateId, weightUnit: weightUnit);
+  } on RoutineNotFound {
+    // The routine was deleted between being listed and being started — from a
+    // stale list, or a detail screen left open while it was deleted elsewhere.
+    // Say so; crashing on a dead row helps nobody.
+    messenger.showSnackBar(
+      const SnackBar(content: Text('That routine no longer exists.')),
+    );
+    return;
+  }
   if (context.mounted) {
     await maybeRequestNotificationPermission(context, ref);
   }

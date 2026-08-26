@@ -51,9 +51,11 @@ Routine starts go through `startWorkout()`; ad-hoc through `startAdHocWorkout()`
 
 ## Error paths
 
-- The routine was deleted between listing and starting. `deleteTemplate` is a **hard** delete, so the
-  row is gone and `startFromTemplate`'s `getSingle` throws `StateError: No element`, unhandled —
-  **open question below**.
+- **The routine was deleted between listing and starting.** `deleteTemplate` is a hard delete, so the
+  row is gone. `startFromTemplate` throws a typed `RoutineNotFound`, which the shared
+  `startWorkout()` catches and reports as *"That routine no longer exists."* No session is created.
+  Fixed in [T-016](../../tickets/T-016-missing-routine.md); before it, this was an unhandled
+  `StateError: No element`.
 - Notification permission denied: the session starts regardless; only rest notifications are lost.
 
 ## Data changes
@@ -83,11 +85,11 @@ Everything is committed inside one transaction per session, so a half-built sess
 
 ## Open questions
 
-- [ ] What should happen if the routine is deleted between listing and starting? `deleteTemplate`
-      hard-deletes the row, so `startFromTemplate` throws an unhandled `StateError: No element`.
-      Reachable today: open a routine's detail screen, delete the routine from the Workout tab on
-      another device or from History's duplicate-then-delete path, then press Start.
+- [x] What should happen if the routine is deleted between listing and starting? Resolved by
+      [T-016](../../tickets/T-016-missing-routine.md): a typed `RoutineNotFound`, explained in the UI.
 - [ ] Should a play button be disabled for a routine with no exercises, as S-030's button is?
 
 ## Revision log
 - 2026-08-26 — derived from the implementation (T-011, T-012, T-013) as part of closing the §6 gap.
+- 2026-08-26 — the deleted-routine crash this spec surfaced is fixed ([T-016](../../tickets/T-016-missing-routine.md));
+  the error path and its open question updated.

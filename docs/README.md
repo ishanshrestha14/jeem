@@ -176,8 +176,9 @@ Next free CMP-ID: **CMP-028**.
 | [T-013](tickets/T-013-workout-tab.md) | Workout tab rebuilt against S-003 | **Done** | L | S-003, CMP-005 |
 | [T-014](tickets/T-014-delete-logged-workout.md) | Delete a logged workout (+ FAB hero-tag fix) | **Done** | S | S-003, S-019 |
 | [T-015](tickets/T-015-home-tab.md) | Rebuild Home against S-001 | **Done** | M | S-001, CMP-008, CMP-013 |
+| [T-016](tickets/T-016-missing-routine.md) | Starting a deleted routine crashed | **Done** | S | FL-001 |
 
-Next free T-ID: **T-016**.
+Next free T-ID: **T-017**.
 
 ### Decisions (ADR)
 | ID | Title | Status |
@@ -377,9 +378,10 @@ the brief, which is why each carries real open questions rather than restating w
 
 Deriving them was worth it immediately, and for two things rather than one:
 
-- **FL-001** surfaced that `startFromTemplate` throws an unhandled `StateError` when the routine is
+- **FL-001** surfaced that `startFromTemplate` threw an unhandled `StateError` when the routine is
   deleted between listing and starting — `deleteTemplate` is a *hard* delete, so the row is simply
-  gone. No ticket had noticed.
+  gone. No ticket had noticed. **Fixed the same day** as
+  [T-016](tickets/T-016-missing-routine.md).
 - Writing FL-004 exposed a **false claim in T-014 and in the code comment on `deleteSession`**, both
   of which said soft-delete was the pattern "every delete here" follows. It is not: `deleteTemplate`
   and `removeSet` drop rows outright. Corrected in all three places.
@@ -410,13 +412,13 @@ easy the *next* piece of work is to pick up, not whether the current state is un
 | FL (flows) | **4 written** — the session lifecycle. Routine-building and programs still underived |
 | CMP (components) | 27 candidates — **0 written specs.** See §6 |
 | F (features) | 0 |
-| T (tickets) | 15 — **all done** |
+| T (tickets) | 16 — **all done** |
 | ADR (decisions) | 6 |
 
 **Last updated:** **T-015 shipped — every reference surface now matches its spec.** Home is a recap
 (weekly summary with week-on-week deltas, then the last five workouts) instead of a fourth routine
 list. Before it, T-012/T-013/T-014 gave us ad-hoc sessions, the S-003 Workout tab and workout
-deletion. No schema change in any of the four. 350 tests pass, `flutter analyze` clean.
+deletion. No schema change in any of the four. 354 tests pass, `flutter analyze` clean.
 
 **Where the code is:** `main`, tracking `origin/main` at
 `git@github.com:ishanshrestha14/jeem.git`. Schema **v6**. Local commits may be ahead of the remote. Five-tab shell

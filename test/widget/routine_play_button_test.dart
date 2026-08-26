@@ -29,13 +29,14 @@ void main() {
         ),
       );
 
-  Future<void> seedRoutine(String name) async {
+  Future<String> seedRoutine(String name) async {
     final templates = TemplateRepository(db);
     final exercises = ExerciseRepository(db);
     final t = await templates.createTemplate(name: name);
     final e = await exercises.create(
         name: 'Row', loggingType: LoggingType.strengthWeightRepsRir);
     await templates.addExercise(templateId: t.id, exerciseId: e.id);
+    return t.id;
   }
 
   testWidgets('a routine row carries a play button', (tester) async {
@@ -98,6 +99,32 @@ void main() {
     // The remove control is still there — the play button joins it rather
     // than replacing it.
     expect(find.byTooltip('Remove from program'), findsOneWidget);
+
+    await disposeAndDrainTimers(tester);
+  });
+
+  testWidgets('starting a routine deleted underneath explains itself',
+      (tester) async {
+    final id = await seedRoutine('Pull B');
+
+    await tester.pumpWidget(harness());
+    await pumpUntilData(tester, until: find.text('Pull B'));
+
+    // Deleted after the list rendered, so the row on screen is stale — the
+    // real-world shape of this: another surface removed it while you were
+    // looking at the list. (Never await a Drift stream's `.first` in a widget
+    // test body; `seedRoutine` hands the id back instead.)
+    await TemplateRepository(db).deleteTemplate(id);
+
+    await tester.tap(find.byTooltip('Start Pull B'));
+    // The repository call is real async, which the fake clock does not drive —
+    // nudge real time forward, then pump the frame that shows the snackbar.
+    await tester.runAsync(() => Future<void>.delayed(
+        const Duration(milliseconds: 50)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('That routine no longer exists.'), findsOneWidget);
+    expect(tester.takeException(), isNull, reason: 'explained, not crashed');
 
     await disposeAndDrainTimers(tester);
   });
