@@ -192,4 +192,75 @@ void main() {
 
     await disposeAndDrainTimers(tester);
   });
+
+  testWidgets('the ⋮ menu carries Edit, Duplicate and Delete', (tester) async {
+    final id = await seedRoutine();
+
+    await tester.pumpWidget(harness(id));
+    await pumpUntilData(tester, until: find.text('Pull B'));
+
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+
+    // T-013 retired the Workout tab that used to carry Duplicate and Delete,
+    // leaving them homeless. This screen is where a single routine is managed.
+    expect(find.text('Edit'), findsOneWidget);
+    expect(find.text('Duplicate'), findsOneWidget);
+    expect(find.text('Delete'), findsOneWidget);
+
+    await disposeAndDrainTimers(tester);
+  });
+
+  testWidgets('Delete asks first, and backing out keeps the routine',
+      (tester) async {
+    final id = await seedRoutine();
+
+    await tester.pumpWidget(harness(id));
+    await pumpUntilData(tester, until: find.text('Pull B'));
+
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Delete'), findsWidgets);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pull B'), findsOneWidget);
+    expect(await TemplateRepository(db).setsFor('x'), isEmpty);
+
+    await disposeAndDrainTimers(tester);
+  });
+
+  testWidgets('Duplicate copies the routine and its prescription',
+      (tester) async {
+    final id = await seedRoutine();
+
+    await tester.pumpWidget(harness(id));
+    await pumpUntilData(tester, until: find.text('Pull B'));
+
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Duplicate'));
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)));
+    await tester.pumpAndSettle();
+
+    // Two routines now, and the copy kept the numbers — the point of
+    // duplicating a routine (T-002).
+    final all = await db.select(db.workoutTemplates).get();
+    expect(all, hasLength(2));
+    final copy = all.firstWhere((t) => t.id != id);
+    final copyExercises = await (db.select(db.templateExercises)
+          ..where((t) => t.templateId.equals(copy.id)))
+        .get();
+    final copySets = await TemplateRepository(db)
+        .setsFor(copyExercises.single.id);
+    // All three planned sets come across with their numbers intact — carrying
+    // the prescription is the point of duplicating a routine (T-002).
+    expect(copySets, hasLength(3));
+    expect(copySets.every((s) => s.weight == 60 && s.reps == 6), isTrue);
+
+    await disposeAndDrainTimers(tester);
+  });
 }

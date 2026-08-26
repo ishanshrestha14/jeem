@@ -6,9 +6,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/semantic_colors.dart';
 import '../../../core/utils/formatting.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../library/ui/library_screen.dart' show InitialsTile;
 import '../data/template_models.dart';
+import '../data/template_repository.dart';
 import '../providers/template_providers.dart';
 import 'start_workout_action.dart';
 
@@ -31,10 +33,15 @@ class RoutineDetailScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         actions: [
-          PopupMenuButton<String>(
-            onSelected: (_) => context.push('/templates/$templateId'),
+          PopupMenuButton<_RoutineAction>(
+            onSelected: (action) =>
+                _handleAction(context, ref, action, templateId),
             itemBuilder: (_) => const [
-              PopupMenuItem<String>(value: 'edit', child: Text('Edit')),
+              PopupMenuItem(value: _RoutineAction.edit, child: Text('Edit')),
+              PopupMenuItem(
+                  value: _RoutineAction.duplicate, child: Text('Duplicate')),
+              PopupMenuItem(
+                  value: _RoutineAction.delete, child: Text('Delete')),
             ],
           ),
         ],
@@ -61,6 +68,50 @@ class RoutineDetailScreen extends ConsumerWidget {
               enabled: routine.valueOrNull!.canStart,
             ),
     );
+  }
+}
+
+/// Everything you can do to a routine as a whole.
+///
+/// All three live here because this is the surface dedicated to one routine.
+/// Duplicate and Delete were on the old Workout tab's routine cards until
+/// [T-013] retired that screen, which left them with no home at all — the
+/// regression this menu closes.
+enum _RoutineAction { edit, duplicate, delete }
+
+Future<void> _handleAction(
+  BuildContext context,
+  WidgetRef ref,
+  _RoutineAction action,
+  String templateId,
+) async {
+  final repo = ref.read(templateRepositoryProvider);
+  final navigator = Navigator.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+
+  switch (action) {
+    case _RoutineAction.edit:
+      context.push('/templates/$templateId');
+
+    case _RoutineAction.duplicate:
+      final copy = await repo.duplicateTemplate(templateId);
+      messenger.showSnackBar(
+        SnackBar(content: Text('Duplicated as "${copy.name}"')),
+      );
+
+    case _RoutineAction.delete:
+      final ok = await confirmDestructive(
+        context,
+        title: 'Delete this routine?',
+        message: 'Sessions you have already logged from it are not affected — '
+            'they keep their own copy of what you did.',
+        confirmLabel: 'Delete routine',
+      );
+      if (!ok) return;
+      await repo.deleteTemplate(templateId);
+      // Nothing left to show. The stream would emit null and this screen pops
+      // itself anyway, but popping here keeps it immediate.
+      navigator.maybePop();
   }
 }
 

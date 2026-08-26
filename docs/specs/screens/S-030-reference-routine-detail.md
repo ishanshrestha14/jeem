@@ -106,8 +106,10 @@ exactly as it does from every other entry point.
 - [ ] Should the **estimated duration** be shown, and derived how? (sets × rest + a per-set constant?)
 - [ ] Should the muscles worked be summarised from **our own taxonomy** (chips or text), given the
       reference's anatomical figure cannot be reproduced?
-- [ ] Should **Delete** join Edit in the ⋮ menu? It currently lives only on the Workout tab
-      (`workout_screen.dart`), and duplicating it needs a reason beyond the reference having a ⋮.
+- [x] Should **Delete** join Edit in the ⋮ menu? **Yes** — resolved by
+      [T-017](../../tickets/T-017-restore-routine-delete.md). The premise of the original deferral
+      ("it already lives on the Workout tab") was invalidated when T-013 retired that tab, leaving
+      Delete and Duplicate with no home at all. Both now sit beside Edit.
 
 ## Revision log
 - 2026-08-25 — created from `ref-S030-routine-detail.png`. Owner decisions: the detail screen becomes

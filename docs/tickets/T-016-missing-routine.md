@@ -57,8 +57,29 @@ between "the row is listed" and "the row still exists".
 
 ## QA checklist (on device)
 
-- [ ] Open a routine's detail screen, delete that routine from History's menu, return and press
-      Start — a message, not a crash.
+**There is no manual reproduction, and the step originally written here was wrong.** It said to open
+a routine's detail screen and delete the routine from another surface — but the detail screen is a
+pushed route, so reaching another surface means backing out of it, which disposes the very screen
+holding the stale Start button.
+
+Two reasons it cannot be hit by hand on one device:
+
+1. Every list that offers a start is **stream-backed**, so deleting a routine re-renders the list
+   without it. There is no stale row left to tap.
+2. Since [T-013](T-013-workout-tab.md) there is **no way to delete a routine in the UI at all** — see
+   [T-017](T-017-restore-routine-delete.md).
+
+The race is real but needs genuine concurrency: a second writer (a restored backup, or a future sync)
+removing the row between the list rendering and the tap landing. That is exactly the kind of window
+a unit test covers and a human cannot, so the coverage is:
+
+- `test/sessions/missing_routine_test.dart` — the repository throws `RoutineNotFound`, creates no
+  session, and behaves the same for an id that never existed.
+- `test/widget/routine_play_button_test.dart` — the row is rendered, the routine is deleted
+  underneath it, and tapping play reports the message instead of crashing.
+
+- [ ] Optional sanity check, once routine deletion exists again: delete a routine, then confirm no
+      surface still offers to start it.
 
 ## Note to self
 
