@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -38,12 +39,16 @@ class SessionSummaryScreen extends ConsumerStatefulWidget {
 
 class _SessionSummaryScreenState extends ConsumerState<SessionSummaryScreen> {
   final _notesController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _durationController = TextEditingController();
   bool _notesHydrated = false;
   bool _busy = false;
 
   @override
   void dispose() {
     _notesController.dispose();
+    _nameController.dispose();
+    _durationController.dispose();
     super.dispose();
   }
 
@@ -61,6 +66,10 @@ class _SessionSummaryScreenState extends ConsumerState<SessionSummaryScreen> {
         if (!_notesHydrated) {
           _notesHydrated = true;
           _notesController.text = session.session.notes ?? '';
+          _nameController.text = session.session.name;
+          // Pre-filled with what the clock recorded, so leaving it alone means
+          // "that was right" and there is nothing to learn to use.
+          _durationController.text = '${_recordedDuration(session).inMinutes}';
         }
         return _buildScaffold(context, session);
       },
@@ -80,11 +89,46 @@ class _SessionSummaryScreenState extends ConsumerState<SessionSummaryScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
-            Text(workout.name, style: AppTheme.exerciseName.copyWith(fontSize: 22)),
+            // S-023: this is an editable record of what happened, not a
+            // read-only summary. Name and duration are the two values that are
+            // otherwise wrong forever — an ad-hoc session is called "Workout",
+            // and a timer left running inflates the weekly summary.
+            Text('Workout name',
+                style: AppTheme.columnHeader.copyWith(color: muted)),
+            const SizedBox(height: 4),
+            TextField(
+              controller: _nameController,
+              enabled: !widget.readOnly && !_busy,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                filled: true,
+                border: OutlineInputBorder(),
+                enabledBorder: OutlineInputBorder(),
+                focusedBorder: OutlineInputBorder(),
+                disabledBorder: OutlineInputBorder(),
+              ),
+            ),
             const SizedBox(height: 4),
             Text(
               DateFormat.yMMMEd().add_jm().format(workout.startedAt),
               style: AppTheme.body.copyWith(color: muted),
+            ),
+            const SizedBox(height: 16),
+            Text('Duration (minutes)',
+                style: AppTheme.columnHeader.copyWith(color: muted)),
+            const SizedBox(height: 4),
+            TextField(
+              controller: _durationController,
+              enabled: !widget.readOnly && !_busy,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                filled: true,
+                border: OutlineInputBorder(),
+                enabledBorder: OutlineInputBorder(),
+                focusedBorder: OutlineInputBorder(),
+                disabledBorder: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 16),
             _StatGrid(session: session, weightUnit: weightUnit, volume: volume),
@@ -169,9 +213,17 @@ class _SessionSummaryScreenState extends ConsumerState<SessionSummaryScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final router = GoRouter.of(context);
     final notes = _notesController.text.trim();
+    final name = _nameController.text.trim();
+    final minutes = int.tryParse(_durationController.text.trim());
     try {
       await ref.read(activeSessionControllerProvider.notifier).finish(
             notes: notes.isEmpty ? null : notes,
+            name: name.isEmpty ? null : name,
+            // Only sent when it differs from what was recorded, so an
+            // untouched field never rewrites `endedAt`.
+            duration: minutes == null
+                ? null
+                : Duration(minutes: minutes),
           );
       if (!context.mounted) return;
       router.go('/home');
@@ -318,4 +370,13 @@ class _ExerciseSummary extends StatelessWidget {
     final repsSegment = weight.isEmpty ? '$reps reps' : '$weight $weightUnit × $reps';
     return 'Set ${set.setIndex + 1} · $repsSegment · RIR ${formatRir(set.rir)}';
   }
+}
+
+/// What the clock actually recorded for [session], which is what the duration
+/// field is pre-filled with.
+Duration _recordedDuration(ActiveSession session) {
+  final w = session.session;
+  final endedAt = w.endedAt ?? DateTime.now();
+  final d = endedAt.difference(w.startedAt) - Duration(seconds: w.pausedSeconds);
+  return d.isNegative ? Duration.zero : d;
 }

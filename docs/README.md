@@ -90,7 +90,7 @@ Full detail, counterparts and gaps: [`02-screen-inventory.md`](research/referenc
 | S-020 | ours | Settings | screen | Implemented |
 | S-021 | ours | Rest sheet | bottom sheet | Implemented |
 | S-022 | ours | Notification permission prompt | overlay | Implemented |
-| S-023 | reference | "Finish Workout" form | screen | **Draft — [spec](specs/screens/S-023-reference-finish-workout-form.md)** |
+| S-023 | reference | "Finish Workout" form | screen | **Implemented — [spec](specs/screens/S-023-reference-finish-workout-form.md)** |
 | S-024 | reference | Post-save celebration / share | modal | **Draft — [spec](specs/screens/S-024-reference-celebration-share.md)** |
 | S-025 | reference | Exercise detail | screen, tabbed | **Implemented — [spec](specs/screens/S-025-reference-exercise-detail.md)** |
 | S-026 | reference | Exercise browser / picker | modal | **Draft — [spec](specs/screens/S-026-reference-exercise-browser.md)** |
@@ -188,8 +188,9 @@ Next free CMP-ID: **CMP-028**.
 | [T-017](tickets/T-017-restore-routine-delete.md) | Restore routine Delete and Duplicate | **Done** | S | S-030 |
 | [T-018](tickets/T-018-exercise-detail.md) | Exercise detail screen (About · History · Records) | **Done** | M | S-025, ADR-004 |
 | [T-019](tickets/T-019-in-session-info.md) | In-session ℹ opens the exercise detail | **Done** | S | S-025, S-013 |
+| [T-020](tickets/T-020-finish-form.md) | Editable finish form: name + duration | **Done** | S | S-023, FL-003 |
 
-Next free T-ID: **T-020**.
+Next free T-ID: **T-021**.
 
 ### Decisions (ADR)
 | ID | Title | Status |
@@ -431,14 +432,14 @@ easy the *next* piece of work is to pick up, not whether the current state is un
 | FL (flows) | **4 written** — the session lifecycle. Routine-building and programs still underived |
 | CMP (components) | 27 registered — **14 built, 4 specced.** See §6 |
 | F (features) | 0 |
-| T (tickets) | 19 — **all done** |
+| T (tickets) | 20 — **all done** |
 | ADR (decisions) | 6 |
 
 **Last updated:** **T-015 shipped — every primary tab now matches its spec** (not every reference
 surface; seven remain, see below). Home is a recap
 (weekly summary with week-on-week deltas, then the last five workouts) instead of a fourth routine
 list. Before it, T-012/T-013/T-014 gave us ad-hoc sessions, the S-003 Workout tab and workout
-deletion. No schema change in any of the four. 370 tests pass, `flutter analyze` clean.
+deletion. No schema change in any of the four. 380 tests pass, `flutter analyze` clean.
 
 **Where the code is:** `main`, tracking `origin/main` at
 `git@github.com:ishanshrestha14/jeem.git`. Schema **v6**. Local commits may be ahead of the remote. Five-tab shell
@@ -455,7 +456,7 @@ rename it into `screenshots/` under its manifest name.
 
    | Spec | Our counterpart | Gap |
    |---|---|---|
-   | S-023 finish form | S-018, read-only | Theirs is editable before saving |
+   | ~~S-023 finish form~~ | **Built** — [T-020](tickets/T-020-finish-form.md) | Media, date/time, activity type and difficulty deliberately skipped |
    | S-024 celebration/share | — | **Deliberately not adopted** (00-overview §5) |
    | ~~S-025 exercise detail~~ | **Built** — [T-018](tickets/T-018-exercise-detail.md) | Progress chart still deferred (needs charting) |
    | S-026 exercise browser | S-011/S-014 | No filter strip, no filter-count badge |

@@ -921,10 +921,17 @@ class ActiveSessionController extends AutoDisposeAsyncNotifier<ActiveSessionStat
     _emit(reloaded, rest);
   }
 
-  Future<void> finish({String? notes}) async {
+  /// Commits the session. [name] and [duration] carry S-023's corrections —
+  /// both are ignored downstream when blank or non-positive.
+  Future<void> finish({String? notes, String? name, Duration? duration}) async {
     final current = await _ready();
     await _cancelRestNotification();
-    await _repo.finishSession(current.session.session.id, notes: notes);
+    await _repo.finishSession(
+      current.session.session.id,
+      notes: notes,
+      name: name,
+      duration: duration,
+    );
     _setState(const AsyncData(null));
   }
 

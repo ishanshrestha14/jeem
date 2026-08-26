@@ -450,13 +450,48 @@ class SessionRepository {
     });
   }
 
-  Future<void> finishSession(String id, {String? notes}) async {
+  /// Commits the session, optionally correcting what was recorded (S-023).
+  ///
+  /// [name] and [duration] exist because the finish form is an **editable**
+  /// record rather than a read-only summary, and these are the two values that
+  /// are otherwise wrong forever — an ad-hoc session is called `Workout` until
+  /// renamed, and a timer left running inflates the duration that then feeds
+  /// the weekly summary.
+  ///
+  /// A blank [name] is ignored: a nameless workout reads worse in every list
+  /// than a generically-named one. A non-positive [duration] is ignored too,
+  /// rather than writing an `endedAt` before `startedAt` and inverting the
+  /// session for every consumer that subtracts them.
+  Future<void> finishSession(
+    String id, {
+    String? notes,
+    String? name,
+    Duration? duration,
+  }) async {
     final now = DateTime.now();
+
+    var endedAt = now;
+    if (duration != null && duration > Duration.zero) {
+      final row = await (_db.select(_db.workoutSessions)
+            ..where((t) => t.id.equals(id)))
+          .getSingle();
+      // Anchored on `startedAt` so the correction means "the workout took
+      // this long", which is what the user is telling us — not "it ended at
+      // some other time".
+      endedAt = row.startedAt
+          .add(Duration(seconds: row.pausedSeconds))
+          .add(duration);
+    }
+
+    final trimmedName = name?.trim();
     await (_db.update(_db.workoutSessions)..where((t) => t.id.equals(id)))
         .write(WorkoutSessionsCompanion(
       status: const Value(SessionStatus.completed),
-      endedAt: Value(now),
+      endedAt: Value(endedAt),
       notes: Value(notes),
+      name: trimmedName == null || trimmedName.isEmpty
+          ? const Value.absent()
+          : Value(trimmedName),
       updatedAt: Value(now),
       restStatus: const Value(RestTimerStatus.idle),
       restEndsAt: const Value(null),

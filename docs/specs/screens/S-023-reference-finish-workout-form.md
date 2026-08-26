@@ -59,3 +59,10 @@ zone — first-run onboarding, not permanent chrome.
 
 ## Revision log
 - 2026-08-23 — created from `ref-S023-finish-workout-form.png`.
+
+## Revision log
+- 2026-08-26 — built as [T-020](../../tickets/T-020-finish-form.md), which adopted the spec's central
+  idea (an editable record, not a read-only summary) for the two fields that are otherwise wrong
+  forever: **name** and **duration**. Media, date & time, activity type and the difficulty rating
+  were deliberately skipped — see the ticket for why each. Duration is anchored on `startedAt`, so
+  correcting it means "the workout took this long" rather than "it ended at a different time".

@@ -173,7 +173,12 @@ void main() {
     expect(find.widgetWithText(FilledButton, 'Save'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, 'Discard'), findsOneWidget);
 
-    final field = tester.widget<TextField>(find.byType(TextField));
+    // The notes field specifically: since T-020 the form also carries an
+    // editable name and duration, so `byType(TextField)` matches three.
+    final field = tester.widget<TextField>(
+      find.byWidgetPredicate((w) =>
+          w is TextField && w.decoration?.hintText == 'How did it go?'),
+    );
     expect(field.enabled, isTrue);
 
     await disposeAndDrainTimers(tester);
@@ -355,9 +360,51 @@ void main() {
     expect(find.widgetWithText(FilledButton, 'Save'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, 'Discard'), findsNothing);
 
-    final field = tester.widget<TextField>(find.byType(TextField));
+    final field = tester.widget<TextField>(
+      find.byWidgetPredicate((w) =>
+          w is TextField && w.decoration?.hintText == 'How did it go?'),
+    );
     expect(field.enabled, isFalse);
 
     await disposeAndDrainTimers(tester);
+  });
+
+  testWidgets('the name is editable before saving (S-023)', (tester) async {
+    final id = await seedPartialSession(tester);
+
+    await tester.pumpWidget(harness(id));
+    await pumpUntilData(tester, until: find.text('Notes'));
+
+    // Not a heading any more: the finish form is an editable record, and an
+    // ad-hoc session arrives called "Workout" until you say otherwise.
+    expect(find.widgetWithText(TextField, 'Push Day'), findsOneWidget);
+
+    await disposeAndDrainTimers(tester, container: container);
+  });
+
+  testWidgets('the recorded duration is editable before saving',
+      (tester) async {
+    final id = await seedPartialSession(tester);
+
+    await tester.pumpWidget(harness(id));
+    await pumpUntilData(tester, until: find.text('Notes'));
+
+    expect(find.text('Duration (minutes)'), findsOneWidget);
+
+    await disposeAndDrainTimers(tester, container: container);
+  });
+
+  testWidgets('both lock in read-only mode', (tester) async {
+    final id = await seedPartialSession(tester);
+
+    await tester.pumpWidget(harness(id, readOnly: true));
+    await pumpUntilData(tester, until: find.text('Notes'));
+
+    // A completed session has nothing left to commit, so nothing is editable.
+    for (final field in tester.widgetList<TextField>(find.byType(TextField))) {
+      expect(field.enabled, isFalse);
+    }
+
+    await disposeAndDrainTimers(tester, container: container);
   });
 }
