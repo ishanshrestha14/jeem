@@ -109,7 +109,13 @@ spec exists. No `specs/screens/` files have been authored yet.
 ### Flows (FL)
 | ID | Title | Status | Spec |
 |---|---|---|---|
-| _none yet_ | | | |
+| FL-001 | Start a workout | Draft | [spec](specs/flows/FL-001-start-a-workout.md) |
+| FL-002 | Log a set | Draft | [spec](specs/flows/FL-002-log-a-set.md) |
+| FL-003 | Finish a workout | Draft | [spec](specs/flows/FL-003-finish-a-workout.md) |
+| FL-004 | Delete a logged workout | Draft | [spec](specs/flows/FL-004-delete-a-workout.md) |
+
+Next free FL-ID: **FL-005**. Still underived: build/edit a routine, exercise info, and the
+programs flows.
 
 ### Components (CMP)
 
@@ -362,16 +368,23 @@ default | pressed | disabled | loading | selected | error
 Two of the three spec folders are empty. Neither is an oversight to be quietly fixed — each has a
 reason, recorded here so a fresh session does not mistake absence for loss.
 
-### `specs/flows/` — empty, never derived
+### `specs/flows/` — partly closed (2026-08-26)
 
-The brief lists a `derive flows` step (start session; log + complete set; rest timer + auto-advance;
-reorder mid-session; create/edit template; exercise info; finish + summary). **It was never
-invoked.** Work went screenshot → spec → gap → ticket instead, and the tickets carried the flow
-detail inline (T-003's `Next` chaining, T-002's snapshot rules, T-001's minimise/resume).
+The brief listed a `derive flows` step; it went uninvoked through T-001..T-015, with the tickets
+carrying flow detail inline instead. The **session lifecycle** is now derived — FL-001 start,
+FL-002 log a set, FL-003 finish, FL-004 delete — written from the implementation rather than from
+the brief, which is why each carries real open questions rather than restating what shipped.
 
-What that cost: there is no single document describing a whole task end to end, so the acceptance
-criteria for "start a session" live scattered across four tickets. Worth doing before the next
-round of session work.
+Deriving them was worth it immediately, and for two things rather than one:
+
+- **FL-001** surfaced that `startFromTemplate` throws an unhandled `StateError` when the routine is
+  deleted between listing and starting — `deleteTemplate` is a *hard* delete, so the row is simply
+  gone. No ticket had noticed.
+- Writing FL-004 exposed a **false claim in T-014 and in the code comment on `deleteSession`**, both
+  of which said soft-delete was the pattern "every delete here" follows. It is not: `deleteTemplate`
+  and `removeSet` drop rows outright. Corrected in all three places.
+
+Still underived: build/edit a routine, exercise info, and the programs flows.
 
 ### `specs/components/` — empty, tracked elsewhere
 
@@ -394,7 +407,7 @@ easy the *next* piece of work is to pick up, not whether the current state is un
 | Type | Count |
 |---|---|
 | S (surfaces) | 30 registered (14 reference · 16 ours) — **16 written specs** |
-| FL (flows) | **0 — never derived.** See §6 |
+| FL (flows) | **4 written** — the session lifecycle. Routine-building and programs still underived |
 | CMP (components) | 27 candidates — **0 written specs.** See §6 |
 | F (features) | 0 |
 | T (tickets) | 15 — **all done** |

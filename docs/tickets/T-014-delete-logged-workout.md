@@ -26,7 +26,9 @@ mis-logged or abandoned workout was permanent.
 
 ## Decisions
 
-- **Soft delete**, stamping `deletedAt`, as every other delete here does. `_fetchCompletedSessions`
+- **Soft delete**, stamping `deletedAt`. Not the universal pattern here — `deleteTemplate` and
+  `removeSet` are hard deletes — but right for a session, which is the only record that a workout
+  happened. `_fetchCompletedSessions`
   already filters on it, so **one write** removes the workout from history, the week strips,
   `Previous` (T-009), personal records and every volume total — all of which are *derived* from
   completed sessions rather than stored.

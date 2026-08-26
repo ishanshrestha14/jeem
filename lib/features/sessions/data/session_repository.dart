@@ -490,7 +490,10 @@ class SessionRepository {
 
   /// Removes a logged workout from the app.
   ///
-  /// A **soft** delete, like every other delete here: the row keeps its sets
+  /// A **soft** delete: the row keeps its sets and is merely stamped
+  /// `deletedAt`. (Not universal here — `deleteTemplate` and `removeSet` are
+  /// hard deletes. Soft is right for a session because it is the only record
+  /// that a workout happened.)
   /// and is merely stamped `deletedAt`. Because `_fetchCompletedSessions`
   /// filters on that column, one write takes the workout out of history, the
   /// week strips, `Previous` (T-009) and the personal-record pass at once —
