@@ -98,4 +98,85 @@ void main() {
     );
     await disposeAndDrainTimers(tester);
   });
+
+  testWidgets('body-part chips filter the list (S-026)', (tester) async {
+    final exercises = ExerciseRepository(db);
+    final bench = await exercises.create(
+        name: 'Bench Press', loggingType: LoggingType.strengthWeightRepsRir);
+    final squat = await exercises.create(
+        name: 'Back Squat', loggingType: LoggingType.strengthWeightRepsRir);
+    await exercises.setTaxonomy(bench.id,
+        primary: const [], secondary: const [], bodyParts: const [BodyPart.chest]);
+    await exercises.setTaxonomy(squat.id,
+        primary: const [], secondary: const [], bodyParts: const [BodyPart.legs]);
+
+    await tester.pumpWidget(harness());
+    await pumpUntilData(tester, until: find.text('Bench Press'));
+
+    expect(find.text('Back Squat'), findsOneWidget);
+
+    // Filtering by a body part is what the taxonomy (T-005) exists for; until
+    // now the library could only be searched by name.
+    await tester.tap(find.widgetWithText(FilterChip, 'Chest'));
+    // Waits for the filtered state, not merely for one row to vanish: the
+    // body-part map arrives on its own stream, so "Squat is gone" is briefly
+    // true for the wrong reason.
+    await pumpUntilData(
+      tester,
+      until: find.byWidgetPredicate((w) =>
+          w is Text && w.data == 'Bench Press'),
+    );
+    await pumpUntilGone(tester, find.text('Back Squat'));
+
+    expect(find.text('Bench Press'), findsOneWidget);
+    expect(find.text('Back Squat'), findsNothing);
+
+    await disposeAndDrainTimers(tester);
+  });
+
+  testWidgets('tapping the active chip again clears the filter',
+      (tester) async {
+    final exercises = ExerciseRepository(db);
+    final bench = await exercises.create(
+        name: 'Bench Press', loggingType: LoggingType.strengthWeightRepsRir);
+    await exercises.create(
+        name: 'Back Squat', loggingType: LoggingType.strengthWeightRepsRir);
+    await exercises.setTaxonomy(bench.id,
+        primary: const [], secondary: const [], bodyParts: const [BodyPart.chest]);
+
+    await tester.pumpWidget(harness());
+    await pumpUntilData(tester, until: find.text('Bench Press'));
+
+    await tester.tap(find.widgetWithText(FilterChip, 'Chest'));
+    await pumpUntilGone(tester, find.text('Back Squat'));
+    await tester.tap(find.widgetWithText(FilterChip, 'Chest'));
+    await pumpUntilData(tester, until: find.text('Back Squat'));
+
+    expect(find.text('Back Squat'), findsOneWidget);
+
+    await disposeAndDrainTimers(tester);
+  });
+
+  testWidgets('an untagged exercise is hidden by any body-part filter',
+      (tester) async {
+    final exercises = ExerciseRepository(db);
+    final bench = await exercises.create(
+        name: 'Bench Press', loggingType: LoggingType.strengthWeightRepsRir);
+    await exercises.create(
+        name: 'Mystery Move', loggingType: LoggingType.strengthWeightRepsRir);
+    await exercises.setTaxonomy(bench.id,
+        primary: const [], secondary: const [], bodyParts: const [BodyPart.chest]);
+
+    await tester.pumpWidget(harness());
+    await pumpUntilData(tester, until: find.text('Mystery Move'));
+
+    await tester.tap(find.widgetWithText(FilterChip, 'Chest'));
+    await pumpUntilGone(tester, find.text('Mystery Move'));
+
+    // Untagged is the normal state early on (ADR-006), so this is a real
+    // consequence worth pinning: filtering hides everything untagged.
+    expect(find.text('Mystery Move'), findsNothing);
+
+    await disposeAndDrainTimers(tester);
+  });
 }

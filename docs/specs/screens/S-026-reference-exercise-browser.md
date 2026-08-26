@@ -75,3 +75,11 @@ library exists (owner decision 2026-08-23, [ADR-006](../../decisions/ADR-006-exe
 - 2026-08-23 — created from `ref-S026-exercise-browser-picker.png`.
 - 2026-08-23 — added the mid-session variant (`Add Exercises` + `Recent Performed`); card subtitle
   identified as **body part**, not muscle.
+
+## Revision log
+- 2026-08-26 — [T-021](../../tickets/T-021-body-part-filter.md) built the filter strip: Favourites
+  first, then a chip per body part, in one scrolling row as this spec describes. **The filter-count
+  badge (CMP-026) was deliberately not built** — the reference needs one because its filters hide
+  behind an icon; ours are visible chips, so the count is already on screen. Still open here:
+  `Recent Performed` as the leading section when the picker is opened mid-session, the grid/list
+  toggle, per-card bookmark and `?`, and `+` inside the picker.

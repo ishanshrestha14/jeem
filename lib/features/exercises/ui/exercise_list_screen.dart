@@ -42,6 +42,7 @@ class _ExerciseListScreenState extends ConsumerState<ExerciseListScreen> {
   void _clearFilters() {
     _clearSearch();
     ref.read(exerciseFavouritesOnlyProvider.notifier).state = false;
+    ref.read(exerciseBodyPartFilterProvider.notifier).state = null;
   }
 
   @override
@@ -49,6 +50,7 @@ class _ExerciseListScreenState extends ConsumerState<ExerciseListScreen> {
     final exercises = ref.watch(filteredExercisesProvider);
     final query = ref.watch(exerciseSearchQueryProvider).trim();
     final favouritesOnly = ref.watch(exerciseFavouritesOnlyProvider);
+    final bodyPart = ref.watch(exerciseBodyPartFilterProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Exercises')),
@@ -81,25 +83,41 @@ class _ExerciseListScreenState extends ConsumerState<ExerciseListScreen> {
                   ref.read(exerciseSearchQueryProvider.notifier).state = v,
             ),
           ),
-          // A single filter chip rather than a filter sheet: favourites is
-          // the only axis that exists while the library is untagged
-          // (ADR-006), and hiding one toggle behind a sheet costs more taps
-          // than it saves.
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
+          // One scrolling strip doing two jobs (S-026): Favourites first, then
+          // a chip per body part. Visible chips rather than a filter sheet —
+          // the reference needs a filter-count badge precisely because its
+          // filters are hidden behind an icon; ours are on screen, so the
+          // count is already visible.
+          SizedBox(
+            height: 48,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-              child: FilterChip(
-                avatar: Icon(
-                  favouritesOnly ? Icons.star : Icons.star_border,
-                  size: 18,
+              children: [
+                FilterChip(
+                  avatar: Icon(
+                    favouritesOnly ? Icons.star : Icons.star_border,
+                    size: 18,
+                  ),
+                  label: const Text('Favourites'),
+                  selected: favouritesOnly,
+                  onSelected: (on) => ref
+                      .read(exerciseFavouritesOnlyProvider.notifier)
+                      .state = on,
                 ),
-                label: const Text('Favourites'),
-                selected: favouritesOnly,
-                onSelected: (on) => ref
-                    .read(exerciseFavouritesOnlyProvider.notifier)
-                    .state = on,
-              ),
+                for (final part in BodyPart.values) ...[
+                  const SizedBox(width: 8),
+                  FilterChip(
+                    label: Text(bodyPartLabel(part)),
+                    selected: bodyPart == part,
+                    // Tapping the active chip clears it, so the strip needs no
+                    // separate "All" chip.
+                    onSelected: (on) => ref
+                        .read(exerciseBodyPartFilterProvider.notifier)
+                        .state = on ? part : null,
+                  ),
+                ],
+              ],
             ),
           ),
           Expanded(
