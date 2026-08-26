@@ -74,8 +74,8 @@ Full detail, counterparts and gaps: [`02-screen-inventory.md`](research/referenc
 | S-004 | reference | Library | screen | **Draft — [spec](specs/screens/S-004-reference-library.md)** |
 | S-005 | reference | You | screen, tabbed | **Draft — [spec](specs/screens/S-005-reference-you-tab.md)** |
 | S-006 | reference | Active session | screen | **Draft — [spec](specs/screens/S-006-reference-active-session.md)** |
-| S-007 | ours | Home / dashboard | screen | Implemented |
-| S-008 | ours | Workout (templates) | screen | Implemented |
+| S-007 | ours | Home / dashboard | screen | **Superseded by S-001** — rebuilt [T-015](tickets/T-015-home-tab.md) |
+| S-008 | ours | Workout (templates) | screen | **Superseded by S-003** — the routine list was retired in [T-013](tickets/T-013-workout-tab.md) |
 | S-009 | ours | Template editor | screen | Implemented |
 | S-010 | ours | Template exercise settings | bottom sheet | Implemented |
 | S-011 | ours | Exercise list | screen | Implemented |
@@ -104,7 +104,11 @@ Next free S-ID: **S-031**.
 S-028 and S-029 were written during T-002 but never added to this table — corrected 2026-08-25.
 
 `Status: Implemented` on our rows means the surface exists in `lib/`; it does **not** mean a written
-spec exists. No `specs/screens/` files have been authored yet.
+spec exists — none of S-007..S-022 has one. **Superseded** means the surface was rebuilt against a
+reference spec and the old row is kept only so the ID is never reused (§2).
+
+Verified against `lib/` on 2026-08-26: S-009..S-022 all still exist. S-007 and S-008 do not, in the
+form these rows describe.
 
 ### Flows (FL)
 | ID | Title | Status | Spec |
@@ -201,18 +205,20 @@ Next free ADR-ID: **ADR-007**.
 
 ## 4b. Verified stack
 
-Read from `pubspec.yaml` and `lib/` on 2026-08-23. This section is the check against the project
-facts drifting from the repo — update it when dependencies change.
+Read from `pubspec.yaml` and `lib/` on 2026-08-23; **re-verified against the code 2026-08-26**, which
+corrected the branch count (4 → 5) and the schema version (2 → 6). This section is the check against
+project facts drifting from the repo — and it had drifted, so re-read it from `lib/` rather than
+trusting it.
 
 | Layer | Actual |
 |---|---|
 | SDK | Dart `^3.11.5`, Flutter |
 | State | `flutter_riverpod ^2.6.1` — **v2, hand-written providers, no codegen** (`riverpod_annotation`/`riverpod_generator` are not dependencies) |
-| Routing | `go_router ^17.5.0` — `StatefulShellRoute.indexedStack`, 4 branches |
-| Persistence | `drift ^2.34.3` + `drift_dev`, `NativeDatabase.createInBackground`, `schemaVersion: 2` |
+| Routing | `go_router ^17.5.0` — `StatefulShellRoute.indexedStack`, **5 branches** (ADR-005) |
+| Persistence | `drift ^2.34.3` + `drift_dev`, `NativeDatabase.createInBackground`, **`schemaVersion: 6`** (T-002) |
 | Design | Material 3 (`useMaterial3: true`), **dark only** — see [ADR-002](decisions/ADR-002-dark-only-theme.md) |
 | Type | **Barlow** + **Barlow Condensed** bundled as app fonts (400/500/600, Condensed also 700) |
-| Platforms | `android/`, `ios/`, `macos/` folders exist; **Android is the only target** |
+| Platforms | `android/`, `ios/`, `macos/` folders exist. **Android is the only shipping target**; macOS is the fast dev loop (`flutter run -d macos`) and is run regularly |
 | Network | **None.** No HTTP/backend/auth dependency of any kind — fully offline |
 
 Capability dependencies beyond the core four: `flutter_local_notifications` + `timezone` (rest-timer
@@ -419,7 +425,7 @@ easy the *next* piece of work is to pick up, not whether the current state is un
 
 | Type | Count |
 |---|---|
-| S (surfaces) | 30 registered (14 reference · 16 ours) — **16 written specs** |
+| S (surfaces) | 30 registered (14 reference · 16 ours) — **16 written specs**; S-007 and S-008 superseded |
 | FL (flows) | **4 written** — the session lifecycle. Routine-building and programs still underived |
 | CMP (components) | 27 registered — **14 built, 4 specced.** See §6 |
 | F (features) | 0 |

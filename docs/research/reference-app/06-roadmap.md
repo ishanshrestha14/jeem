@@ -10,6 +10,26 @@ tabs it creates have something in them.
 
 ---
 
+
+> **Status, 2026-08-26 — this roadmap is complete and kept for history.**
+>
+> Everything below shipped, though not always in the shape planned here. The table entries are the
+> *plan as written on 2026-08-23*; where the built thing differs, the ticket is the truth:
+>
+> | Planned here | Shipped as |
+> |---|---|
+> | 1 Prescription schema (v3, columns on `TemplateExercises`) | [T-002](../../tickets/T-002-prescription-schema.md) — **schema v6**, a `TemplateSets` row per planned set instead of per-exercise columns |
+> | 2 Prescription editor (CMP-017) | T-002 — a planned-sets sheet, not the S-010 settings sheet |
+> | 3 Pre-filled set rows | [T-008](../../tickets/T-008-plan-prefill.md) — as a *hint* materialised on completion, not a pre-written value |
+> | 4 Custom numeric keypad | [T-003](../../tickets/T-003-numeric-keypad.md) |
+> | 5 `Previous` column | [T-009](../../tickets/T-009-previous-best.md) — one line per exercise, **not** a column |
+> | 6 WIP bar | [T-001](../../tickets/T-001-wip-bar.md) |
+> | 6b Exercise taxonomy | [T-004](../../tickets/T-004-exercise-taxonomy.md), corrected by [T-005](../../tickets/T-005-plural-primary-muscles.md) |
+>
+> Phases 2 and 3 likewise: every reference surface (S-001..S-006, S-030) now matches its spec. See
+> §7 of [`docs/README.md`](../../README.md) for current status, and the ticket registry for what
+> actually happened.
+
 ## Phase 1 — Make logging fast (Must)
 
 The four Musts from the gap analysis, in dependency order. Nothing here touches navigation.
