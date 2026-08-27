@@ -193,8 +193,9 @@ Next free CMP-ID: **CMP-028**.
 | [T-022](tickets/T-022-replace-exercise.md) | Replace an exercise in a routine | **Done** | S | S-029, S-028 |
 | [T-023](tickets/T-023-recent-performed-picker.md) | `Recent Performed` leads the mid-session picker | **Done** | S | S-026, S-014 |
 | [T-024](tickets/T-024-soft-delete-and-records-badge.md) | Soft-delete routines + `Records 🏅 N` badge | **Done** | M | S-001, ADR-004 |
+| [T-025](tickets/T-025-routine-stats.md) | Routine detail stats: duration + body parts — closes S-030 | **Done** | M | S-030, ADR-006 |
 
-Next free T-ID: **T-025**.
+Next free T-ID: **T-026**.
 
 ### Decisions (ADR)
 | ID | Title | Status |
@@ -428,7 +429,7 @@ matters.
 Every implemented ticket references the surface spec and ADR it came from. These gaps affect how
 easy the *next* piece of work is to pick up, not whether the current state is understood.
 
-## 7. Current status (2026-08-24)
+## 7. Current status (2026-08-27)
 
 | Type | Count |
 |---|---|
@@ -436,14 +437,17 @@ easy the *next* piece of work is to pick up, not whether the current state is un
 | FL (flows) | **4 written** — the session lifecycle. Routine-building and programs still underived |
 | CMP (components) | 27 registered — **14 built, 4 specced.** See §6 |
 | F (features) | 0 |
-| T (tickets) | 24 — **all done** |
+| T (tickets) | 25 — **all done** |
 | ADR (decisions) | 6 |
 
-**Last updated:** **T-015 shipped — every primary tab now matches its spec** (not every reference
-surface; seven remain, see below). Home is a recap
-(weekly summary with week-on-week deltas, then the last five workouts) instead of a fourth routine
-list. Before it, T-012/T-013/T-014 gave us ad-hoc sessions, the S-003 Workout tab and workout
-deletion. No schema change in any of the four. 414 tests pass, `flutter analyze` clean.
+**Last updated:** **T-025 shipped — S-030 has no open questions left.** The routine detail's stats
+tile now carries a duration and a body-part line beside its set count. The duration is *measured*
+from the last three sessions of that routine, falling back to a plan formula only while the routine
+has never been performed — so its one invented number, a 45-second per-set work constant, is visible
+only until the first time you run it. No schema change. 441 tests pass, `flutter analyze` clean.
+
+Before it: T-024 made routine deletes soft and put Records on Home; T-015 finished the primary tabs
+against their specs.
 
 **Where the code is:** `main`, tracking `origin/main` at
 `git@github.com:ishanshrestha14/jeem.git`. Schema **v6**. Local commits may be ahead of the remote. Five-tab shell
@@ -464,9 +468,13 @@ were are answered and shipped in [T-024](tickets/T-024-soft-delete-and-records-b
 
 What remains, all un-blocked:
 
-1. **S-030's estimated duration and muscle summary** — both deliberately deferred in T-011. The
-   duration needs a formula chosen (sets x rest + a per-set constant?); the muscle summary can come
-   from our own taxonomy.
+1. ~~**S-030's estimated duration and muscle summary**~~ — **done**, [T-025](tickets/T-025-routine-stats.md)
+   (2026-08-27). Not the formula this line proposed: the duration is **measured** from the last three
+   sessions of that routine wherever there are any, and the sets × rest formula is only the
+   never-performed fallback. Its 45-second per-set work constant is the one invented number, and it
+   disappears the first time you run the routine. The muscle summary is body parts as text, in enum
+   order; the reference's anatomical figure is now a recorded decision not to build rather than an
+   open question. **S-030 has no open questions left.**
 2. **S-003's Insights row** — still out, because we have no recovery or streak model. A streak *is*
    computable offline; recovery is not, and should not be invented.
 3. **The remaining flows** — build/edit a routine, exercise info, programs. FL-001..FL-004 cover the

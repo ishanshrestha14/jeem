@@ -263,4 +263,116 @@ void main() {
 
     await disposeAndDrainTimers(tester);
   });
+
+  // ---------------------------------------------------------------------
+  // T-025 — the stats tile's other two slots, deferred since T-011.
+  // ---------------------------------------------------------------------
+
+  /// A completed session for [templateId] that really took [ran], inserted
+  /// directly rather than driven through `startFromTemplate`/`finishSession`:
+  /// those run against the wall clock, so a session started and finished in
+  /// the same test takes zero time and is dropped as corrupt.
+  Future<void> aLoggedSession({
+    required String templateId,
+    required Duration ran,
+    int daysAgo = 0,
+  }) async {
+    final startedAt = DateTime.now().subtract(Duration(days: daysAgo, hours: 2));
+    await db.into(db.workoutSessions).insert(
+          WorkoutSessionsCompanion.insert(
+            id: 'logged-$daysAgo-${ran.inSeconds}',
+            name: 'Pull B',
+            status: SessionStatus.completed,
+            startedAt: startedAt,
+            createdAt: startedAt,
+            updatedAt: startedAt,
+            templateId: Value(templateId),
+            endedAt: Value(startedAt.add(ran)),
+          ),
+        );
+  }
+
+  testWidgets('a routine never performed estimates its duration from the plan',
+      (tester) async {
+    // 3 sets x 45s work, plus rest after the first two only.
+    final id = await seedRoutine(sets: 3);
+
+    await tester.pumpWidget(harness(id));
+    await pumpUntilData(tester, until: find.text('Pull B'));
+
+    expect(find.text('Duration'), findsOneWidget);
+    expect(find.text('~5 min'), findsOneWidget);
+    expect(find.text('estimated'), findsOneWidget,
+        reason: 'the guess is labelled as one');
+    expect(find.text('your average'), findsNothing);
+    await disposeAndDrainTimers(tester);
+  });
+
+  testWidgets('a performed routine averages what it actually took',
+      (tester) async {
+    final id = await seedRoutine(sets: 3);
+    await aLoggedSession(
+        templateId: id, ran: const Duration(minutes: 50), daysAgo: 1);
+    await aLoggedSession(
+        templateId: id, ran: const Duration(minutes: 60), daysAgo: 2);
+
+    await tester.pumpWidget(harness(id));
+    await pumpUntilData(tester, until: find.text('your average'));
+
+    expect(find.text('~55 min'), findsOneWidget);
+    expect(find.text('estimated'), findsNothing,
+        reason: 'one real run beats the formula');
+    await disposeAndDrainTimers(tester);
+  });
+
+  testWidgets('the body parts a routine works read as one line', (tester) async {
+    final templates = TemplateRepository(db);
+    final exercises = ExerciseRepository(db);
+    final t = await templates.createTemplate(name: 'Push A');
+    final bench = await exercises.create(
+        name: 'Bench Press',
+        loggingType: LoggingType.strengthWeightRepsRir,
+        bodyParts: [BodyPart.chest, BodyPart.arms]);
+    final press = await exercises.create(
+        name: 'Overhead Press',
+        loggingType: LoggingType.strengthWeightRepsRir,
+        bodyParts: [BodyPart.shoulders, BodyPart.chest]);
+    await templates.addExercise(templateId: t.id, exerciseId: bench.id);
+    await templates.addExercise(templateId: t.id, exerciseId: press.id);
+
+    await tester.pumpWidget(harness(t.id));
+    await pumpUntilData(tester, until: find.text('Chest · Shoulders · Arms'));
+
+    // Deduped, and in enum order rather than alphabetical, so the same
+    // routine always reads the same way.
+    expect(find.text('Chest · Shoulders · Arms'), findsOneWidget);
+    await disposeAndDrainTimers(tester);
+  });
+
+  testWidgets('untagged exercises leave no empty body-part line',
+      (tester) async {
+    final id = await seedRoutine();
+
+    await tester.pumpWidget(harness(id));
+    await pumpUntilData(tester, until: find.text('Pull B'));
+
+    expect(find.text('Muscles worked'), findsNothing);
+    await disposeAndDrainTimers(tester);
+  });
+
+  testWidgets('an empty routine keeps the tile as a single stat',
+      (tester) async {
+    final templates = TemplateRepository(db);
+    final t = await templates.createTemplate(name: 'Empty');
+
+    await tester.pumpWidget(harness(t.id));
+    await pumpUntilData(tester, until: find.text('Empty'));
+
+    // Nothing to time and nothing to work: `~0 min` and a bare label are both
+    // worse than today's single centred column.
+    expect(find.text('Total sets'), findsOneWidget);
+    expect(find.text('Duration'), findsNothing);
+    expect(find.text('Muscles worked'), findsNothing);
+    await disposeAndDrainTimers(tester);
+  });
 }

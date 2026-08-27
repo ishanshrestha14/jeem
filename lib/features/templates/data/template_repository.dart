@@ -192,6 +192,41 @@ class TemplateRepository {
     return summaries;
   }
 
+  /// What this routine has actually cost, newest first — the measured half of
+  /// the routine detail's duration stat (T-025, S-030).
+  ///
+  /// `endedAt - startedAt - pausedSeconds`, the same arithmetic as
+  /// `SessionWithExercises.elapsed`, so the number here and the one the live
+  /// header showed during the session agree.
+  ///
+  /// Non-positive results are dropped as corrupt. **Nothing else is filtered.**
+  /// A session that ran five hours because it was left open still counts:
+  /// T-020 lets the user edit the duration on the finish form, so an odd
+  /// number is one they chose to keep, and second-guessing it here would
+  /// silently discard an explicit edit.
+  Future<List<Duration>> recentDurations(
+    String templateId, {
+    int limit = 3,
+  }) async {
+    final rows = await (_db.select(_db.workoutSessions)
+          ..where((s) =>
+              s.templateId.equals(templateId) &
+              s.status.equalsValue(SessionStatus.completed) &
+              s.endedAt.isNotNull() &
+              s.deletedAt.isNull())
+          ..orderBy([(s) => OrderingTerm.desc(s.endedAt)])
+          ..limit(limit))
+        .get();
+
+    return [
+      for (final row in rows)
+        if (row.endedAt!.difference(row.startedAt) -
+                Duration(seconds: row.pausedSeconds)
+            case final d when d > Duration.zero)
+          d,
+    ];
+  }
+
   /// Total planned sets across a template's exercises. Counted from rows
   /// since v6 — there is no per-exercise total to add up any more.
   Future<int> _plannedSetCount(List<TemplateExercise> exercises) async {

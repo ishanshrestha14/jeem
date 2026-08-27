@@ -9,8 +9,11 @@ import '../../../core/utils/formatting.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/initials_tile.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../db/app_database.dart';
+import '../../exercises/providers/exercise_providers.dart';
 import '../data/template_models.dart';
 import '../data/template_repository.dart';
+import '../domain/routine_estimate.dart';
 import '../providers/template_providers.dart';
 import 'start_workout_action.dart';
 
@@ -136,6 +139,19 @@ class _Body extends ConsumerWidget {
         .firstOrNull;
     final lastPerformed = summary?.lastPerformedAt;
 
+    // T-025's two stats. Both degrade to absent rather than to a placeholder:
+    // an unloaded or empty value hides its slot, so the tile is never showing
+    // a number it does not have.
+    final measured =
+        ref.watch(recentDurationsProvider(templateId)).valueOrNull ??
+            const <Duration>[];
+    final duration =
+        resolveRoutineDuration(plan: routine, measured: measured);
+    final bodyParts = summariseBodyParts(
+      routine,
+      ref.watch(bodyPartsByExerciseProvider).valueOrNull ?? const {},
+    );
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
@@ -148,7 +164,11 @@ class _Body extends ConsumerWidget {
           style: theme.textTheme.bodyMedium?.copyWith(color: semantic.muted),
         ),
         const SizedBox(height: 16),
-        _StatsTile(totalSets: routine.totalSets),
+        _StatsTile(
+          totalSets: routine.totalSets,
+          duration: duration,
+          bodyParts: bodyParts,
+        ),
         const SizedBox(height: 16),
         if (routine.exercises.isEmpty)
           const EmptyState(
@@ -163,18 +183,53 @@ class _Body extends ConsumerWidget {
   }
 }
 
-/// The bordered stat row under the name. Total sets only: the reference also
-/// shows an estimated duration and an anatomical figure, neither of which we
-/// have — and its figure must not be copied (S-030, open questions).
+/// The bordered stat tile under the name: what the routine costs you and what
+/// it works, answered before you commit to it.
+///
+/// Two numeric columns with the body parts on their own full-width line
+/// beneath, rather than the reference's three-slot row — a third of the width
+/// is not enough for three or four body-part words, and they are a list
+/// rather than a number, so a numeric column would misread them.
+///
+/// The reference's third slot is an anatomical figure. We do not draw one:
+/// its art must not be copied (README §3), and our taxonomy says the same
+/// thing in words (T-025).
+///
+/// Each slot disappears when it has nothing to say, so an empty untagged
+/// routine renders exactly the single centred column this tile was before
+/// T-025.
 class _StatsTile extends StatelessWidget {
-  const _StatsTile({required this.totalSets});
+  const _StatsTile({
+    required this.totalSets,
+    required this.duration,
+    required this.bodyParts,
+  });
 
   final int totalSets;
+  final RoutineDuration? duration;
+  final List<BodyPart> bodyParts;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final semantic = theme.extension<SemanticColors>()!;
+    final labelStyle =
+        theme.textTheme.bodyMedium?.copyWith(color: semantic.muted);
+
+    Widget stat(String label, String value, {String? caption}) => Column(
+          children: [
+            Text(label, style: labelStyle),
+            const SizedBox(height: 4),
+            Text(value, style: theme.textTheme.headlineSmall),
+            if (caption != null) ...[
+              const SizedBox(height: 2),
+              Text(caption, style: theme.textTheme.bodySmall
+                  ?.copyWith(color: semantic.muted)),
+            ],
+          ],
+        );
+
+    final d = duration;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
@@ -183,11 +238,41 @@ class _StatsTile extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text('Total sets',
-              style:
-                  theme.textTheme.bodyMedium?.copyWith(color: semantic.muted)),
-          const SizedBox(height: 4),
-          Text('$totalSets', style: theme.textTheme.headlineSmall),
+          IntrinsicHeight(
+            child: Row(
+              children: [
+                Expanded(child: stat('Total sets', '$totalSets')),
+                if (d != null) ...[
+                  VerticalDivider(width: 1, color: semantic.line),
+                  Expanded(
+                    child: stat(
+                      'Duration',
+                      approximateMinutes(d.value),
+                      // Which branch produced this is said out loud: a
+                      // measured number and a guessed one deserve different
+                      // amounts of trust.
+                      caption: d.wasMeasured ? 'your average' : 'estimated',
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (bodyParts.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Divider(height: 1, color: semantic.line),
+            const SizedBox(height: 16),
+            Text('Muscles worked', style: labelStyle),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                bodyParts.map(bodyPartLabel).join(' · '),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleMedium,
+              ),
+            ),
+          ],
         ],
       ),
     );
