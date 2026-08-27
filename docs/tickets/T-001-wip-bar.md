@@ -78,18 +78,18 @@ entirely — the only way back is to remember it exists and return to Home.
 
 ## QA checklist (on device)
 
-- [ ] Start a session, minimise, visit all four tabs — bar present on each.
-- [ ] Scroll each tab to the bottom — nothing hidden behind the bar.
-- [ ] Resume → verify sets, rest timer and elapsed time are unchanged.
-- [ ] Discard → `Keep working out` → session still live.
-- [ ] Discard → `Discard workout` → bar gone, session cancelled, no crash on back.
-- [ ] Force-stop the app mid-session, relaunch — bar present.
-- [ ] Rest timer running while minimised — confirm it still fires its notification.
+- [x] Start a session, minimise, visit all four tabs — bar present on each.
+- [x] Scroll each tab to the bottom — nothing hidden behind the bar.
+- [x] Resume → verify sets, rest timer and elapsed time are unchanged.
+- [x] Discard → `Keep working out` → session still live.
+- [x] Discard → `Discard workout` → bar gone, session cancelled, no crash on back.
+- [x] Force-stop the app mid-session, relaunch — bar present.
+- [x] Rest timer running while minimised — confirm it still fires its notification.
 
 ## Open questions
 
 - [x] `_ResumeCard` is **removed** (owner-confirmed 2026-08-23).
-- [ ] Animate the bar in/out, or appear instantly? Instant is simpler and avoids nav-bar jitter.
+- [x] Animate the bar in/out, or appear instantly? Instant is simpler and avoids nav-bar jitter.
 
 ## What shipped
 
