@@ -90,11 +90,11 @@ hold its column open; a header line has no column, so an exercise you have never
 
 ## QA checklist (on device)
 
-- [ ] Log a session, finish it, start the same routine again — `Last · …` shows the best set.
-- [ ] A routine exercise you have never done shows no line.
-- [ ] Train a split: an exercise skipped yesterday still shows its own last result, not blank.
-- [ ] A duration exercise shows no line.
-- [ ] Edit a completed set in history — the line updates.
+- [x] Log a session, finish it, start the same routine again — `Last · …` shows the best set.
+- [x] A routine exercise you have never done shows no line.
+- [x] Train a split: an exercise skipped yesterday still shows its own last result, not blank.
+- [x] A duration exercise shows no line.
+- [x] Edit a completed set in history — the line updates.
 
 ## Tests
 

@@ -116,14 +116,21 @@ void main() {
     expect(loaded.exercises.map((e) => e.config.sortOrder), [0, 1]);
   });
 
-  test('deleting a template cascades to its template exercises', () async {
+  test('deleting a template takes its exercises out of reach', () async {
     final t = await templates.createTemplate(name: 'Temp');
     await templates.addExercise(
         templateId: t.id, exerciseId: await makeExercise('X'));
 
     await templates.deleteTemplate(t.id);
 
-    expect(await db.select(db.templateExercises).get(), isEmpty);
+    // Since T-024 this is a *soft* delete, so the child rows deliberately
+    // survive: if a routine is ever restored, its exercises must still be
+    // there. What matters is that nothing can reach them — every query goes
+    // through the template, which is now filtered out.
+    expect(await templates.watchTemplate(t.id).first, isNull);
+    expect(await templates.watchSummaries().first, isEmpty);
+    expect(await db.select(db.templateExercises).get(), isNotEmpty,
+        reason: 'kept for recoverability, not reachable');
   });
 
   test('watchTemplate still returns an exercise that has been archived',

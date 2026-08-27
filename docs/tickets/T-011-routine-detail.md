@@ -72,12 +72,12 @@ already-running-session dialog behaves identically to every other entry point.
 
 ## QA checklist (on device)
 
-- [ ] Library → tap a routine → detail; Start workout runs it.
-- [ ] Library → play button on a routine → straight into the session.
-- [ ] Open a program → tap a routine → same detail screen.
-- [ ] A never-performed routine reads `Never performed`.
-- [ ] An empty routine cannot be started.
-- [ ] Start one routine while another session runs — the resume-or-discard dialog appears.
+- [x] Library → tap a routine → detail; Start workout runs it.
+- [x] Library → play button on a routine → straight into the session.
+- [x] Open a program → tap a routine → same detail screen.
+- [x] A never-performed routine reads `Never performed`.
+- [x] An empty routine cannot be started.
+- [x] Start one routine while another session runs — the resume-or-discard dialog appears.
 
 ## Tests
 

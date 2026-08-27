@@ -231,15 +231,50 @@ class TemplateRepository {
         );
   }
 
-  Future<void> deleteTemplate(String id) async {
+  /// Drops a never-saved draft outright.
+  ///
+  /// Deliberately **hard**, unlike [deleteTemplate]. A blank, unnamed routine
+  /// with no exercises is litter rather than history: there is nothing in it to
+  /// recover, and soft-deleting it would accumulate invisible rows forever,
+  /// one per time someone opened the editor and changed their mind.
+  ///
+  /// Only the editor's back-out path should call this, and only when the draft
+  /// is genuinely untouched.
+  Future<void> discardDraft(String id) async {
     await (_db.delete(_db.workoutTemplates)..where((t) => t.id.equals(id)))
         .go();
+  }
+
+  /// Removes a routine from the app.
+  ///
+  /// **Soft** (owner-confirmed 2026-08-27), stamping `deletedAt`. Every query
+  /// that reads routines already filters on it — `watchSummaries`,
+  /// `watchTemplate`, the programs join, and `startFromTemplate` — so one
+  /// write takes the routine out of every surface at once.
+  ///
+  /// A routine is what your logged history was built from, which made a hard
+  /// delete the one destructive delete in this app: sessions keep their own
+  /// snapshot, so history was never at risk, but the routine itself was
+  /// unrecoverable. It was also the root of the race
+  /// [T-016](../../../../docs/tickets/T-016-missing-routine.md) had to defend
+  /// against — the row vanishing between a list rendering and a tap landing.
+  /// That defence still holds, because a filtered-out row is as absent as a
+  /// dropped one.
+  ///
+  /// Deleting twice is harmless.
+  Future<void> deleteTemplate(String id) async {
+    final now = DateTime.now();
+    await (_db.update(_db.workoutTemplates)..where((t) => t.id.equals(id)))
+        .write(WorkoutTemplatesCompanion(
+      deletedAt: Value(now),
+      updatedAt: Value(now),
+    ));
   }
 
   Future<WorkoutTemplate> duplicateTemplate(String id) async {
     return _db.transaction(() async {
       final original = await (_db.select(_db.workoutTemplates)
-            ..where((t) => t.id.equals(id)))
+            ..where((t) => t.id.equals(id) & t.deletedAt.isNull()))
           .getSingle();
       final originalExercises = await (_db.select(_db.templateExercises)
             ..where((t) => t.templateId.equals(id) & t.deletedAt.isNull())

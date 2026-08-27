@@ -18,10 +18,14 @@ import 'pump_helpers.dart';
 /// (S-003) and the Library owns routines (S-004).
 void main() {
   late AppDatabase db;
+  String? sharedExerciseId;
 
   setUp(() {
     db = testDatabase();
     SharedPreferences.setMockInitialValues({});
+    // Each test gets a fresh database, so an id cached from the last one
+    // points at nothing.
+    sharedExerciseId = null;
   });
   tearDown(() => db.close());
 
@@ -33,19 +37,23 @@ void main() {
         ),
       );
 
-  Future<String> aLoggedWorkout({String name = 'Push'}) async {
+  Future<String> aLoggedWorkout({String name = 'Push', double weight = 100}) async {
     final templates = TemplateRepository(db);
     final exercises = ExerciseRepository(db);
     final sessions = SessionRepository(db);
     final t = await templates.createTemplate(name: name);
-    final e = await exercises.create(
-        name: '$name move', loggingType: LoggingType.strengthWeightRepsRir);
+    // One exercise across workouts, so their records actually compete.
+    final e = sharedExerciseId == null
+        ? await exercises.create(
+            name: 'Bench', loggingType: LoggingType.strengthWeightRepsRir)
+        : (await exercises.findById(sharedExerciseId!))!;
+    sharedExerciseId = e.id;
     await templates.addExercise(
         templateId: t.id, exerciseId: e.id, targetSets: 1);
     final s = await sessions.startFromTemplate(t.id, weightUnit: 'kg');
     final set = (await db.select(db.sessionSets).get()).last;
     await sessions.updateSet(set.copyWith(
-      weight: const Value(100),
+      weight: Value(weight),
       reps: const Value(5),
       completedAt: Value(DateTime.now()),
     ));
@@ -145,5 +153,27 @@ void main() {
 
     expect(find.text('IN PROGRESS'), findsNothing);
     expect(find.widgetWithText(FilledButton, 'Resume'), findsNothing);
+  });
+
+  testWidgets('a workout holding a standing record shows a badge (S-001)',
+      (tester) async {
+    await aLoggedWorkout(name: 'Push');
+
+    await tester.pumpWidget(harness());
+    await pumpUntilData(tester, until: find.text('Recent workouts'));
+
+    expect(find.textContaining('1 record'), findsOneWidget);
+  });
+
+  testWidgets('a workout whose record was beaten shows none', (tester) async {
+    // The badge means "this still stands" (owner-confirmed), so it goes away
+    // when you beat it — the number can fall as you get stronger.
+    await aLoggedWorkout(name: 'Old', weight: 60);
+    await aLoggedWorkout(name: 'New', weight: 100);
+
+    await tester.pumpWidget(harness());
+    await pumpUntilData(tester, until: find.text('Recent workouts'));
+
+    expect(find.textContaining('record'), findsOneWidget);
   });
 }

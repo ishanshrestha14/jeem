@@ -192,8 +192,9 @@ Next free CMP-ID: **CMP-028**.
 | [T-021](tickets/T-021-body-part-filter.md) | Filter the exercise library by body part | **Done** | S | S-026, ADR-006 |
 | [T-022](tickets/T-022-replace-exercise.md) | Replace an exercise in a routine | **Done** | S | S-029, S-028 |
 | [T-023](tickets/T-023-recent-performed-picker.md) | `Recent Performed` leads the mid-session picker | **Done** | S | S-026, S-014 |
+| [T-024](tickets/T-024-soft-delete-and-records-badge.md) | Soft-delete routines + `Records 🏅 N` badge | **Done** | M | S-001, ADR-004 |
 
-Next free T-ID: **T-024**.
+Next free T-ID: **T-025**.
 
 ### Decisions (ADR)
 | ID | Title | Status |
@@ -435,14 +436,14 @@ easy the *next* piece of work is to pick up, not whether the current state is un
 | FL (flows) | **4 written** — the session lifecycle. Routine-building and programs still underived |
 | CMP (components) | 27 registered — **14 built, 4 specced.** See §6 |
 | F (features) | 0 |
-| T (tickets) | 23 — **all done** |
+| T (tickets) | 24 — **all done** |
 | ADR (decisions) | 6 |
 
 **Last updated:** **T-015 shipped — every primary tab now matches its spec** (not every reference
 surface; seven remain, see below). Home is a recap
 (weekly summary with week-on-week deltas, then the last five workouts) instead of a fourth routine
 list. Before it, T-012/T-013/T-014 gave us ad-hoc sessions, the S-003 Workout tab and workout
-deletion. No schema change in any of the four. 399 tests pass, `flutter analyze` clean.
+deletion. No schema change in any of the four. 414 tests pass, `flutter analyze` clean.
 
 **Where the code is:** `main`, tracking `origin/main` at
 `git@github.com:ishanshrestha14/jeem.git`. Schema **v6**. Local commits may be ahead of the remote. Five-tab shell
@@ -458,27 +459,19 @@ S-029, S-030 built; S-027 and S-028 reviewed 2026-08-26 and found to have no gap
 S-024 deliberately not adopted. §6's documentation gaps are closed on both halves (FL-001..FL-004,
 four component specs).
 
-So there is no drift left to fix. What remains is **deferred decisions**, and two of them need the
-owner's answer before any code is written:
+So there is no drift left to fix, and **no decision is currently blocking work** — the two that
+were are answered and shipped in [T-024](tickets/T-024-soft-delete-and-records-badge.md).
 
-1. **Per-session `Records 🏅 N` on Home** (S-001). Needs a decision first: does a record count
-   against the history **up to that session**, or against **all** history? They give different
-   badges for the same workout — the first is "this was a PR at the time", the second "this still
-   stands". Everything else is in place (ADR-004 metrics, `computePersonalRecords`).
-2. **Should `deleteTemplate` become a soft delete?** It is a hard delete today, which is the root of
-   the race [T-016](tickets/T-016-missing-routine.md) had to defend against. Changing it alters what
-   a deleted routine means for history and duplication, so it is a product decision, not a cleanup.
+What remains, all un-blocked:
 
-Un-blocked, no decision needed:
-
-3. **S-030's estimated duration and muscle summary** — both deliberately deferred in T-011. The
+1. **S-030's estimated duration and muscle summary** — both deliberately deferred in T-011. The
    duration needs a formula chosen (sets x rest + a per-set constant?); the muscle summary can come
    from our own taxonomy.
-4. **S-003's Insights row** — still out, because we have no recovery or streak model. A streak *is*
+2. **S-003's Insights row** — still out, because we have no recovery or streak model. A streak *is*
    computable offline; recovery is not, and should not be invented.
-5. **The remaining flows** — build/edit a routine, exercise info, programs. FL-001..FL-004 cover the
+3. **The remaining flows** — build/edit a routine, exercise info, programs. FL-001..FL-004 cover the
    session lifecycle only.
-6. **A progress chart** (S-025's fourth pane, CMP-019). Charting is entirely new to this codebase,
+4. **A progress chart** (S-025's fourth pane, CMP-019). Charting is entirely new to this codebase,
    which is why T-018 stopped at three panes.
 
 **Working notes for a fresh session** — two traps this codebase sets, both of which have cost real

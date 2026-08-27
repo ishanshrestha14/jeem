@@ -163,7 +163,10 @@ class _TemplateEditorScreenState extends ConsumerState<TemplateEditorScreen> {
         tid != null &&
         _nameController.text.trim().isEmpty &&
         _exerciseCount == 0) {
-      await _repo.deleteTemplate(tid);
+      // `discardDraft`, not `deleteTemplate`: this row was never a routine, so
+      // there is nothing to keep. Soft-deleting every abandoned draft would
+      // quietly fill the table.
+      await _repo.discardDraft(tid);
     }
     if (mounted) Navigator.of(context).pop();
   }

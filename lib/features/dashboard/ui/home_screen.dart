@@ -7,6 +7,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/semantic_colors.dart';
 import '../../../core/utils/formatting.dart';
 import '../../history/providers/history_providers.dart';
+import '../../records/data/personal_records.dart';
+import '../../records/providers/records_providers.dart';
 import '../../sessions/data/session_models.dart';
 import '../../templates/ui/start_workout_action.dart';
 import '../domain/weekly_summary.dart';
@@ -35,6 +37,7 @@ class HomeScreen extends ConsumerWidget {
     final history = ref.watch(historyProvider).valueOrNull ?? const [];
     final summary = weeklySummary(history, now: DateTime.now());
     final recent = history.take(_recentLimit).toList();
+    final records = ref.watch(personalRecordsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Home')),
@@ -87,7 +90,8 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ],
             ),
-            for (final s in recent) _WorkoutRow(session: s),
+            for (final s in recent)
+              _WorkoutRow(session: s, records: recordsSetIn(s, records)),
           ],
         ],
       ),
@@ -186,9 +190,14 @@ class _FirstWorkoutCard extends ConsumerWidget {
 /// CMP-012's structure with the social layer removed: name, when, and the two
 /// numbers. Tapping opens the session's read-only summary.
 class _WorkoutRow extends StatelessWidget {
-  const _WorkoutRow({required this.session});
+  const _WorkoutRow({required this.session, this.records = 0});
 
   final ActiveSession session;
+
+  /// How many exercises this workout holds a **currently standing** record for
+  /// (S-001's `Records 🏅 N`). Zero hides the badge — most workouts set no
+  /// record, and a `0 records` line on every row would be noise.
+  final int records;
 
   @override
   Widget build(BuildContext context) {
@@ -221,6 +230,14 @@ class _WorkoutRow extends StatelessWidget {
                     style: theme.textTheme.bodyMedium
                         ?.copyWith(color: semantic.muted),
                   ),
+                  if (records > 0) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      '🏅 $records ${records == 1 ? 'record' : 'records'}',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: semantic.success),
+                    ),
+                  ],
                 ],
               ),
             ),

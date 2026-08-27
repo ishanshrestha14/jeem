@@ -175,3 +175,34 @@ class _Accumulator {
         mostReps: reps,
       );
 }
+
+/// How many exercises this session holds a **currently standing** record for
+/// — S-001's `Records 🏅 N`.
+///
+/// Owner-confirmed 2026-08-27: a record counts against **all** history, so the
+/// badge means *"this session still holds a best"*, not *"this was a best at
+/// the time"*. A workout whose record has since been beaten shows nothing,
+/// which is why the number can go down as you get stronger.
+///
+/// **Counted per exercise, not per metric.** One heavy set commonly sets the
+/// heaviest weight, the best estimated 1RM and the most reps at once; counting
+/// metrics would render that as `Records 3` for a single lift, overstating what
+/// happened. One exercise, one badge.
+///
+/// Matched on [PersonalRecord.achievedAt], which `computePersonalRecords`
+/// stamps with the session's own end time.
+int recordsSetIn(ActiveSession session, List<ExerciseRecords> records) {
+  final when = session.session.endedAt ?? session.session.startedAt;
+
+  var count = 0;
+  for (final exercise in records) {
+    final held = [
+      exercise.heaviestWeight,
+      exercise.bestEstimatedOneRepMax,
+      exercise.bestSessionVolume,
+      exercise.mostReps,
+    ].any((r) => r != null && r.achievedAt == when);
+    if (held) count++;
+  }
+  return count;
+}
