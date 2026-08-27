@@ -453,29 +453,44 @@ rename it into `screenshots/` under its manifest name.
 
 **Next step (a fresh session starts here):**
 
-1. **The five primary tabs match their specs** — S-001..S-006 and S-030 are built. **Seven reference
-   specs are still unbuilt-against**, and an earlier claim here that "no reference surface is
-   drifted" was wrong: it counted only the tabs.
+**Every reference spec is now built or explicitly closed.** S-001..S-006, S-023, S-025, S-026,
+S-029, S-030 built; S-027 and S-028 reviewed 2026-08-26 and found to have no gap worth building;
+S-024 deliberately not adopted. §6's documentation gaps are closed on both halves (FL-001..FL-004,
+four component specs).
 
-   | Spec | Our counterpart | Gap |
-   |---|---|---|
-   | ~~S-023 finish form~~ | **Built** — [T-020](tickets/T-020-finish-form.md) | Media, date/time, activity type and difficulty deliberately skipped |
-   | S-024 celebration/share | — | **Deliberately not adopted** (00-overview §5) |
-   | ~~S-025 exercise detail~~ | **Built** — [T-018](tickets/T-018-exercise-detail.md) | Progress chart still deferred (needs charting) |
-   | S-026 exercise browser | S-011/S-014 | Body-part filtering ([T-021](tickets/T-021-body-part-filter.md)) and `Recent Performed` ([T-023](tickets/T-023-recent-performed-picker.md)) built; only the card grid and per-card affordances remain |
-   | S-027 create exercise | S-012 | **Reviewed 2026-08-26 — no gap.** Its finding (body parts ≠ muscles) was already built by T-004/T-005 |
-   | S-028 create routine | S-009 | **Reviewed 2026-08-26 — no gap worth building.** Its finding (per-set prescription) shipped as T-002; inline-vs-sheet expansion is a recorded deviation |
-   | S-029 routine exercise menu | S-010 | **Reviewed 2026-08-26.** Replace exercise built ([T-022](tickets/T-022-replace-exercise.md)); warm-up sets, supersets and per-exercise units are new concepts, not gaps |
+So there is no drift left to fix. What remains is **deferred decisions**, and two of them need the
+owner's answer before any code is written:
 
-2. Deferred decisions rather than gaps: per-session `Records 🏅 N` on Home (needs a decision on what
-   window a record counts against), the estimated duration and muscle summary on S-030, Insights on
-   S-003, and whether `deleteTemplate` should be a soft delete (T-016).
-2. Consider closing the §6 gaps — flows especially. T-008, T-009 and T-010 each carried their flow
-   detail inline in the ticket again, which is the drift §6 warns about.
-3. **RIR onto the keypad** (CMP-018 specs an `RIR` key) would free the set row's fifth column, and
-   is the precondition for `Previous` becoming a per-row column as S-006 draws it.
-4. **Nothing on the session screen is outstanding.** CMP-015, CMP-001, CMP-018 and CMP-020 are all
-   built; the session work that has driven the last four tickets is done for now.
+1. **Per-session `Records 🏅 N` on Home** (S-001). Needs a decision first: does a record count
+   against the history **up to that session**, or against **all** history? They give different
+   badges for the same workout — the first is "this was a PR at the time", the second "this still
+   stands". Everything else is in place (ADR-004 metrics, `computePersonalRecords`).
+2. **Should `deleteTemplate` become a soft delete?** It is a hard delete today, which is the root of
+   the race [T-016](tickets/T-016-missing-routine.md) had to defend against. Changing it alters what
+   a deleted routine means for history and duplication, so it is a product decision, not a cleanup.
+
+Un-blocked, no decision needed:
+
+3. **S-030's estimated duration and muscle summary** — both deliberately deferred in T-011. The
+   duration needs a formula chosen (sets x rest + a per-set constant?); the muscle summary can come
+   from our own taxonomy.
+4. **S-003's Insights row** — still out, because we have no recovery or streak model. A streak *is*
+   computable offline; recovery is not, and should not be invented.
+5. **The remaining flows** — build/edit a routine, exercise info, programs. FL-001..FL-004 cover the
+   session lifecycle only.
+6. **A progress chart** (S-025's fourth pane, CMP-019). Charting is entirely new to this codebase,
+   which is why T-018 stopped at three panes.
+
+**Working notes for a fresh session** — two traps this codebase sets, both of which have cost real
+time and are written up in [T-013](tickets/T-013-workout-tab.md) and
+[T-016](tickets/T-016-missing-routine.md):
+
+- **Never `await` a Drift stream's `.first` inside a `testWidgets` body.** It needs real async turns
+  the fake clock does not provide, and the run *wedges* rather than failing. Have the fixture return
+  the ids it created.
+- **Every widget test that pumps a Drift-backed provider must end with `disposeAndDrainTimers`**,
+  or drift's cleanup timer is left pending and the whole file wedges. A red run therefore looks like
+  a hang — read the head of the log, not the tail.
 
 **Build/run:** see [`BUILD_ENVIRONMENT.md`](BUILD_ENVIRONMENT.md). `flutter run -d macos` is the
 fast loop; `flutter build apk --release` for the phone.
