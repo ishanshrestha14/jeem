@@ -80,11 +80,11 @@ the code being changed.
 
 ## QA checklist (on device)
 
-- [ ] Complete a set — the row washes, and it reads as done from across the room.
-- [ ] The numerals are still clearly the loudest thing in the row.
-- [ ] Un-complete it — the wash fades out.
-- [ ] Focus a completed row — it takes the current treatment, not the wash.
-- [ ] A duration exercise behaves the same.
+- [x] Complete a set — the row washes, and it reads as done from across the room.
+- [x] The numerals are still clearly the loudest thing in the row.
+- [x] Un-complete it — the wash fades out.
+- [x] Focus a completed row — it takes the current treatment, not the wash.
+- [x] A duration exercise behaves the same.
 
 ## Tests
 

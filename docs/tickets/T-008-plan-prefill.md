@@ -82,11 +82,11 @@ otherwise, which is the same reason T-002 gave the two their own columns.
 
 ## QA checklist (on device)
 
-- [ ] Start a session from a routine with a prescription — pending rows show muted numbers.
-- [ ] Tap ✓ on an untouched row — the number turns solid and the session volume moves.
-- [ ] Type over a hint, then tap ✓ — what you typed is what is logged.
-- [ ] Start a session from a routine with no prescription — rows are blank, as before.
-- [ ] A duration-logged exercise is unaffected.
+- [x] Start a session from a routine with a prescription — pending rows show muted numbers.
+- [x] Tap ✓ on an untouched row — the number turns solid and the session volume moves.
+- [x] Type over a hint, then tap ✓ — what you typed is what is logged.
+- [x] Start a session from a routine with no prescription — rows are blank, as before.
+- [x] A duration-logged exercise is unaffected.
 
 ## Tests
 

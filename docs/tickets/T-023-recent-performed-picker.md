@@ -69,8 +69,8 @@ which does the same job).
 ## QA checklist (on device)
 
 - [x] Log a workout, start another, tap **Add exercises** — what you just did is at the top.
-- [ ] Type a search inside that picker — the sections disappear and results are plain.
-- [ ] Open the picker from the routine editor — no `Recent` section.
+- [x] Type a search inside that picker — the sections disappear and results are plain.
+- [x] Open the picker from the routine editor — no `Recent` section.
 
 ## Revision log
 - 2026-08-27 — created and shipped.

@@ -24,13 +24,8 @@ throws `RoutineNotFound` rather than crashing.
 
 ### Two consequences that needed deciding, not patching
 
-- **An abandoned draft is still hard-deleted.** The editor discards a blank, unnamed, exercise-less
-  draft on the way out. Soft-deleting those would accumulate invisible rows forever — one per time
-  anybody opened the editor and changed their mind. That path now calls a separate `discardDraft`,
-  and the distinction is the point: a draft is litter, a routine is history.
-- **Child rows are deliberately kept.** The hard delete cascaded to `templateExercises`; the soft one
-  does not, because if a routine is ever restorable its exercises must still be there. Nothing can
-  reach them — every query goes through the template. The DAO test now asserts *unreachability*
+- **An abandoned draft is still hard-deleted.** The editor discards a blank, unnamed, exercise-less draft on the way out. Soft-deleting those would accumulate invisible rows forever — one per time anybody opened the editor and changed their mind. That path now calls a separate `discardDraft`, and the distinction is the point: a draft is litter, a routine is history.
+- **Child rows are deliberately kept.** The hard delete cascaded to `templateExercises`; the soft one does not, because if a routine is ever restorable its exercises must still be there. Nothing can reach them — every query goes through the template. The DAO test now asserts *unreachability*
   rather than row absence, which is what it always meant.
 
 ## 2. `Records 🏅 N` on Home's workout rows
@@ -80,14 +75,24 @@ noise.
 
 ## QA checklist (on device)
 
-- [ ] Delete a routine you have logged workouts from — history keeps them.
-- [ ] Home shows 🏅 on a workout that set a record; beat it and the badge moves.
-- [ ] Open and back out of a new routine without typing — no empty routine appears.
+- [x] Delete a routine you have logged workouts from — history keeps them.
+- [x] Home shows 🏅 on a workout that set a record; beat it and the badge moves.
+- [x] Open and back out of a new routine without typing — no empty routine appears.
 
-## Follow-up this opens
+## No restore path — decided, not overlooked
 
-Routines are now recoverable in the database and nothing surfaces them. An "undo delete" or a
-restore view is newly *possible* — worth considering, not obviously worth building.
+Routines are recoverable in the database and **nothing surfaces them**, so from the user's seat
+deleting still looks exactly like a hard delete. The owner raised this while testing and chose to
+**leave it as is** (2026-08-27).
+
+Worth stating the honest cost, so a later session does not "fix" it by accident: the benefits of soft
+delete are currently all invisible — a restorable row, T-016's race defused, history keeping its
+referential context. None is user-facing. Options weighed and declined: an undo snackbar on delete
+(cheap, catches the accidental case), a "Recently deleted" list in the Library (handles regret a week
+later), or reverting to a hard delete.
+
+If it is ever picked up, the undo snackbar is the one worth doing first: accidental deletion is the
+overwhelmingly common case, and it needs no new surface.
 
 ## Revision log
 - 2026-08-27 — created and shipped; both deferred decisions answered by the owner.
