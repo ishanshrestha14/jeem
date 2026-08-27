@@ -12,8 +12,7 @@ The follow-up [T-021](T-021-body-part-filter.md) deliberately left out. S-026: o
 session the picker's leading section becomes **`Recent Performed`** rather than the alphabetical
 library, because *mid-set what you want is almost always something you have done before*.
 
-The spec also notes it is cheap for us — we already have the session history to sort by — and that
-turned out to be exactly right: [T-018](T-018-exercise-detail.md) had already built the pass over
+The spec also notes it is cheap for us — we already have the session history to sort by — and that turned out to be exactly right: [T-018](T-018-exercise-detail.md) had already built the pass over
 completed sessions this needed.
 
 ## Scope (in)
@@ -69,7 +68,7 @@ which does the same job).
 
 ## QA checklist (on device)
 
-- [ ] Log a workout, start another, tap **Add exercises** — what you just did is at the top.
+- [x] Log a workout, start another, tap **Add exercises** — what you just did is at the top.
 - [ ] Type a search inside that picker — the sections disappear and results are plain.
 - [ ] Open the picker from the routine editor — no `Recent` section.
 

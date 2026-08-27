@@ -84,9 +84,9 @@ That is a fair change — the assertions still test what they meant — but wort
 
 ## QA checklist (on device)
 
-- [ ] Finish an ad-hoc session, rename it on the form, save — the new name shows in history.
-- [ ] Correct a duration, save, and check the Workout tab and Home's weekly summary agree.
-- [ ] Open a past workout from history — nothing is editable.
+- [x] Finish an ad-hoc session, rename it on the form, save — the new name shows in history.
+- [x] Correct a duration, save, and check the Workout tab and Home's weekly summary agree.
+- [x] Open a past workout from history — nothing is editable.
 
 ## Revision log
 - 2026-08-26 — created and shipped.

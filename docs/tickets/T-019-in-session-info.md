@@ -60,8 +60,8 @@ because it tested *reachability* via a real consequence, rather than testing the
 
 ## QA checklist (on device)
 
-- [ ] Mid-session, tap ℹ → detail opens; History shows previous sessions for that lift.
-- [ ] Back returns to the running session with the timer intact.
+- [x] Mid-session, tap ℹ → detail opens; History shows previous sessions for that lift.
+- [x] Back returns to the running session with the timer intact.
 
 ## Revision log
 - 2026-08-26 — created and shipped, correcting T-018's assumption once the owner answered.

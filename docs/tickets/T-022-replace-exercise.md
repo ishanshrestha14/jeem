@@ -74,9 +74,9 @@ The rest of S-029 is not a gap so much as a different product:
 
 ## QA checklist (on device)
 
-- [ ] Routine editor → an exercise's settings → Replace exercise → pick another; the sets stay.
-- [ ] Replace a strength exercise with a duration one; the set count survives, the numbers clear.
-- [ ] Start the routine afterwards — the session snapshots the replacement, with the kept plan.
+- [x] Routine editor → an exercise's settings → Replace exercise → pick another; the sets stay.
+- [x] Replace a strength exercise with a duration one; the set count survives, the numbers clear.
+- [x] Start the routine afterwards — the session snapshots the replacement, with the kept plan.
 
 ## Revision log
 - 2026-08-26 — created and shipped, from the S-027/S-028/S-029 review pass.

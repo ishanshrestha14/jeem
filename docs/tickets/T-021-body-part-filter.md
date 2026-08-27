@@ -74,9 +74,9 @@ to vanish.
 
 ## QA checklist (on device)
 
-- [ ] Tag two exercises with different body parts; each chip shows only its own.
-- [ ] Combine a chip with a search term and with Favourites.
-- [ ] Clear-search / clear-filter empty states still offer a way back.
+- [x] Tag two exercises with different body parts; each chip shows only its own.
+- [x] Combine a chip with a search term and with Favourites.
+- [x] Clear-search / clear-filter empty states still offer a way back.
 
 ## Revision log
 - 2026-08-26 — created and shipped.
