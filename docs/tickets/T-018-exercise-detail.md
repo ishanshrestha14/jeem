@@ -73,11 +73,11 @@ largest remaining capability gap now the session loop is done.
 
 ## QA checklist (on device)
 
-- [ ] Library → Exercises → tap one → detail opens on About.
-- [ ] History shows past sessions; a never-done exercise says so.
-- [ ] Records match the You tab for the same exercise.
-- [ ] ⋮ → Edit opens the editor and saving returns correctly.
-- [ ] The ℹ inside a live session opens this screen (changed by T-019).
+- [x] Library → Exercises → tap one → detail opens on About.
+- [x] History shows past sessions; a never-done exercise says so.
+- [x] Records match the You tab for the same exercise.
+- [x] ⋮ → Edit opens the editor and saving returns correctly.
+- [x] The ℹ inside a live session opens this screen (changed by T-019).
 
 ## Revision log
 - 2026-08-26 — created and shipped. Panes and tap target confirmed by the owner; the in-session ℹ

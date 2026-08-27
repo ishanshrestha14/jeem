@@ -1,26 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/semantic_colors.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/utils/formatting.dart';
 import '../../../db/app_database.dart';
+import '../../history/providers/history_providers.dart';
+import '../domain/exercise_history.dart';
 import '../providers/exercise_providers.dart';
 import 'exercise_editor_screen.dart';
 import 'exercise_info_sheet.dart';
 
-/// Full-height picker for adding an exercise to a template. Returns the
-/// chosen exercise's id, or null if the sheet is dismissed without a pick.
-Future<String?> showExercisePickerSheet(BuildContext context) {
+/// Full-height picker for adding an exercise to a template or a live session.
+/// Returns the chosen exercise's id, or null if dismissed without a pick.
+///
+/// [recentFirst] leads with what you have actually performed, most recent
+/// first (S-026). Pass it when adding **mid-session**: what you want then is
+/// almost always something you have done before, so recency beats
+/// alphabetical. Building a routine is not mid-set, so it stays alphabetical
+/// there — a section that appears sometimes is harder to learn than one that
+/// appears for a reason.
+Future<String?> showExercisePickerSheet(
+  BuildContext context, {
+  bool recentFirst = false,
+}) {
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (ctx) => const _ExercisePickerSheet(),
+    builder: (ctx) => _ExercisePickerSheet(recentFirst: recentFirst),
   );
 }
 
 class _ExercisePickerSheet extends ConsumerStatefulWidget {
-  const _ExercisePickerSheet();
+  const _ExercisePickerSheet({this.recentFirst = false});
+
+  final bool recentFirst;
 
   @override
   ConsumerState<_ExercisePickerSheet> createState() =>
@@ -122,9 +138,31 @@ class _ExercisePickerSheetState extends ConsumerState<_ExercisePickerSheet> {
                     final bodyParts =
                         ref.watch(bodyPartsByExerciseProvider).valueOrNull ??
                             const <String, List<BodyPart>>{};
+
+                    // Mid-session, lead with what has actually been performed
+                    // (S-026). Only while not searching: once you have typed a
+                    // query you are looking for a specific thing, and
+                    // reordering around recency would fight the search.
+                    final recentIds = widget.recentFirst && query.isEmpty
+                        ? recentlyPerformedExerciseIds(
+                            ref.watch(historyProvider).valueOrNull ?? const [])
+                        : const <String>[];
+                    final byId = {for (final e in rows) e.id: e};
+                    final recent = [
+                      for (final id in recentIds)
+                        if (byId.containsKey(id)) byId[id]!,
+                    ];
+                    final rest = [
+                      for (final e in rows)
+                        if (!recentIds.contains(e.id)) e,
+                    ];
+                    final sectioned = recent.isEmpty
+                        ? <Object>[...rows]
+                        : <Object>['Recent', ...recent, 'All exercises', ...rest];
+
                     return ListView.builder(
                       controller: scrollController,
-                      itemCount: rows.length + 1,
+                      itemCount: sectioned.length + 1,
                       itemBuilder: (ctx, i) {
                         if (i == 0) {
                           return ListTile(
@@ -133,7 +171,22 @@ class _ExercisePickerSheetState extends ConsumerState<_ExercisePickerSheet> {
                             onTap: () => _createExercise(context),
                           );
                         }
-                        final exercise = rows[i - 1];
+                        final item = sectioned[i - 1];
+                        if (item is String) {
+                          return Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                            child: Text(
+                              item,
+                              style: AppTheme.columnHeader.copyWith(
+                                color: Theme.of(context)
+                                    .extension<SemanticColors>()!
+                                    .muted,
+                              ),
+                            ),
+                          );
+                        }
+                        final exercise = item as Exercise;
                         return ListTile(
                           title: Text(exercise.name),
                           subtitle: Text([

@@ -83,7 +83,7 @@ exercise by value, so nothing about it requires a template to have existed.
 - [x] Start an ad-hoc session, add two exercises, log a set in each, finish — it appears in history.
 - [x] Add an exercise to a routine-started session already underway.
 - [x] Complete every set, then add another exercise — the session is in progress again.
-- [ ] Open More mid-session — settings behave as they do from the app bar.
+- [x] Open More mid-session — settings behave as they do from the app bar.
 
 ## Not yet reachable
 

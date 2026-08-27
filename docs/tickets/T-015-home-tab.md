@@ -101,10 +101,10 @@ which is present whether or not anything is logged.
 
 ## QA checklist (on device)
 
-- [ ] Fresh install — zeros and the first-run card.
-- [ ] Log a workout — the summary moves and the card is replaced by the list.
-- [ ] Log a second week — deltas appear against the first.
-- [ ] `See all` opens History; tapping a row opens that session's summary.
+- [x] Fresh install — zeros and the first-run card.
+- [x] Log a workout — the summary moves and the card is replaced by the list.
+- [x] Log a second week — deltas appear against the first.
+- [x] `See all` opens History; tapping a row opens that session's summary.
 
 ## Revision log
 - 2026-08-25 — created and shipped. Owner scoped out the routine list, capped the session list, and

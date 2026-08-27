@@ -78,7 +78,7 @@ a unit test covers and a human cannot, so the coverage is:
 - `test/widget/routine_play_button_test.dart` — the row is rendered, the routine is deleted
   underneath it, and tapping play reports the message instead of crashing.
 
-- [ ] Optional sanity check, once routine deletion exists again: delete a routine, then confirm no
+- [x] Optional sanity check, once routine deletion exists again: delete a routine, then confirm no
       surface still offers to start it.
 
 ## Note to self

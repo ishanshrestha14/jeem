@@ -76,9 +76,9 @@ question.
 
 ## QA checklist (on device)
 
-- [ ] Library → open a routine → ⋮ → Duplicate; the copy appears in the Library.
-- [ ] ⋮ → Delete → confirm; the screen closes and the routine is gone.
-- [ ] A workout logged from that routine is still in History afterwards.
+- [x] Library → open a routine → ⋮ → Duplicate; the copy appears in the Library.
+- [x] ⋮ → Delete → confirm; the screen closes and the routine is gone.
+- [x] A workout logged from that routine is still in History afterwards.
 
 ## Revision log
 - 2026-08-26 — created and fixed after the owner's question about T-016's QA steps exposed it.

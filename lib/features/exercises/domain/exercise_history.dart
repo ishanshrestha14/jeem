@@ -56,3 +56,34 @@ List<ExerciseHistoryEntry> exerciseHistory(
 
   return out;
 }
+
+/// Library exercise ids ordered by how recently they were actually performed,
+/// most recent first, each appearing once.
+///
+/// S-026: when the picker opens **mid-session** its leading section is
+/// `Recent Performed` rather than the alphabetical library — mid-set what you
+/// want is almost always something you have done before, so recency beats
+/// alphabetical.
+///
+/// [completed] must be newest-first, which `historyProvider` already is.
+///
+/// "Performed" means a set was actually logged, matching [exerciseHistory]: an
+/// exercise you loaded into a session and skipped is not something you did.
+/// A snapshot carrying no `exerciseId` is skipped, since the picker offers
+/// library rows and there is no row for it to point at.
+List<String> recentlyPerformedExerciseIds(List<ActiveSession> completed) {
+  final seen = <String>{};
+  final out = <String>[];
+
+  for (final session in completed) {
+    for (final entry in session.exercises) {
+      final id = entry.exercise.exerciseId;
+      if (id == null || seen.contains(id)) continue;
+      if (!entry.sets.any((s) => s.completedAt != null)) continue;
+      seen.add(id);
+      out.add(id);
+    }
+  }
+
+  return out;
+}

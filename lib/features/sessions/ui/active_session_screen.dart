@@ -360,7 +360,10 @@ class _ActiveSessionScreenState extends ConsumerState<ActiveSessionScreen>
   /// Opens the exercise picker and appends the choice to the live session.
   /// Cancelling changes nothing.
   Future<void> _handleAddExercise() async {
-    final exerciseId = await showExercisePickerSheet(context);
+    // Mid-session: lead with what has actually been performed (S-026). This
+    // is the call site that reasoning was written for.
+    final exerciseId =
+        await showExercisePickerSheet(context, recentFirst: true);
     if (exerciseId == null || !mounted) return;
     await ref
         .read(activeSessionControllerProvider.notifier)

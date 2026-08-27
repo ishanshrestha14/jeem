@@ -147,4 +147,72 @@ void main() {
   test('no history yields nothing', () {
     expect(exerciseHistory(const [], exerciseKey: 'ex-1'), isEmpty);
   });
+
+  group('recently performed', () {
+    test('orders by the most recent session that logged them', () {
+      final out = recentlyPerformedExerciseIds([
+        session(
+            endedAt: DateTime(2026, 8, 20),
+            exerciseName: 'Bench',
+            sets: [set(weight: 60, reps: 8)]),
+        session(
+            endedAt: DateTime(2026, 8, 18),
+            exerciseName: 'Squat',
+            exerciseId: 'ex-2',
+            sets: [set(weight: 100, reps: 5)]),
+      ]);
+
+      expect(out, ['ex-1', 'ex-2']);
+    });
+
+    test('an exercise done twice appears once, at its most recent place', () {
+      final out = recentlyPerformedExerciseIds([
+        session(
+            endedAt: DateTime(2026, 8, 20),
+            exerciseName: 'Squat',
+            exerciseId: 'ex-2',
+            sets: [set(weight: 100, reps: 5)]),
+        session(
+            endedAt: DateTime(2026, 8, 18),
+            exerciseName: 'Bench',
+            sets: [set(weight: 60, reps: 8)]),
+        session(
+            endedAt: DateTime(2026, 8, 16),
+            exerciseName: 'Squat',
+            exerciseId: 'ex-2',
+            sets: [set(weight: 90, reps: 5)]),
+      ]);
+
+      expect(out, ['ex-2', 'ex-1']);
+    });
+
+    test('a session where nothing was logged does not count as performed', () {
+      final out = recentlyPerformedExerciseIds([
+        session(
+            endedAt: DateTime(2026, 8, 20),
+            exerciseName: 'Bench',
+            sets: [set(weight: 60, reps: 8, complete: false)]),
+      ]);
+
+      expect(out, isEmpty);
+    });
+
+    test('an exercise with no id is skipped', () {
+      // The picker matches on library ids; a snapshot with none has no row to
+      // offer, so recency cannot point at anything.
+      final out = recentlyPerformedExerciseIds([
+        session(
+            endedAt: DateTime(2026, 8, 20),
+            exerciseName: 'Ad-hoc',
+            exerciseId: null,
+            sets: [set(weight: 20, reps: 12)]),
+      ]);
+
+      expect(out, isEmpty);
+    });
+
+    test('no history yields nothing', () {
+      expect(recentlyPerformedExerciseIds(const []), isEmpty);
+    });
+  });
 }

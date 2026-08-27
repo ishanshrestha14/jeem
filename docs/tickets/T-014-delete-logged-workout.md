@@ -97,9 +97,9 @@ All four passed first time; nothing needed fixing. They are guards, not fixes.
 ## QA checklist (on device)
 
 - [x] Delete a workout from the Workout tab — confirmed by the owner.
-- [ ] Delete one from History.
-- [ ] Delete a workout that set a PR; check the You tab's records.
-- [ ] Switch between Explore and Workout, then start a session — no hero exception.
+- [x] Delete one from History.
+- [x] Delete a workout that set a PR; check the You tab's records.
+- [x] Switch between Explore and Workout, then start a session — no hero exception.
 
 ## Revision log
 - 2026-08-25 — created and shipped after the owner found the gap while testing T-013.

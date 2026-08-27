@@ -83,3 +83,8 @@ library exists (owner decision 2026-08-23, [ADR-006](../../decisions/ADR-006-exe
   behind an icon; ours are visible chips, so the count is already on screen. Still open here:
   `Recent Performed` as the leading section when the picker is opened mid-session, the grid/list
   toggle, per-card bookmark and `?`, and `+` inside the picker.
+- 2026-08-27 — [T-023](../../tickets/T-023-recent-performed-picker.md) built `Recent Performed` as
+  the leading section when the picker opens mid-session, and only then — building a routine is not
+  mid-set, and a section that appears sometimes is harder to learn than one that appears for a
+  reason. Suppressed while searching. This spec's "cheap for us: we already have session history to
+  sort by" proved exactly right; T-018's pass over completed sessions was all it needed.

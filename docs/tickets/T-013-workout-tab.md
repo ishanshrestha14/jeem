@@ -93,10 +93,10 @@ three assertions are not lost — they moved with the behaviour:
 
 ## QA checklist (on device)
 
-- [ ] Open the tab with nothing logged — empty state, suggestions, FAB.
-- [ ] FAB → empty session → add an exercise → log a set → finish.
-- [ ] Reopen the tab — the workout is listed and suggestions are gone.
-- [ ] A never-performed routine leads the suggestions.
+- [x] Open the tab with nothing logged — empty state, suggestions, FAB.
+- [x] FAB → empty session → add an exercise → log a set → finish.
+- [x] Reopen the tab — the workout is listed and suggestions are gone.
+- [x] A never-performed routine leads the suggestions.
 
 ## Two more retired assertions
 
