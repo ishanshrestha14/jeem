@@ -1,3 +1,4 @@
+import '../../../core/utils/weight_units.dart';
 import '../../../db/app_database.dart';
 
 class SessionExerciseWithSets {
@@ -52,6 +53,18 @@ class ActiveSession {
     }
     return total;
   }
+
+  /// [completedVolume], restated in [displayUnit].
+  ///
+  /// The session knows the unit it was logged in, so the conversion belongs
+  /// here rather than at each call site. `completedVolume` is kept for the
+  /// single-session surfaces (the summary screen, a history row), which show
+  /// a session in its own unit and have nothing to reconcile (T-026).
+  double completedVolumeIn(String displayUnit) => convertWeight(
+        completedVolume,
+        from: session.weightUnit,
+        to: displayUnit,
+      );
 
   SessionExerciseWithSets? exerciseOf(String setId) {
     for (final e in exercises) {

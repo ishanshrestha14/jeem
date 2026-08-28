@@ -10,6 +10,7 @@ import '../../history/providers/history_providers.dart';
 import '../../records/data/personal_records.dart';
 import '../../records/providers/records_providers.dart';
 import '../../sessions/data/session_models.dart';
+import '../../settings/providers/settings_providers.dart';
 import '../../templates/ui/start_workout_action.dart';
 import '../domain/weekly_summary.dart';
 
@@ -35,7 +36,8 @@ class HomeScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final semantic = theme.extension<SemanticColors>()!;
     final history = ref.watch(historyProvider).valueOrNull ?? const [];
-    final summary = weeklySummary(history, now: DateTime.now());
+    final unit = ref.watch(settingsProvider).weightUnit;
+    final summary = weeklySummary(history, now: DateTime.now(), displayUnit: unit);
     final recent = history.take(_recentLimit).toList();
     final records = ref.watch(personalRecordsProvider);
 
@@ -69,7 +71,7 @@ class HomeScreen extends ConsumerWidget {
                   label: 'Volume',
                   value: '${summary.volume.round()}',
                   delta: summary.volumeDelta,
-                  deltaLabel: '${summary.volumeDelta.abs().round()} kg',
+                  deltaLabel: '${summary.volumeDelta.abs().round()} $unit',
                 ),
               ),
             ],

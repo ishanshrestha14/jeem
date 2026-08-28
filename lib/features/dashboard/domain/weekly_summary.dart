@@ -34,6 +34,7 @@ class WeeklySummary {
 WeeklySummary weeklySummary(
   List<ActiveSession> completed, {
   required DateTime now,
+  required String displayUnit,
 }) {
   final thisWeek = weekStart(now);
   final lastWeek = thisWeek.subtract(const Duration(days: 7));
@@ -58,11 +59,11 @@ WeeklySummary weeklySummary(
     if (isThisWeek) {
       workouts++;
       duration += took;
-      volume += s.completedVolume;
+      volume += s.completedVolumeIn(displayUnit);
     } else {
       priorWorkouts++;
       priorDuration += took;
-      priorVolume += s.completedVolume;
+      priorVolume += s.completedVolumeIn(displayUnit);
     }
   }
 

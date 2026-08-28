@@ -71,7 +71,7 @@ void main() {
       session(endedAt: DateTime(2026, 8, 24)), // Monday, this week
       session(endedAt: DateTime(2026, 8, 25)), // Tuesday, this week
       session(endedAt: DateTime(2026, 8, 21)), // Friday, last week
-    ], now: now);
+    ], now: now, displayUnit: 'kg');
 
     expect(s.workouts, 2);
   });
@@ -79,7 +79,7 @@ void main() {
   test('the week starts on Sunday, so Sunday counts as this week', () {
     final s = weeklySummary([
       session(endedAt: DateTime(2026, 8, 23, 9)), // Sunday
-    ], now: now);
+    ], now: now, displayUnit: 'kg');
 
     expect(s.workouts, 1);
   });
@@ -87,7 +87,7 @@ void main() {
   test('Saturday belongs to last week, not this one', () {
     final s = weeklySummary([
       session(endedAt: DateTime(2026, 8, 22, 23)), // Saturday
-    ], now: now);
+    ], now: now, displayUnit: 'kg');
 
     expect(s.workouts, 0);
     expect(s.workoutsDelta, -1, reason: 'it counted toward last week');
@@ -97,7 +97,7 @@ void main() {
     final s = weeklySummary([
       session(endedAt: DateTime(2026, 8, 24), minutes: 30, weight: 100, reps: 5),
       session(endedAt: DateTime(2026, 8, 25), minutes: 45, weight: 60, reps: 10),
-    ], now: now);
+    ], now: now, displayUnit: 'kg');
 
     expect(s.duration, const Duration(minutes: 75));
     expect(s.volume, 500 + 600);
@@ -110,7 +110,7 @@ void main() {
       // Last week: two workouts, 200kg total.
       session(endedAt: DateTime(2026, 8, 18), minutes: 30, weight: 50, reps: 2),
       session(endedAt: DateTime(2026, 8, 19), minutes: 30, weight: 50, reps: 2),
-    ], now: now);
+    ], now: now, displayUnit: 'kg');
 
     expect(s.workoutsDelta, -1);
     expect(s.volumeDelta, 500 - 200);
@@ -120,14 +120,14 @@ void main() {
   test('an incomplete set adds no volume', () {
     final s = weeklySummary([
       session(endedAt: DateTime(2026, 8, 24), completed: false),
-    ], now: now);
+    ], now: now, displayUnit: 'kg');
 
     expect(s.workouts, 1);
     expect(s.volume, 0);
   });
 
   test('no history is all zeroes, not nulls', () {
-    final s = weeklySummary(const [], now: now);
+    final s = weeklySummary(const [], now: now, displayUnit: 'kg');
 
     expect(s.workouts, 0);
     expect(s.volume, 0);
