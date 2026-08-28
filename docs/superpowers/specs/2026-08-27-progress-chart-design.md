@@ -325,11 +325,16 @@ duration-logged exercise has no Progress tab. **No golden tests.**
 
 ## Open questions
 
-- [ ] Which unit does "current setting" mean at the moment of comparison — the live Settings value,
-      re-derived whenever it changes? Assumed yes; it makes records and charts move when you switch
-      units, which is correct but worth confirming it is not surprising.
-- [ ] Should T-026 backfill anything, or purely normalise at read time? Assumed read-time only,
-      consistent with "storage is untouched".
+**None. Both closed by the owner, 2026-08-28.**
+
+- [x] Which unit does "current setting" mean at the moment of comparison? **The live Settings
+      value**, re-derived whenever it changes. So switching kg to lb restates every record, the
+      `Previous` line and the weekly volume immediately — which is exactly why the invalidation watch
+      described above is required rather than optional.
+- [x] Should T-026 backfill anything, or purely normalise at read time? **Read-time only.** No
+      migration, no rewritten rows. A session keeps the unit it was logged in permanently; the
+      conversion happens on the way out, every time. Consistent with "storage is untouched", and it
+      means the fix is reversible by deleting code.
 
 ## Revision log
 
@@ -355,3 +360,5 @@ duration-logged exercise has no Progress tab. **No golden tests.**
      unchanged. Conversion constant fixed at 1 lb = 0.45359237 kg.
   8. Display rounding for converted sums fixed: full precision to sum and compare, round to a whole
      unit only to draw, delta computed before rounding.
+- 2026-08-28 — both open questions closed by the owner: the display unit is the live Settings value,
+  and T-026 normalises at read time with no backfill. **The design has no open questions left.**
