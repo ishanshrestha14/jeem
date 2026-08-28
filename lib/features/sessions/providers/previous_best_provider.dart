@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../history/providers/history_providers.dart';
+import '../../settings/providers/settings_providers.dart';
 import '../domain/previous_best.dart';
 
 /// `exerciseId ?? name` -> the best set of the last session that contained it.
@@ -12,5 +13,8 @@ import '../domain/previous_best.dart';
 /// cached table would have to invalidate on.
 final previousBestProvider = Provider<Map<String, PreviousBest>>((ref) {
   final sessions = ref.watch(historyProvider).valueOrNull ?? const [];
-  return previousBestByExercise(sessions);
+  // Watched for the same reason personalRecordsProvider watches it: a unit
+  // switch must restate `Previous` without waiting on a history edit (T-026).
+  final unit = ref.watch(settingsProvider).weightUnit;
+  return previousBestByExercise(sessions, displayUnit: unit);
 });

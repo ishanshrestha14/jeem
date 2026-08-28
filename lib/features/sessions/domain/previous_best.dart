@@ -1,3 +1,4 @@
+import '../../../core/utils/weight_units.dart';
 import '../../../db/tables.dart';
 import '../../records/data/personal_records.dart';
 import '../data/session_models.dart';
@@ -44,8 +45,9 @@ class PreviousBest {
 /// session snapshot kept one, else by name, so an ad-hoc or since-deleted
 /// exercise still matches itself.
 Map<String, PreviousBest> previousBestByExercise(
-  List<ActiveSession> completed,
-) {
+  List<ActiveSession> completed, {
+  required String displayUnit,
+}) {
   final out = <String, PreviousBest>{};
 
   for (final session in completed) {
@@ -61,9 +63,16 @@ Map<String, PreviousBest> previousBestByExercise(
       var bestScore = 0.0;
       for (final set in entry.sets) {
         if (set.completedAt == null) continue;
-        final weight = set.weight;
+        final logged = set.weight;
         final reps = set.reps;
-        if (weight == null || reps == null || reps <= 0) continue;
+        if (logged == null || reps == null || reps <= 0) continue;
+        // Converted before scoring, so a set logged in lb is ranked against a
+        // kg set by what was actually lifted (T-026).
+        final weight = convertWeight(
+          logged,
+          from: session.session.weightUnit,
+          to: displayUnit,
+        );
 
         final score = estimatedOneRepMax(weight, reps);
         if (best == null || score > bestScore ||

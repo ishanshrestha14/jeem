@@ -81,7 +81,7 @@ void main() {
       session(endedAt: DateTime.utc(2026, 8, 10), exercises: [
         entry(name: 'Bench', sets: [set(weight: 60, reps: 8), set(weight: 70, reps: 5)]),
       ]),
-    ]);
+    ], displayUnit: 'kg');
 
     expect(best['ex-1']!.weight, 70);
     expect(best['ex-1']!.reps, 5);
@@ -93,7 +93,7 @@ void main() {
       session(endedAt: DateTime.utc(2026, 8, 10), exercises: [
         entry(name: 'Bench', sets: [set(weight: 70, reps: 2), set(weight: 60, reps: 10)]),
       ]),
-    ]);
+    ], displayUnit: 'kg');
 
     expect(best['ex-1']!.weight, 60);
     expect(best['ex-1']!.reps, 10);
@@ -112,7 +112,7 @@ void main() {
       session(endedAt: DateTime.utc(2026, 8, 3), exercises: [
         entry(name: 'Bench', sets: [set(weight: 200, reps: 5)]),
       ]),
-    ]);
+    ], displayUnit: 'kg');
 
     expect(best['ex-1']!.weight, 80,
         reason: 'the 10th, not the older 3rd — recency beats the bigger lift');
@@ -127,7 +127,7 @@ void main() {
       session(endedAt: DateTime.utc(2026, 8, 10), exercises: [
         entry(name: 'Bench', sets: [set(weight: 80, reps: 5)]),
       ]),
-    ]);
+    ], displayUnit: 'kg');
 
     expect(best['ex-1']!.weight, 80);
   });
@@ -141,7 +141,7 @@ void main() {
           set(weight: 50, reps: 5),
         ]),
       ]),
-    ]);
+    ], displayUnit: 'kg');
 
     expect(best['ex-1']!.weight, 50);
   });
@@ -155,7 +155,7 @@ void main() {
           sets: [set(weight: null, reps: null)],
         ),
       ]),
-    ]);
+    ], displayUnit: 'kg');
 
     expect(best, isEmpty);
   });
@@ -165,13 +165,13 @@ void main() {
       session(endedAt: DateTime.utc(2026, 8, 10), exercises: [
         entry(name: 'Ad-hoc Curl', exerciseId: null, sets: [set(weight: 20, reps: 12)]),
       ]),
-    ]);
+    ], displayUnit: 'kg');
 
     expect(best['Ad-hoc Curl']!.weight, 20);
   });
 
   test('no history yields no entries', () {
-    expect(previousBestByExercise([]), isEmpty);
+    expect(previousBestByExercise([], displayUnit: 'kg'), isEmpty);
   });
 
   test('the achieving set carries the date it was done', () {
@@ -179,7 +179,7 @@ void main() {
       session(endedAt: DateTime.utc(2026, 8, 10), exercises: [
         entry(name: 'Bench', sets: [set(weight: 80, reps: 5)]),
       ]),
-    ]);
+    ], displayUnit: 'kg');
 
     expect(best['ex-1']!.when, DateTime.utc(2026, 8, 10));
   });
