@@ -75,7 +75,8 @@ non-field part of the screen still unfocuses, and the pad's own close key is unt
 
 ## QA checklist
 
-- [ ] macOS: tap a weight field, type `102.5` on the pad — all five keys land, pad stays open.
+- [x] macOS: tap a weight field, type `102.5` on the pad — all five keys land, pad stays open.
+      **Owner-confirmed 2026-08-28** on the rebuilt debug build.
 - [ ] macOS: `Next` still moves weight → reps → next set's weight.
 - [ ] macOS: the pad's close key still dismisses it, and tapping the background still unfocuses.
 - [ ] Android: enter a weight and reps as before — no change.
@@ -92,3 +93,5 @@ non-field part of the screen still unfocuses, and the pad's own close key is unt
 - 2026-08-28 — created and fixed. Found by owner testing on macOS; root-caused to Flutter's
   platform-dependent `onTapOutside` default, and to `flutter test` defaulting to Android, which is
   why the existing keypad suite passed throughout.
+- 2026-08-28 — owner verified the fix on macOS. The remaining QA lines (`Next` chaining, the close
+  key, and the Android no-change check) are still unexercised and stay unticked.
