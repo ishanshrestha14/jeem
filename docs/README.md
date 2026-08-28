@@ -195,8 +195,13 @@ Next free CMP-ID: **CMP-028**.
 | [T-024](tickets/T-024-soft-delete-and-records-badge.md) | Soft-delete routines + `Records 🏅 N` badge | **Done** | M | S-001, ADR-004 |
 | [T-025](tickets/T-025-routine-stats.md) | Routine detail stats: duration + body parts — closes S-030 | **Done** | M | S-030, ADR-006 |
 | [T-026](tickets/T-026-weight-unit-normalisation.md) | Normalise weights to the display unit before comparing | **Done** | M | ADR-003, ADR-004 |
+| [T-028](tickets/T-028-keypad-closes-on-desktop.md) | In-session keypad closed on every keystroke (desktop only) | **Done** | S | CMP-018, S-006 |
 
-Next free T-ID: **T-027**.
+**T-027 is reserved** for the progress chart — its
+[design](superpowers/specs/2026-08-27-progress-chart-design.md) already names it, and §2 assigns IDs
+in order of first appearance, so the desktop keypad bug took T-028 rather than displacing it.
+
+Next free T-ID: **T-029**.
 
 ### Decisions (ADR)
 | ID | Title | Status |

@@ -115,8 +115,11 @@ class AppKeypadController extends ChangeNotifier {
 
     if (character == '.') {
       if (!editor.allowDecimal) return;
-      final remaining =
-          value.text.replaceRange(selection.start, selection.end, '');
+      final remaining = value.text.replaceRange(
+        selection.start,
+        selection.end,
+        '',
+      );
       // One decimal point only, and a leading '.' becomes '0.' so the value
       // is parseable the moment it is typed rather than after the next digit.
       if (remaining.contains('.')) return;
@@ -144,7 +147,10 @@ class AppKeypadController extends ChangeNotifier {
     if (selection.start == 0) return;
     _replace(
       controller,
-      TextSelection(baseOffset: selection.start - 1, extentOffset: selection.start),
+      TextSelection(
+        baseOffset: selection.start - 1,
+        extentOffset: selection.start,
+      ),
       '',
     );
   }
@@ -171,8 +177,11 @@ class AppKeypadController extends ChangeNotifier {
     TextSelection selection,
     String replacement,
   ) {
-    final text =
-        controller.text.replaceRange(selection.start, selection.end, replacement);
+    final text = controller.text.replaceRange(
+      selection.start,
+      selection.end,
+      replacement,
+    );
     controller.value = TextEditingValue(
       text: text,
       selection: TextSelection.collapsed(
@@ -199,9 +208,7 @@ class AppKeypadScope extends InheritedNotifier<AppKeypadController> {
   /// Reads the controller without subscribing — for fields, which react to
   /// their own focus rather than to the pad's state.
   static AppKeypadController? readOf(BuildContext context) {
-    return context
-        .getInheritedWidgetOfExactType<AppKeypadScope>()
-        ?.notifier;
+    return context.getInheritedWidgetOfExactType<AppKeypadScope>()?.notifier;
   }
 }
 
@@ -235,56 +242,72 @@ class AppKeypad extends StatelessWidget {
     final theme = Theme.of(context);
     final semantic = theme.extension<SemanticColors>()!;
 
-    return Material(
-      color: semantic.surfaceHigh,
-      child: SafeArea(
-        top: false,
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: semantic.line)),
-          ),
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final row in const [
-                ['1', '2', '3'],
-                ['4', '5', '6'],
-                ['7', '8', '9'],
-              ])
+    // The pad is part of the field it edits, not somewhere else the user
+    // tapped. `TextField` unfocuses on a pointer-down outside itself, and
+    // that default fires **only on desktop** (macOS/Windows/Linux) — so on
+    // macOS every key press detached the editor and closed the pad before it
+    // could register. `TextFieldTapRegion` puts the pad in the field's own
+    // tap group, which is exactly what it exists for.
+    //
+    // Invisible to the suite for the same reason it was invisible in review:
+    // `flutter test` runs as `TargetPlatform.android`, where the default
+    // handler does nothing. `session_keypad_focus_test.dart` overrides the
+    // platform to macOS to keep this honest.
+    return TextFieldTapRegion(
+      child: Material(
+        color: semantic.surfaceHigh,
+        child: SafeArea(
+          top: false,
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: semantic.line)),
+            ),
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final row in const [
+                  ['1', '2', '3'],
+                  ['4', '5', '6'],
+                  ['7', '8', '9'],
+                ])
+                  _KeyRow(
+                    children: [
+                      for (final digit in row)
+                        _Key(
+                          label: digit,
+                          onPressed: () => controller.input(digit),
+                        ),
+                      _actionFor(row, editor, semantic),
+                    ],
+                  ),
                 _KeyRow(
                   children: [
-                    for (final digit in row)
-                      _Key(
-                        label: digit,
-                        onPressed: () => controller.input(digit),
-                      ),
-                    _actionFor(row, editor, semantic),
+                    // The decimal point exists only where a fraction is valid,
+                    // so an integer field cannot be given one.
+                    editor.allowDecimal
+                        ? _Key(
+                            label: '.',
+                            onPressed: () => controller.input('.'),
+                          )
+                        : const _Key.blank(),
+                    _Key(label: '0', onPressed: () => controller.input('0')),
+                    _Key(
+                      icon: Icons.backspace_outlined,
+                      semanticLabel: 'Backspace',
+                      onPressed: controller.backspace,
+                    ),
+                    _Key(
+                      label: 'Next',
+                      filled: true,
+                      onPressed: () {
+                        if (!controller.next()) controller.close();
+                      },
+                    ),
                   ],
                 ),
-              _KeyRow(
-                children: [
-                  // The decimal point exists only where a fraction is valid,
-                  // so an integer field cannot be given one.
-                  editor.allowDecimal
-                      ? _Key(label: '.', onPressed: () => controller.input('.'))
-                      : const _Key.blank(),
-                  _Key(label: '0', onPressed: () => controller.input('0')),
-                  _Key(
-                    icon: Icons.backspace_outlined,
-                    semanticLabel: 'Backspace',
-                    onPressed: controller.backspace,
-                  ),
-                  _Key(
-                    label: 'Next',
-                    filled: true,
-                    onPressed: () {
-                      if (!controller.next()) controller.close();
-                    },
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -348,11 +371,11 @@ class _Key extends StatelessWidget {
   });
 
   const _Key.blank()
-      : label = null,
-        icon = null,
-        semanticLabel = null,
-        onPressed = null,
-        filled = false;
+    : label = null,
+      icon = null,
+      semanticLabel = null,
+      onPressed = null,
+      filled = false;
 
   final String? label;
   final IconData? icon;
@@ -388,8 +411,9 @@ class _Key extends StatelessWidget {
               onPressed: onPressed,
               style: style.copyWith(
                 side: WidgetStateProperty.all(BorderSide(color: semantic.line)),
-                foregroundColor:
-                    WidgetStateProperty.all(theme.colorScheme.onSurface),
+                foregroundColor: WidgetStateProperty.all(
+                  theme.colorScheme.onSurface,
+                ),
               ),
               child: child,
             ),
