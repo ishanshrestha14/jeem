@@ -73,6 +73,10 @@ Map<String, PreviousBest> previousBestByExercise(
           from: session.session.weightUnit,
           to: displayUnit,
         );
+        // A zero-weight set is bodyweight work, not a 0 kg best — mirrors
+        // computePersonalRecords's own guard, so the two never disagree about
+        // whether a bodyweight-only session has a "best" (T-026).
+        if (weight <= 0) continue;
 
         final score = estimatedOneRepMax(weight, reps);
         if (best == null || score > bestScore ||

@@ -69,7 +69,7 @@ class HomeScreen extends ConsumerWidget {
               Expanded(
                 child: _SummaryStat(
                   label: 'Volume',
-                  value: '${summary.volume.round()}',
+                  value: '${summary.volume.round()} $unit',
                   delta: summary.volumeDelta,
                   deltaLabel: '${summary.volumeDelta.abs().round()} $unit',
                 ),

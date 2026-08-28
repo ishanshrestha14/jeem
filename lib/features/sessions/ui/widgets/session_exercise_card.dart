@@ -9,6 +9,7 @@ import '../../../../core/utils/formatting.dart';
 import '../../../../core/widgets/numeric_field.dart';
 import '../../../../db/app_database.dart';
 import '../../../exercises/ui/exercise_info_sheet.dart';
+import '../../../settings/providers/settings_providers.dart';
 import '../../providers/active_session_controller.dart';
 import '../../providers/previous_best_provider.dart';
 import 'duration_set_row.dart';
@@ -194,7 +195,10 @@ class SessionExerciseCard extends ConsumerWidget {
                 PreviousBestLine(
                   best: ref.watch(previousBestProvider)[
                       exercise.exerciseId ?? exercise.name],
-                  weightUnit: weightUnit,
+                  // The settings unit, not this session's `weightUnit`: the
+                  // value came from `previousBestProvider`, which converts to
+                  // settings before ranking (T-026).
+                  weightUnit: ref.watch(settingsProvider).weightUnit,
                 ),
                 const SizedBox(height: 8),
                 _ColumnHeaders(

@@ -26,8 +26,10 @@ class PreviousBestLine extends StatelessWidget {
 
   final PreviousBest? best;
 
-  /// The *session's* unit, not a global setting — a session records the unit
-  /// it was logged in, and this line is read beside that session's numbers.
+  /// The current **settings** unit, not the session's own — `best.weight`
+  /// comes from `previousBestProvider`, which converts to the settings unit
+  /// before ranking (T-026), so the label shown here must match that
+  /// conversion rather than whatever unit the session was logged in.
   final String weightUnit;
 
   @override

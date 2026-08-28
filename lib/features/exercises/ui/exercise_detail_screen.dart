@@ -11,6 +11,7 @@ import '../../../db/app_database.dart';
 import '../../history/providers/history_providers.dart';
 import '../../records/data/personal_records.dart';
 import '../../records/providers/records_providers.dart';
+import '../../settings/providers/settings_providers.dart';
 import '../domain/exercise_history.dart';
 import '../providers/exercise_providers.dart';
 
@@ -251,6 +252,9 @@ class _RecordsPane extends ConsumerWidget {
     final semantic = theme.extension<SemanticColors>()!;
     final all = ref.watch(personalRecordsProvider);
     final records = all.where((r) => r.exerciseKey == exercise.id).firstOrNull;
+    // Values from personalRecordsProvider are already in the settings unit,
+    // so the label shown next to them must be that unit too (T-026).
+    final unit = ref.watch(settingsProvider).weightUnit;
 
     if (records == null || records.isEmpty) {
       return Center(
@@ -268,11 +272,11 @@ class _RecordsPane extends ConsumerWidget {
     // ADR-004's four metrics, in its order.
     final rows = <(String, PersonalRecord?, String Function(PersonalRecord))>[
       ('Heaviest weight', records.heaviestWeight,
-          (r) => '${formatWeight(r.value)} kg'),
+          (r) => '${formatWeight(r.value)} $unit'),
       ('Best estimated 1RM', records.bestEstimatedOneRepMax,
-          (r) => '${formatWeight(r.value)} kg'),
+          (r) => '${formatWeight(r.value)} $unit'),
       ('Best session volume', records.bestSessionVolume,
-          (r) => '${r.value.round()} kg'),
+          (r) => '${r.value.round()} $unit'),
       ('Most reps', records.mostReps, (r) => '${r.value.round()}'),
     ];
 
@@ -294,7 +298,7 @@ class _RecordsPane extends ConsumerWidget {
                   Text(
                     // The achieving set, so the number is readable rather than
                     // just impressive (ADR-004).
-                    '${formatWeight(record.weight)} kg x ${record.reps} · '
+                    '${formatWeight(record.weight)} $unit x ${record.reps} · '
                     '${relativeDay(record.achievedAt)}',
                     style: theme.textTheme.bodySmall
                         ?.copyWith(color: semantic.muted),

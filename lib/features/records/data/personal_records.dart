@@ -105,8 +105,6 @@ List<ExerciseRecords> computePersonalRecords(
           from: session.session.weightUnit,
           to: displayUnit,
         );
-        // A zero-weight set is bodyweight work, not a 0 kg record (T-026).
-        if (weight <= 0) continue;
 
         final record = PersonalRecord(
           value: weight,
@@ -115,17 +113,23 @@ List<ExerciseRecords> computePersonalRecords(
           achievedAt: when,
         );
 
-        acc.considerWeight(record);
-        acc.considerOneRepMax(record.copyWithValue(
-          estimatedOneRepMax(weight, reps),
-        ));
-        acc.considerReps(record.copyWithValue(reps.toDouble()));
+        // A zero-weight set is bodyweight work, not a 0 kg record (T-026) —
+        // but that only disqualifies the weight-derived metrics. ADR-004 has
+        // mostReps ignore weight entirely, so a 0 kg x 25 set still earns a
+        // reps record; skipping it here too would silently drop that badge.
+        if (weight > 0) {
+          acc.considerWeight(record);
+          acc.considerOneRepMax(record.copyWithValue(
+            estimatedOneRepMax(weight, reps),
+          ));
 
-        sessionVolume += weight * reps;
-        // The session's volume is attributed to its heaviest set, so the
-        // "achieving set" shown next to a volume record is a real set from
-        // that session rather than an invented average.
-        if (volumeSet == null || weight > volumeSet.weight) volumeSet = record;
+          sessionVolume += weight * reps;
+          // The session's volume is attributed to its heaviest set, so the
+          // "achieving set" shown next to a volume record is a real set from
+          // that session rather than an invented average.
+          if (volumeSet == null || weight > volumeSet.weight) volumeSet = record;
+        }
+        acc.considerReps(record.copyWithValue(reps.toDouble()));
       }
 
       if (sessionVolume > 0 && volumeSet != null) {

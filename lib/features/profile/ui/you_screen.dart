@@ -8,6 +8,7 @@ import '../../../core/utils/formatting.dart';
 import '../../history/providers/history_providers.dart';
 import '../../records/data/personal_records.dart';
 import '../../records/providers/records_providers.dart';
+import '../../settings/providers/settings_providers.dart';
 import '../../../core/widgets/week_dot_strip.dart';
 
 /// The You tab: what accumulates *because* you trained (S-005).
@@ -118,15 +119,19 @@ class _SectionHeading extends StatelessWidget {
 /// CMP-021: one row per exercise, led by its heaviest lift, with the set that
 /// produced it and the date beneath — a record reads better as a value plus
 /// its set than as a bare number (S-005).
-class _RecordRow extends StatelessWidget {
+class _RecordRow extends ConsumerWidget {
   const _RecordRow({required this.records});
 
   final ExerciseRecords records;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final semantic = theme.extension<SemanticColors>()!;
+    // The value came out of personalRecordsProvider already converted to the
+    // settings unit, so the label shown alongside it must be that unit too —
+    // not a hardcoded `kg` (T-026).
+    final unit = ref.watch(settingsProvider).weightUnit;
     final best = records.headline;
     if (best == null) return const SizedBox.shrink();
 
@@ -158,13 +163,13 @@ class _RecordRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${formatWeight(best.weight)} kg',
+                '${formatWeight(best.weight)} $unit',
                 style: theme.textTheme.titleMedium
                     ?.copyWith(color: theme.colorScheme.onSurface),
               ),
               const SizedBox(height: 2),
               Text(
-                '${formatWeight(best.weight)}kg x ${best.reps} reps',
+                '${formatWeight(best.weight)}$unit x ${best.reps} reps',
                 style:
                     theme.textTheme.bodyMedium?.copyWith(color: semantic.muted),
               ),

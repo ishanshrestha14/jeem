@@ -34,14 +34,30 @@ void main() {
     expect(records.single.heaviestWeight!.value, closeTo(132.277, 1e-3));
   });
 
-  test('a zero-weight set sets no record', () {
+  test('a zero-weight set sets no weight-derived record', () {
     // Bodyweight work. A 0 kg "record" is not a lift, and it is what the
-    // progress chart would otherwise plot at zero.
+    // progress chart would otherwise plot at zero. It still sets a reps
+    // record (see the next test) — this one only guards the weight metrics.
     final sessions = [completedSession(unit: 'kg', sets: [(0.0, 10)])];
 
     final records = computePersonalRecords(sessions, displayUnit: 'kg');
 
-    expect(records, isEmpty);
+    expect(records.single.heaviestWeight, isNull);
+    expect(records.single.bestEstimatedOneRepMax, isNull);
+    expect(records.single.bestSessionVolume, isNull);
+  });
+
+  test('a zero-weight set still sets a reps record but no weight record', () {
+    // ADR-004: mostReps ignores weight entirely, so 0 kg x 25 is still a reps
+    // record even though it is not a weight one (T-026).
+    final sessions = [completedSession(unit: 'kg', sets: [(0.0, 25)])];
+
+    final records = computePersonalRecords(sessions, displayUnit: 'kg');
+
+    expect(records.single.mostReps?.value, closeTo(25, 1e-9));
+    expect(records.single.heaviestWeight, isNull);
+    expect(records.single.bestEstimatedOneRepMax, isNull);
+    expect(records.single.bestSessionVolume, isNull);
   });
 
   test('switching the display unit restates records with no history edit',
