@@ -4,6 +4,7 @@
 /// the true record of what happened, and rewriting history to one unit would
 /// destroy it. What converts is every *comparison or aggregation across
 /// sessions* — records, `Previous`, and weekly volume — on the way out.
+library;
 
 /// Exact by definition (international avoirdupois pound).
 const double kgPerPound = 0.45359237;
