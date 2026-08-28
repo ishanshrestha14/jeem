@@ -76,7 +76,7 @@ void main() {
     await aLoggedWorkout(weight: 80);
     final heavy = await aLoggedWorkout(weight: 120);
     expect(
-      computePersonalRecords(await sessions.watchCompletedSessions().first)
+      computePersonalRecords(await sessions.watchCompletedSessions().first, displayUnit: 'kg')
           .single
           .heaviestWeight!
           .weight,
@@ -86,7 +86,7 @@ void main() {
     await sessions.deleteSession(heavy);
 
     expect(
-      computePersonalRecords(await sessions.watchCompletedSessions().first)
+      computePersonalRecords(await sessions.watchCompletedSessions().first, displayUnit: 'kg')
           .single
           .heaviestWeight!
           .weight,
@@ -100,7 +100,7 @@ void main() {
     await sessions.deleteSession(id);
 
     expect(
-      computePersonalRecords(await sessions.watchCompletedSessions().first),
+      computePersonalRecords(await sessions.watchCompletedSessions().first, displayUnit: 'kg'),
       isEmpty,
     );
   });

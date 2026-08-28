@@ -71,7 +71,7 @@ void main() {
         endedAt: DateTime(2026, 8, 20),
         exerciseId: 'bench',
         sets: [set(weight: 120, reps: 5)]);
-    final records = computePersonalRecords([best, older]);
+    final records = computePersonalRecords([best, older], displayUnit: 'kg');
 
     expect(recordsSetIn(best, records), 1);
     expect(recordsSetIn(older, records), 0,
@@ -86,7 +86,7 @@ void main() {
         endedAt: DateTime(2026, 8, 20),
         exerciseId: 'bench',
         sets: [set(weight: 120, reps: 5)]);
-    final records = computePersonalRecords([only]);
+    final records = computePersonalRecords([only], displayUnit: 'kg');
 
     expect(recordsSetIn(only, records), 1);
   });
@@ -111,7 +111,7 @@ void main() {
             .single,
       ],
     );
-    final records = computePersonalRecords([s]);
+    final records = computePersonalRecords([s], displayUnit: 'kg');
 
     expect(recordsSetIn(s, records), 2);
   });
@@ -125,7 +125,7 @@ void main() {
         endedAt: DateTime(2026, 8, 21),
         exerciseId: 'bench',
         sets: [set(weight: 60, reps: 3)]);
-    final records = computePersonalRecords([weaker, best]);
+    final records = computePersonalRecords([weaker, best], displayUnit: 'kg');
 
     expect(recordsSetIn(weaker, records), 0);
   });
@@ -144,7 +144,7 @@ void main() {
         endedAt: DateTime(2026, 8, 21),
         exerciseId: 'bench',
         sets: [set(weight: 60, reps: 5)]);
-    final records = computePersonalRecords([light, heavy]);
+    final records = computePersonalRecords([light, heavy], displayUnit: 'kg');
 
     expect(recordsSetIn(light, records), 1);
   });

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import '../../../core/utils/weight_units.dart';
 import '../../../db/app_database.dart';
 import '../../sessions/data/session_models.dart';
 
@@ -72,7 +73,10 @@ double estimatedOneRepMax(double weight, int reps) {
 ///
 /// Duration-logged exercises are skipped entirely: they have no weight, reps
 /// or volume in this sense, so a record would be meaningless (ADR-004).
-List<ExerciseRecords> computePersonalRecords(List<ActiveSession> sessions) {
+List<ExerciseRecords> computePersonalRecords(
+  List<ActiveSession> sessions, {
+  required String displayUnit,
+}) {
   final byExercise = <String, _Accumulator>{};
 
   for (final session in sessions) {
@@ -91,9 +95,18 @@ List<ExerciseRecords> computePersonalRecords(List<ActiveSession> sessions) {
 
       for (final set in exercise.sets) {
         if (set.completedAt == null) continue;
-        final weight = set.weight;
+        final logged = set.weight;
         final reps = set.reps;
-        if (weight == null || reps == null || reps <= 0) continue;
+        if (logged == null || reps == null || reps <= 0) continue;
+        // Converted before any comparison: the session stores what was
+        // logged, in the unit it was logged in, and two sessions can differ.
+        final weight = convertWeight(
+          logged,
+          from: session.session.weightUnit,
+          to: displayUnit,
+        );
+        // A zero-weight set is bodyweight work, not a 0 kg record (T-026).
+        if (weight <= 0) continue;
 
         final record = PersonalRecord(
           value: weight,

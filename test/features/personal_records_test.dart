@@ -92,7 +92,7 @@ void main() {
         exerciseName: 'Barbell Row',
         sets: [set(weight: 60, reps: 8), set(weight: 70, reps: 6)],
       ),
-    ]);
+    ], displayUnit: 'kg');
 
     final best = records.single.headline!;
     expect(best.weight, 70);
@@ -109,7 +109,7 @@ void main() {
           set(weight: 100, reps: 1, complete: false),
         ],
       ),
-    ]);
+    ], displayUnit: 'kg');
     expect(records.single.headline!.weight, 60);
   });
 
@@ -121,7 +121,7 @@ void main() {
         loggingType: LoggingType.durationOnly,
         sets: [set(weight: null, reps: null)],
       ),
-    ]);
+    ], displayUnit: 'kg');
     expect(records, isEmpty);
   });
 
@@ -146,7 +146,7 @@ void main() {
         exerciseName: 'Barbell Row',
         sets: [set(weight: 60, reps: 12)],
       ),
-    ]);
+    ], displayUnit: 'kg');
 
     final r = records.single;
     // 50x10 + 50x10 = 1000 beats 60x12 = 720.
@@ -167,7 +167,7 @@ void main() {
         exerciseName: 'Barbell Row',
         sets: [set(weight: 70, reps: 6)],
       ),
-    ]);
+    ], displayUnit: 'kg');
     expect(records.single.headline!.achievedAt, DateTime.utc(2026, 8, 10),
         reason: 'matching a best again is not a new personal best');
   });
@@ -186,7 +186,7 @@ void main() {
         exerciseId: 'ex-squat',
         sets: [set(weight: 100, reps: 5)],
       ),
-    ]);
+    ], displayUnit: 'kg');
     expect([for (final r in records) r.exerciseName], ['Squat', 'Curl']);
   });
 }
