@@ -1,6 +1,6 @@
 # T-026 — Normalise weights to the display unit before comparing
 
-- **Status:** In progress
+- **Status:** Done (2026-08-28)
 - **Priority:** Must
 - **Effort:** M
 - **Specs:** ADR-003, ADR-004, [design](../superpowers/specs/2026-08-27-progress-chart-design.md)
@@ -35,14 +35,14 @@ it. Today a 100 lb lift (45 kg) out-ranks a 60 kg one on every personal record.
 
 ## Acceptance criteria
 
-- [ ] A mixed kg/lb history ranks personal records by true weight.
-- [ ] `Previous` names the genuinely heavier set across a unit change.
-- [ ] Weekly volume sums after conversion; the delta is computed before rounding.
-- [ ] Switching the unit in Settings restates all three with no history edit.
-- [ ] Home's volume delta shows the user's unit, not a hardcoded `kg`.
-- [ ] `flutter analyze` clean; full suite green.
+- [x] A mixed kg/lb history ranks personal records by true weight.
+- [x] `Previous` names the genuinely heavier set across a unit change.
+- [x] Weekly volume sums after conversion; the delta is computed before rounding.
+- [x] Switching the unit in Settings restates all three with no history edit.
+- [x] Home's volume delta shows the user's unit, not a hardcoded `kg`.
+- [x] `flutter analyze` clean; full suite green (454 tests pass, 13 added on this branch).
 
-## QA checklist
+## QA checklist (on device)
 
 - [ ] Log a session in kg, switch to lb, open You — records restate immediately.
 - [ ] Home's weekly volume and its delta both read in the current unit.
@@ -50,3 +50,6 @@ it. Today a 100 lb lift (45 kg) out-ranks a 60 kg one on every personal record.
 ## Revision log
 
 - 2026-08-28 — created from the T-027 design doc, which uncovered the bug.
+- 2026-08-28 — shipped. Records, `Previous` and weekly volume all convert first; the three providers
+  watch the settings unit so a switch restates them with no history edit. Also decided here: a
+  logged `0` is bodyweight, not a 0 kg record — `computePersonalRecords` skipped only `null` before.

@@ -59,3 +59,10 @@ confirmed before any ticket implements it.**
   More accurate, but the session chrome would change shape between routines — rejected on the
   consistency argument above.
 - **Hide volume when zero.** Same objection: a stat that vanishes is a layout that jumps.
+
+## Revision log
+
+- 2026-08-28 — volume is stated in the **display unit**, summed after conversion at full precision
+  and rounded only to draw ([T-026](../tickets/T-026-weight-unit-normalisation.md)). Until then it
+  added kg and lb together, so a mixed history produced a meaningless total — the definition was
+  right and the arithmetic was not.
