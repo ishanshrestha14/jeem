@@ -149,7 +149,7 @@ table earns its keep. The rest are built or identified but unspecced; see §6.
 | CMP-016 | Top-bar rest slot | Candidate |
 | CMP-017 | **Per-exercise prescription editor** (sets · reps/range · RIR · weight) | Candidate |
 | CMP-018 | **In-session numeric keypad** ([spec](specs/components/CMP-018-numeric-keypad.md)) | Candidate |
-| CMP-019 | Stat chart card (metric · value · delta · range · line chart) | Candidate |
+| CMP-019 | Stat chart card (metric · value · delta · range · line chart) | **Built** — [T-027](tickets/T-027-progress-chart.md) |
 | CMP-020 | Week dot-strip (workout log) | **Built — [spec](specs/components/CMP-020-week-dot-strip.md)** |
 | CMP-021 | Personal-record row | Candidate |
 | CMP-022 | Taxonomy grid cell (muscle / equipment) | Candidate |
@@ -195,13 +195,11 @@ Next free CMP-ID: **CMP-028**.
 | [T-024](tickets/T-024-soft-delete-and-records-badge.md) | Soft-delete routines + `Records 🏅 N` badge | **Done** | M | S-001, ADR-004 |
 | [T-025](tickets/T-025-routine-stats.md) | Routine detail stats: duration + body parts — closes S-030 | **Done** | M | S-030, ADR-006 |
 | [T-026](tickets/T-026-weight-unit-normalisation.md) | Normalise weights to the display unit before comparing | **Done** | M | ADR-003, ADR-004 |
+| [T-027](tickets/T-027-progress-chart.md) | Progress chart: estimated 1RM over time | **Done** | L | S-025, CMP-019, ADR-004 |
 | [T-028](tickets/T-028-keypad-closes-on-desktop.md) | In-session keypad closed on every keystroke (desktop only) | **Done** | S | CMP-018, S-006 |
 
-**T-027 is reserved** for the progress chart — its
-[design](superpowers/specs/2026-08-27-progress-chart-design.md) already names it, and §2 assigns IDs
-in order of first appearance, so the desktop keypad bug took T-028 rather than displacing it.
-
-Next free T-ID: **T-029**.
+Next free T-ID: **T-029** — T-028 already took the slot after T-027, since §2 assigns IDs in order of
+first appearance and the desktop keypad bug was filed before the progress chart's ticket was written.
 
 ### Decisions (ADR)
 | ID | Title | Status |
@@ -435,7 +433,7 @@ matters.
 Every implemented ticket references the surface spec and ADR it came from. These gaps affect how
 easy the *next* piece of work is to pick up, not whether the current state is understood.
 
-## 7. Current status (2026-08-28)
+## 7. Current status (2026-08-29)
 
 | Type | Count |
 |---|---|
@@ -443,24 +441,27 @@ easy the *next* piece of work is to pick up, not whether the current state is un
 | FL (flows) | **4 written** — the session lifecycle. Routine-building and programs still underived |
 | CMP (components) | 27 registered — **14 built, 4 specced.** See §6 |
 | F (features) | 0 |
-| T (tickets) | 26 — **all done** |
+| T (tickets) | 28 — **all done** |
 | ADR (decisions) | 6 |
 
-**Last updated:** **T-026 shipped — weight-unit normalisation.** While designing the progress chart
-(T-027), it turned out there is **no weight-unit conversion anywhere in `lib/`**: sessions snapshot
-their own `weightUnit`, Settings lets it change at any time, and three surfaces compared or summed
-weights across sessions without reading that field — a 100 lb lift out-ranked a 60 kg one on every
-personal record. T-026 was not on this section's list at all; it was uncovered as a live bug while
-scoping T-027, not planned work, and is recorded plainly as such. Fixed read-time only (no migration,
-no schema change): `computePersonalRecords`, `previousBestByExercise` and `weeklySummary` all take a
-`displayUnit` and their providers watch the settings unit, so a unit switch restates all three with
-no history edit; Home's volume delta stopped hardcoding `kg`. One deliberate behaviour change rode
-along — `computePersonalRecords` used to skip only a `null` weight, so a logged `0` set a 0 kg
-personal record; it now skips `weight <= 0`, since a zero-weight set is bodyweight work, not a lift.
-441 tests before the branch, **454 tests pass now** (13 added), `flutter analyze` clean.
+**Last updated:** **T-027 shipped — the progress chart.** S-025's fourth pane: a hand-rolled
+`CustomPainter` line chart of estimated 1RM over time, one point per session, oldest left, absent
+entirely for duration-logged exercises. No charting dependency (`fl_chart` and friends were
+explicitly rejected in the design). Built in five reviewed steps — `exerciseProgress` (`d127580`),
+y-axis geometry (`f00e33a`), time-axis ticks (`8c1cd28`), the `LineChart` widget (`ed095fe`), and the
+Progress pane itself (`c366e26`) — each passing review with spec ✅ and quality approved. **One
+deviation from the design:** the geometry section's 5% pre-padding of the observed range was dropped
+before choosing the tick step, since it contradicted the design's own worked examples and wasted 40%
+of the plot height; see the design doc's and [T-027](tickets/T-027-progress-chart.md)'s revision
+logs. 458 tests before the branch, **488 tests pass now** (30 added), `flutter analyze` clean. The
+QA checklist (device/macOS run) is still unticked on the ticket — this update is docs-only, not a
+device pass.
 
-Before it: T-025 closed S-030's open questions with measured duration and a body-part line; T-024
-made routine deletes soft and put Records on Home.
+Before it: T-026 shipped weight-unit normalisation, uncovered as a live bug while scoping T-027 —
+sessions snapshot their own `weightUnit`, Settings lets it change at any time, and three surfaces
+compared or summed weights across sessions without reading that field. Fixed read-time only, no
+migration. Before that: T-025 closed S-030's open questions with measured duration and a body-part
+line; T-024 made routine deletes soft and put Records on Home.
 
 **Where the code is:** `main`, tracking `origin/main` at
 `git@github.com:ishanshrestha14/jeem.git`. Schema **v6**. Local commits may be ahead of the remote. Five-tab shell
@@ -469,12 +470,8 @@ made routine deletes soft and put Records on Home.
 **Screenshot workflow:** paste into any note under `docs/`; Obsidian writes the PNG to disk and I
 rename it into `screenshots/` under its manifest name.
 
-**Next step (a fresh session starts here): T-027, the progress chart** (no ticket file yet — next
-free T-ID) — design doc at
-[`docs/superpowers/specs/2026-08-27-progress-chart-design.md`](superpowers/specs/2026-08-27-progress-chart-design.md).
-It was the reason T-026 got found in the first place (scoping the chart surfaced the missing
-weight-unit conversion, which had to ship first so the chart isn't built on top of a comparison bug),
-and it is now unblocked.
+**Next step (a fresh session starts here): S-003's Insights row**, or pick up one of the remaining
+flows below — both are un-blocked and neither depends on the other.
 
 **Every reference spec is now built or explicitly closed.** S-001..S-006, S-023, S-025, S-026,
 S-029, S-030 built; S-027 and S-028 reviewed 2026-08-26 and found to have no gap worth building;
@@ -482,25 +479,25 @@ S-024 deliberately not adopted. §6's documentation gaps are closed on both halv
 four component specs).
 
 So there is no drift left to fix, and **no decision is currently blocking work** — the ones that
-were are answered and shipped in [T-024](tickets/T-024-soft-delete-and-records-badge.md) and
-[T-026](tickets/T-026-weight-unit-normalisation.md).
+were are answered and shipped in [T-024](tickets/T-024-soft-delete-and-records-badge.md),
+[T-026](tickets/T-026-weight-unit-normalisation.md), and
+[T-027](tickets/T-027-progress-chart.md).
 
-What else remains, all un-blocked:
+Two items that used to be on this list are now **done**: S-030's estimated duration and muscle
+summary, closed by [T-025](tickets/T-025-routine-stats.md) (2026-08-27) — the duration is
+**measured** from the last three sessions of that routine wherever there are any, with the sets ×
+rest formula only as the never-performed fallback, and the muscle summary is body parts as text, in
+enum order; S-030 has no open questions left. And the progress chart, closed by
+[T-027](tickets/T-027-progress-chart.md) (2026-08-29) — S-025's fourth pane, CMP-019: one line, one
+point per session, oldest left, hand-rolled with no charting dependency. Charting was entirely new to
+this codebase, which is why T-018 stopped at three panes; scoping it is what uncovered T-026.
 
-1. ~~**S-030's estimated duration and muscle summary**~~ — **done**, [T-025](tickets/T-025-routine-stats.md)
-   (2026-08-27). Not the formula this line proposed: the duration is **measured** from the last three
-   sessions of that routine wherever there are any, and the sets × rest formula is only the
-   never-performed fallback. Its 45-second per-set work constant is the one invented number, and it
-   disappears the first time you run the routine. The muscle summary is body parts as text, in enum
-   order; the reference's anatomical figure is now a recorded decision not to build rather than an
-   open question. **S-030 has no open questions left.**
-2. **S-003's Insights row** — still out, because we have no recovery or streak model. A streak *is*
+What actually remains, both un-blocked:
+
+1. **S-003's Insights row** — still out, because we have no recovery or streak model. A streak *is*
    computable offline; recovery is not, and should not be invented.
-3. **The remaining flows** — build/edit a routine, exercise info, programs. FL-001..FL-004 cover the
+2. **The remaining flows** — build/edit a routine, exercise info, programs. FL-001..FL-004 cover the
    session lifecycle only.
-4. **A progress chart** — designed, not yet ticketed as **T-027**. S-025's fourth pane, CMP-019.
-   Charting is entirely new to this codebase, which is why T-018 stopped at three panes; scoping it
-   is what uncovered T-026.
 
 **Working notes for a fresh session** — two traps this codebase sets, both of which have cost real
 time and are written up in [T-013](tickets/T-013-workout-tab.md) and

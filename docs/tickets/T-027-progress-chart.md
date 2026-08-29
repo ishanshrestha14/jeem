@@ -1,6 +1,6 @@
 # T-027 — Progress chart: estimated 1RM over time (CMP-019)
 
-- **Status:** In progress
+- **Status:** **Done** (2026-08-29)
 - **Priority:** Should
 - **Effort:** L
 - **Specs:** S-025, CMP-019, ADR-004, [design](../superpowers/specs/2026-08-27-progress-chart-design.md)
@@ -33,12 +33,12 @@ session, the best estimated 1RM you hit that day.
 
 ## Acceptance criteria
 
-- [ ] The Progress tab charts one point per session, oldest left.
-- [ ] Axis ticks are round numbers and bracket every point.
-- [ ] A gap in training shows as horizontal distance, since points sit at real dates.
-- [ ] One session draws a dot and no line; no sessions shows the empty state.
-- [ ] A duration-logged exercise has no Progress tab.
-- [ ] `flutter analyze` clean; full suite green.
+- [x] The Progress tab charts one point per session, oldest left.
+- [x] Axis ticks are round numbers and bracket every point.
+- [x] A gap in training shows as horizontal distance, since points sit at real dates.
+- [x] One session draws a dot and no line; no sessions shows the empty state.
+- [x] A duration-logged exercise has no Progress tab.
+- [x] `flutter analyze` clean; full suite green.
 
 ## QA checklist
 
@@ -50,3 +50,12 @@ session, the best estimated 1RM you hit that day.
 ## Revision log
 
 - 2026-08-29 — created from the approved design.
+- 2026-08-29 — **Done.** `exerciseProgress` (`d127580`), y-axis geometry (`f00e33a`), time-axis ticks
+  (`8c1cd28`), the `LineChart` widget (`ed095fe`), and the Progress pane on S-025 (`c366e26`). Every
+  task passed review with spec ✅ and quality approved. 30 tests added (458 before the branch, 488
+  after); `flutter analyze` clean. **One deviation from the design:** the geometry section's 5%
+  pre-padding of the observed range was dropped before choosing the tick step — it produced a 65-90
+  domain for 70-85 data (40% of the plot height empty) and contradicted the design's own worked
+  examples. Choosing the step from the raw span and snapping outward reproduces both worked examples
+  exactly; see the design doc's revision log for 2026-08-29. The four QA checklist items below are
+  left unticked — they need a device or macOS run, not just a green test suite.

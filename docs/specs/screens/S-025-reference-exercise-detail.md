@@ -36,8 +36,11 @@ latter is social, out of scope). Per ADR-001 these are sections of this spec.
    `biceps` and trapezius/rhomboids into `upperBack`.
 
 ### History pane / Progress pane
-UNVERIFIED — not captured. `History` presumably lists past sessions containing this exercise;
-`Progress` presumably charts it (cf. CMP-019 on S-005).
+`History` presumably lists past sessions containing this exercise — still UNVERIFIED, not captured.
+`Progress` is built as [T-027](../../tickets/T-027-progress-chart.md): a hand-rolled line chart of
+estimated 1RM, one point per session, oldest left. This is **our design, not the reference's** — the
+reference's Progress pane was never screenshotted, so the layout above is not a copy of anything
+seen; it is absent entirely for duration-logged exercises, which have no weight to chart.
 
 ## What this confirms for our model — and where we got it wrong
 
@@ -94,3 +97,7 @@ half the library. See **T-005**.
 - 2026-08-26 — [T-019](../../tickets/T-019-in-session-info.md): the in-session ℹ now opens this
   screen rather than the S-013 sheet, so an exercise has one surface everywhere. The sheet remains as
   the fallback for a session snapshot carrying no `exerciseId`, which has no detail screen to open.
+- 2026-08-29 — built as [T-027](../../tickets/T-027-progress-chart.md): the `Progress` pane, a
+  hand-rolled line chart of estimated 1RM over time. **Our design, not the reference's** — the
+  reference's Progress pane was never screenshotted, so this spec still marks that pane `UNVERIFIED`.
+  The pane is absent entirely for duration-logged exercises.

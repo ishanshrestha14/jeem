@@ -362,3 +362,9 @@ duration-logged exercise has no Progress tab. **No golden tests.**
      unit only to draw, delta computed before rounding.
 - 2026-08-28 — both open questions closed by the owner: the display unit is the live Settings value,
   and T-026 normalises at read time with no backfill. **The design has no open questions left.**
+- 2026-08-29 — built as [T-027](../../tickets/T-027-progress-chart.md). **One deviation:** the
+  geometry section called for padding the observed range 5% before choosing the tick step. That was
+  dropped — it produced a 65-90 domain for data spanning 70-85 (40% of the height empty) and
+  contradicted the two worked examples this document itself gives (`70 / 75 / 80 / 85`, and
+  `61 / 62 / 63 / 64` for the ugly range). Both are reproduced exactly by choosing the step from the
+  raw span and snapping outward, which is what shipped.
