@@ -89,4 +89,77 @@ void main() {
       expect(scale.max, greaterThan(scale.min));
     });
   });
+
+  group('dateTicks', () {
+    test('labels a short span by day', () {
+      // Under 8 weeks: `4 Aug`.
+      final ticks = dateTicks(
+        DateTime.utc(2026, 7, 6),
+        DateTime.utc(2026, 8, 10),
+      );
+
+      expect(ticks.length, inInclusiveRange(3, 5));
+      expect(ticks.first.label, matches(RegExp(r'^\d{1,2} [A-Z][a-z]{2}$')));
+    });
+
+    test('labels a medium span by month', () {
+      // 8 weeks to 2 years, inside one calendar year: `Aug`.
+      final ticks = dateTicks(
+        DateTime.utc(2026, 2, 1),
+        DateTime.utc(2026, 11, 1),
+      );
+
+      expect(ticks.length, inInclusiveRange(3, 5));
+      expect(ticks.first.label, matches(RegExp(r'^[A-Z][a-z]{2}$')));
+    });
+
+    test('appends the year when the span crosses one', () {
+      // Dec and Jan must never read as the same year.
+      final ticks = dateTicks(
+        DateTime.utc(2025, 10, 1),
+        DateTime.utc(2026, 6, 1),
+      );
+
+      expect(ticks.every((t) => RegExp(r'\d{2}$').hasMatch(t.label)), isTrue,
+          reason: 'every label carries a year once the domain crosses one');
+    });
+
+    test('ticks land on period boundaries, not on the data dates', () {
+      // Labelling session dates would bunch labels wherever training was
+      // dense, which is exactly where the axis must stay readable.
+      final ticks = dateTicks(
+        DateTime.utc(2026, 2, 17),
+        DateTime.utc(2026, 11, 3),
+      );
+
+      expect(ticks.every((t) => t.when.day == 1), isTrue);
+    });
+
+    test('a single date yields exactly one tick', () {
+      final day = DateTime.utc(2026, 8, 4);
+      final ticks = dateTicks(day, day);
+
+      expect(ticks, hasLength(1));
+      expect(ticks.single.when, day);
+    });
+  });
+
+  group('dateFraction', () {
+    test('maps the span onto 0..1', () {
+      final first = DateTime.utc(2026, 1, 1);
+      final last = DateTime.utc(2026, 1, 11);
+
+      expect(dateFraction(first, first, last), closeTo(0, 1e-9));
+      expect(dateFraction(last, first, last), closeTo(1, 1e-9));
+      expect(dateFraction(DateTime.utc(2026, 1, 6), first, last),
+          closeTo(0.5, 1e-9));
+    });
+
+    test('a single date sits at the left edge rather than dividing by zero',
+        () {
+      final day = DateTime.utc(2026, 8, 4);
+
+      expect(dateFraction(day, day, day), 0);
+    });
+  });
 }

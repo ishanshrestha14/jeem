@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:intl/intl.dart';
+
 /// The vertical axis of a chart: a domain snapped to round tick boundaries,
 /// and the ticks themselves.
 ///
@@ -82,4 +84,83 @@ ChartScale verticalScale(List<double> values, {int targetTicks = 4}) {
     max: (hi / step).ceil() * step,
     step: step,
   );
+}
+
+/// One labelled position on the time axis.
+class DateTick {
+  const DateTick({required this.when, required this.label});
+
+  final DateTime when;
+  final String label;
+}
+
+/// Where [when] sits between [first] and [last], as 0..1.
+///
+/// A single-date domain has no span, so everything sits at the left edge
+/// rather than dividing by zero.
+double dateFraction(DateTime when, DateTime first, DateTime last) {
+  final span = last.difference(first).inSeconds;
+  if (span <= 0) return 0;
+  return when.difference(first).inSeconds / span;
+}
+
+/// Labels for the time axis, on **period boundaries** rather than on the
+/// session dates themselves.
+///
+/// Labelling the data would bunch labels wherever training was dense, which is
+/// exactly where the axis needs to stay readable. Granularity comes from the
+/// span, targeting 3-5 labels:
+///
+/// | Span | Granularity | Example |
+/// |---|---|---|
+/// | < 8 weeks | weekly | `4 Aug` |
+/// | 8 weeks - 2 years | monthly | `Aug` |
+/// | > 2 years | quarterly | `Aug 26` |
+///
+/// The year is appended whenever the domain crosses one, at any granularity,
+/// so `Dec` and `Jan` can never be read as the same year.
+List<DateTick> dateTicks(DateTime first, DateTime last) {
+  final days = last.difference(first).inDays;
+  final crossesYear = first.year != last.year;
+
+  if (days <= 0) {
+    return [
+      DateTick(when: first, label: DateFormat(crossesYear ? 'd MMM yy' : 'd MMM').format(first)),
+    ];
+  }
+
+  if (days < 56) {
+    // Weekly, stepped so 3-5 labels result.
+    final everyNWeeks = math.max(1, (days / 7 / 4).ceil());
+    final format = DateFormat(crossesYear ? 'd MMM yy' : 'd MMM');
+    final out = <DateTick>[];
+    // Start at the first midnight at or after `first`, so ticks are stable
+    // positions rather than offsets from an arbitrary timestamp.
+    var cursor = DateTime.utc(first.year, first.month, first.day);
+    if (cursor.isBefore(first)) cursor = cursor.add(const Duration(days: 1));
+    while (!cursor.isAfter(last)) {
+      out.add(DateTick(when: cursor, label: format.format(cursor)));
+      cursor = cursor.add(Duration(days: 7 * everyNWeeks));
+    }
+    return out;
+  }
+
+  final months = (days / 30.44).round();
+  final quarterly = days > 730;
+  final stepMonths = quarterly
+      ? math.max(3, ((months / 4).ceil() ~/ 3) * 3)
+      : math.max(1, (months / 4).ceil());
+  final format = DateFormat(crossesYear || quarterly ? 'MMM yy' : 'MMM');
+
+  final out = <DateTick>[];
+  // First month boundary at or after `first`.
+  var cursor = DateTime.utc(first.year, first.month, 1);
+  if (cursor.isBefore(first)) {
+    cursor = DateTime.utc(first.year, first.month + 1, 1);
+  }
+  while (!cursor.isAfter(last)) {
+    out.add(DateTick(when: cursor, label: format.format(cursor)));
+    cursor = DateTime.utc(cursor.year, cursor.month + stepMonths, 1);
+  }
+  return out;
 }
