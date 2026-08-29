@@ -7,20 +7,24 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/semantic_colors.dart';
 import '../../../core/utils/formatting.dart';
+import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/line_chart.dart';
 import '../../../db/app_database.dart';
 import '../../history/providers/history_providers.dart';
 import '../../records/data/personal_records.dart';
 import '../../records/providers/records_providers.dart';
 import '../../settings/providers/settings_providers.dart';
 import '../domain/exercise_history.dart';
+import '../domain/exercise_progress.dart';
 import '../providers/exercise_providers.dart';
 
 /// S-025 — everything known about one exercise: how to do it, what you have
 /// done, and your best.
 ///
-/// Three panes, not the reference's five. `Progress` needs charting this app
-/// has none of (the gap analysis marks it Later), and `Leaderboard` is social,
-/// which [00-overview §5] puts out of scope.
+/// Four panes for strength/reps exercises (About, History, Progress,
+/// Records), three for duration-only ones — `Progress` charts estimated 1RM,
+/// which duration work has none of (T-027). Not the reference's five:
+/// `Leaderboard` is social, which [00-overview §5] puts out of scope.
 ///
 /// The in-session ℹ still opens the small info sheet (S-013) rather than this:
 /// mid-set you want a glance, and pushing a tabbed screen navigates away from a
@@ -46,8 +50,12 @@ class ExerciseDetailScreen extends ConsumerWidget {
           });
           return const Scaffold(body: SizedBox.shrink());
         }
+        // A plank has no estimated 1RM, and ADR-004 already gives duration
+        // work no records — so the pane is absent rather than empty (T-027).
+        final showsProgress =
+            exercise.loggingType != LoggingType.durationOnly;
         return DefaultTabController(
-          length: 3,
+          length: showsProgress ? 4 : 3,
           child: Scaffold(
             appBar: AppBar(
               title: Text(exercise.name),
@@ -59,11 +67,12 @@ class ExerciseDetailScreen extends ConsumerWidget {
                   ],
                 ),
               ],
-              bottom: const TabBar(
+              bottom: TabBar(
                 tabs: [
-                  Tab(text: 'About'),
-                  Tab(text: 'History'),
-                  Tab(text: 'Records'),
+                  const Tab(text: 'About'),
+                  const Tab(text: 'History'),
+                  if (showsProgress) const Tab(text: 'Progress'),
+                  const Tab(text: 'Records'),
                 ],
               ),
             ),
@@ -71,6 +80,7 @@ class ExerciseDetailScreen extends ConsumerWidget {
               children: [
                 _AboutPane(exercise: exercise),
                 _HistoryPane(exercise: exercise),
+                if (showsProgress) _ProgressPane(exercise: exercise),
                 _RecordsPane(exercise: exercise),
               ],
             ),
@@ -238,6 +248,39 @@ class _HistoryPane extends ConsumerWidget {
     if (w == null) return '$r reps';
     if (r == null) return '${formatWeight(w)}$unit';
     return '${formatWeight(w)}$unit x $r';
+  }
+}
+
+class _ProgressPane extends ConsumerWidget {
+  const _ProgressPane({required this.exercise});
+
+  final Exercise exercise;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessions = ref.watch(historyProvider).valueOrNull ?? const [];
+    final unit = ref.watch(settingsProvider).weightUnit;
+    final points = exerciseProgress(
+      exerciseHistory(sessions, exerciseKey: exercise.id),
+      displayUnit: unit,
+    );
+
+    if (points.isEmpty) {
+      return const EmptyState(
+        icon: Icons.show_chart,
+        title: 'No progress yet',
+        message: 'Log this exercise in a workout and its estimated 1RM will '
+            'chart here.',
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 24, 16, 16),
+      child: LineChart(
+        points: [for (final p in points) (when: p.when, value: p.value)],
+        valueLabel: unit,
+      ),
+    );
   }
 }
 

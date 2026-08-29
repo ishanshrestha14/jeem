@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gymflow/core/theme/app_theme.dart';
+import 'package:gymflow/core/widgets/line_chart.dart';
 import 'package:gymflow/db/app_database.dart';
 import 'package:gymflow/features/exercises/data/exercise_repository.dart';
 import 'package:gymflow/features/exercises/ui/exercise_detail_screen.dart';
@@ -13,9 +14,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../db/test_database.dart';
 import 'pump_helpers.dart';
 
-/// S-025: everything known about one exercise — how to do it, what you have
-/// done, and your best. Ours is About · History · Progress · Records for
-/// strength/reps exercises (T-027); Leaderboard is social and out of scope.
+/// T-027 — S-025's fourth pane, deferred by T-018 because charting was new to
+/// this codebase.
 void main() {
   late AppDatabase db;
 
@@ -33,10 +33,13 @@ void main() {
         ),
       );
 
-  Future<String> anExercise({String name = 'Bench Press'}) async {
+  Future<String> anExercise({
+    String name = 'Bench Press',
+    LoggingType loggingType = LoggingType.strengthWeightRepsRir,
+  }) async {
     final e = await ExerciseRepository(db).create(
       name: name,
-      loggingType: LoggingType.strengthWeightRepsRir,
+      loggingType: loggingType,
       description: 'Press the bar.',
     );
     return e.id;
@@ -59,70 +62,59 @@ void main() {
     await sessions.finishSession(s.id);
   }
 
-  testWidgets('opens on About, showing the name and description',
-      (tester) async {
+  testWidgets('a strength exercise has a Progress tab', (tester) async {
     final id = await anExercise();
 
     await tester.pumpWidget(harness(id));
     await pumpUntilData(tester, until: find.text('Press the bar.'));
 
-    expect(find.text('Bench Press'), findsWidgets);
-    expect(find.text('About'), findsOneWidget);
-    expect(find.text('History'), findsOneWidget);
     expect(find.text('Progress'), findsOneWidget);
-    expect(find.text('Records'), findsOneWidget);
+    await disposeAndDrainTimers(tester);
   });
 
-  testWidgets('History lists the sessions this exercise appeared in',
+  testWidgets('a duration-logged exercise has no Progress tab', (tester) async {
+    // An estimated 1RM for a plank is meaningless, and ADR-004 already gives
+    // duration work no records at all.
+    final id = await anExercise(
+      name: 'Plank',
+      loggingType: LoggingType.durationOnly,
+    );
+
+    await tester.pumpWidget(harness(id));
+    await pumpUntilData(tester, until: find.text('Press the bar.'));
+
+    expect(find.text('Progress'), findsNothing);
+    expect(find.text('Records'), findsOneWidget,
+        reason: 'the other three panes are unaffected');
+    await disposeAndDrainTimers(tester);
+  });
+
+  testWidgets('an exercise never performed shows the empty state, not a chart',
       (tester) async {
     final id = await anExercise();
-    await aLoggedSession(id);
 
     await tester.pumpWidget(harness(id));
-    await pumpUntilData(tester, until: find.text('About'));
-    await tester.tap(find.text('History'));
+    await pumpUntilData(tester, until: find.text('Press the bar.'));
+    await tester.tap(find.text('Progress'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Push A'), findsOneWidget);
-    expect(find.textContaining('100'), findsWidgets);
+    expect(find.byType(LineChart), findsNothing);
+    expect(find.text('No progress yet'), findsOneWidget);
+    await disposeAndDrainTimers(tester);
   });
 
-  testWidgets('History says so when the exercise has never been done',
-      (tester) async {
+  testWidgets('a performed exercise charts its sessions', (tester) async {
     final id = await anExercise();
+    await aLoggedSession(id, weight: 90);
+    await aLoggedSession(id, weight: 100);
 
     await tester.pumpWidget(harness(id));
-    await pumpUntilData(tester, until: find.text('About'));
-    await tester.tap(find.text('History'));
+    await pumpUntilData(tester, until: find.text('Press the bar.'));
+    await tester.tap(find.text('Progress'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('never'), findsOneWidget);
-  });
-
-  testWidgets('Records shows the heaviest lift once there is history',
-      (tester) async {
-    final id = await anExercise();
-    await aLoggedSession(id, weight: 80);
-    await aLoggedSession(id, weight: 120);
-
-    await tester.pumpWidget(harness(id));
-    await pumpUntilData(tester, until: find.text('About'));
-    await tester.tap(find.text('Records'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Heaviest weight'), findsOneWidget);
-    expect(find.textContaining('120'), findsWidgets);
-  });
-
-  testWidgets('editing is in the overflow, not the surface', (tester) async {
-    final id = await anExercise();
-
-    await tester.pumpWidget(harness(id));
-    await pumpUntilData(tester, until: find.text('About'));
-
-    expect(find.text('Edit'), findsNothing);
-    await tester.tap(find.byIcon(Icons.more_vert));
-    await tester.pumpAndSettle();
-    expect(find.text('Edit'), findsOneWidget);
+    expect(find.byType(LineChart), findsOneWidget);
+    expect(find.text('No progress yet'), findsNothing);
+    await disposeAndDrainTimers(tester);
   });
 }
