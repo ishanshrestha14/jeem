@@ -136,7 +136,7 @@ List<DateTick> dateTicks(DateTime first, DateTime last) {
     final out = <DateTick>[];
     // Start at the first midnight at or after `first`, so ticks are stable
     // positions rather than offsets from an arbitrary timestamp.
-    var cursor = DateTime.utc(first.year, first.month, first.day);
+    var cursor = DateTime(first.year, first.month, first.day);
     if (cursor.isBefore(first)) cursor = cursor.add(const Duration(days: 1));
     while (!cursor.isAfter(last)) {
       out.add(DateTick(when: cursor, label: format.format(cursor)));
@@ -154,13 +154,13 @@ List<DateTick> dateTicks(DateTime first, DateTime last) {
 
   final out = <DateTick>[];
   // First month boundary at or after `first`.
-  var cursor = DateTime.utc(first.year, first.month, 1);
+  var cursor = DateTime(first.year, first.month, 1);
   if (cursor.isBefore(first)) {
-    cursor = DateTime.utc(first.year, first.month + 1, 1);
+    cursor = DateTime(first.year, first.month + 1, 1);
   }
   while (!cursor.isAfter(last)) {
     out.add(DateTick(when: cursor, label: format.format(cursor)));
-    cursor = DateTime.utc(cursor.year, cursor.month + stepMonths, 1);
+    cursor = DateTime(cursor.year, cursor.month + stepMonths, 1);
   }
   return out;
 }

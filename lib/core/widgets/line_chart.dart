@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/semantic_colors.dart';
@@ -43,13 +46,25 @@ class LineChart extends StatelessWidget {
     final ticks = dateTicks(first, last);
 
     return LayoutBuilder(builder: (context, constraints) {
+      // An unbounded parent (e.g. a `Column` in a `ScrollView`) hands the
+      // rect below `-infinity`/`infinity` edges, which asserts once used as
+      // a `Positioned.top`. There is no sane rect to draw in that case.
+      if (!constraints.maxWidth.isFinite || !constraints.maxHeight.isFinite) {
+        return const SizedBox.shrink();
+      }
+
       final plot = Rect.fromLTRB(
         LineChart.leftGutter,
         8,
         constraints.maxWidth - 8,
         constraints.maxHeight - LineChart.bottomGutter,
       );
+      if (plot.width <= 0 || plot.height <= 0) {
+        return const SizedBox.shrink();
+      }
+
       final labelStyle = theme.textTheme.bodySmall?.copyWith(color: semantic.muted);
+      final topTick = scale.ticks.last;
 
       return Stack(
         children: [
@@ -62,23 +77,24 @@ class LineChart extends StatelessWidget {
                 ticks: ticks,
                 first: first,
                 last: last,
-                valueLabel: valueLabel,
+                plot: plot,
                 lineColor: theme.colorScheme.primary,
                 gridColor: semantic.line,
-                textColor: semantic.muted,
-                textStyle: theme.textTheme.bodySmall ?? const TextStyle(fontSize: 12),
               ),
             ),
           ),
           // Every tick labelled — the axis does not start at zero, so the
-          // numbers are what carry the scale.
+          // numbers are what carry the scale. The topmost tick also carries
+          // the unit, since a bare number carries the scale only partly.
           for (final tick in scale.ticks)
             Positioned(
               left: 0,
               width: LineChart.leftGutter - 6,
               top: plot.bottom - scale.fractionOf(tick) * plot.height - 8,
               child: Text(
-                _formatTick(tick),
+                tick == topTick
+                    ? '${_formatTick(tick, scale.step)} $valueLabel'
+                    : _formatTick(tick, scale.step),
                 textAlign: TextAlign.right,
                 style: labelStyle,
               ),
@@ -96,19 +112,54 @@ class LineChart extends StatelessWidget {
                 style: labelStyle,
               ),
             ),
+          // The design's *States* section: a single session shows "the dot
+          // and its value" — the ticks alone cannot show it precisely.
+          if (points.length == 1)
+            Positioned(
+              left: plot.left +
+                  dateFraction(points.single.when, first, last) * plot.width +
+                  8,
+              top: plot.bottom -
+                  scale.fractionOf(points.single.value) * plot.height -
+                  20,
+              child: Text(
+                _formatValue(points.single.value),
+                style: labelStyle,
+              ),
+            ),
         ],
       );
     });
   }
 }
 
-/// Formats a tick value as an integer when it lands on one, else one
-/// decimal place. Shared by the widget's labels and the painter.
-String _formatTick(double v) =>
+/// Formats a tick value with enough decimal places to distinguish it from
+/// its neighbours, derived from [step] rather than a hardcoded precision:
+/// `verticalScale` can choose a step as fine as 0.025 on a tightly-clustered
+/// series, and a fixed one decimal place would round every tick on that
+/// chart to the same label — exactly where the labels matter most.
+String _formatTick(double v, double step) => v.toStringAsFixed(_decimalsFor(step));
+
+/// Formats a single raw value (not necessarily a multiple of any step),
+/// e.g. the sole point's value on a one-session chart: an integer when it
+/// lands on one, else one decimal place.
+String _formatValue(double v) =>
     v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
 
+/// The fewest decimal places that represent [step] exactly, up to 4.
+int _decimalsFor(double step) {
+  for (var decimals = 0; decimals < 4; decimals++) {
+    final scaled = step * math.pow(10, decimals);
+    if ((scaled - scaled.roundToDouble()).abs() < 1e-6) return decimals;
+  }
+  return 4;
+}
+
 /// Strokes what it is handed. Makes no decisions: every number it draws was
-/// computed by `chart_geometry.dart`, which is tested without rendering.
+/// computed by `chart_geometry.dart` or the plot rect `LineChart.build`
+/// derived once from its constraints, which is tested without rendering.
+/// Draws no text — every label is a real `Text` widget in the `Stack` above
+/// this painter, so `find.text` can see it.
 class LineChartPainter extends CustomPainter {
   LineChartPainter({
     required this.points,
@@ -116,11 +167,9 @@ class LineChartPainter extends CustomPainter {
     required this.ticks,
     required this.first,
     required this.last,
-    required this.valueLabel,
+    required this.plot,
     required this.lineColor,
     required this.gridColor,
-    required this.textColor,
-    required this.textStyle,
   });
 
   final List<({DateTime when, double value})> points;
@@ -128,11 +177,13 @@ class LineChartPainter extends CustomPainter {
   final List<DateTick> ticks;
   final DateTime first;
   final DateTime last;
-  final String valueLabel;
+
+  /// Computed once by `LineChart.build` from its `LayoutBuilder` constraints
+  /// and handed down, so the widget's labels and this painter's canvas can
+  /// never disagree about where the plot area is.
+  final Rect plot;
   final Color lineColor;
   final Color gridColor;
-  final Color textColor;
-  final TextStyle textStyle;
 
   /// One session is not a trend, and a line through it would imply one.
   bool get drawsLine => points.length >= 2;
@@ -140,13 +191,6 @@ class LineChartPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (points.isEmpty) return;
-
-    final plot = Rect.fromLTRB(
-      LineChart.leftGutter,
-      8,
-      size.width - 8,
-      size.height - LineChart.bottomGutter,
-    );
     if (plot.width <= 0 || plot.height <= 0) return;
 
     final grid = Paint()
@@ -193,8 +237,22 @@ class LineChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(LineChartPainter old) =>
-      old.points != points ||
+      !listEquals(old.points, points) ||
       old.scale.min != scale.min ||
       old.scale.max != scale.max ||
-      old.lineColor != lineColor;
+      old.scale.step != scale.step ||
+      !_sameTicks(old.ticks, ticks) ||
+      old.first != first ||
+      old.last != last ||
+      old.plot != plot ||
+      old.lineColor != lineColor ||
+      old.gridColor != gridColor;
+}
+
+bool _sameTicks(List<DateTick> a, List<DateTick> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i].when != b[i].when || a[i].label != b[i].label) return false;
+  }
+  return true;
 }

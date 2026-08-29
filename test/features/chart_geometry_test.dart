@@ -142,6 +142,27 @@ void main() {
       expect(ticks, hasLength(1));
       expect(ticks.single.when, day);
     });
+
+    test('boundary cursors are built in local time, matching local inputs',
+        () {
+      // Session dates (`endedAt ?? startedAt`) are local DateTimes, not UTC.
+      // Building the boundary cursor with `DateTime.utc` from local calendar
+      // fields shifts every tick by the local UTC offset — wrong whenever
+      // that offset is nonzero. Using local `DateTime` fixtures here would
+      // pass either way if the environment happens to run in UTC, so this
+      // asserts the tick's own offset matches a fresh local `DateTime`'s,
+      // which only holds when the production code builds local cursors too.
+      final first = DateTime(2026, 2, 17);
+      final last = DateTime(2026, 11, 3);
+
+      final ticks = dateTicks(first, last);
+
+      final localOffset = DateTime(2026, 6, 1).timeZoneOffset;
+      for (final tick in ticks) {
+        expect(tick.when.timeZoneOffset, localOffset,
+            reason: 'tick $tick should be a local time, not UTC');
+      }
+    });
   });
 
   group('dateFraction', () {

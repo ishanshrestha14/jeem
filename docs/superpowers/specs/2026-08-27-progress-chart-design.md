@@ -368,3 +368,8 @@ duration-logged exercise has no Progress tab. **No golden tests.**
   contradicted the two worked examples this document itself gives (`70 / 75 / 80 / 85`, and
   `61 / 62 / 63 / 64` for the ugly range). Both are reproduced exactly by choosing the step from the
   raw span and snapping outward, which is what shipped.
+- 2026-08-29 — **one further deviation, accepted at the final-review fix wave:** the geometry layer
+  returns **fractions** (`ChartScale.fractionOf`, `dateFraction`) rather than this document's wording of
+  "tick positions and the polyline offsets". A fraction is equivalent — the widget multiplies it by
+  whatever plot rect it computed — and rect-independent, so `chart_geometry.dart` never needs to know
+  the pane's pixel size. Kept deliberately.

@@ -59,3 +59,16 @@ session, the best estimated 1RM you hit that day.
   examples. Choosing the step from the raw span and snapping outward reproduces both worked examples
   exactly; see the design doc's revision log for 2026-08-29. The four QA checklist items below are
   left unticked — they need a device or macOS run, not just a green test suite.
+- 2026-08-29 — **Final-review fix wave.** The whole-branch review found eight issues, all fixed in one
+  commit: the plot rect was computed twice (widget and painter) with no bounded-size guard; `valueLabel`
+  was threaded through three layers and never rendered; a single-point chart showed a bare dot with no
+  value, contradicting the design's *States* section; a stale comment claimed the painter formats text;
+  tick labels lost precision on a tightly-clustered series; `dateTicks` built UTC cursors from local
+  calendar fields, off by the local UTC offset; two same-day `exerciseHistory` entries could plot as a
+  spurious line segment; and `shouldRepaint` compared only `points` and part of `scale`. Fixed: the rect
+  is now computed once in `LineChart.build` and passed to `LineChartPainter`; the topmost y-tick carries
+  the unit and `valueLabel`/`textColor`/`textStyle` were removed from the painter; a single point renders
+  its value as a `Text` label; the comment is corrected; tick-label decimals are derived from the step;
+  the boundary cursors use local `DateTime`; `exerciseProgress` collapses same-date entries keeping the
+  higher value; and `shouldRepaint` compares every field it depends on, including the rect. 494 tests
+  passing (488 before this wave); `flutter analyze` clean.

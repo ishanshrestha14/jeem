@@ -52,7 +52,21 @@ List<ProgressPoint> exerciseProgress(
     if (best > 0) points.add(ProgressPoint(when: entry.when, value: best));
   }
 
+  // Two entries can share a date: `exerciseHistory` emits one per
+  // occurrence, and nothing stops an exercise the routine already contains
+  // being added again mid-session. One point per session, so the later
+  // entry's best value wins over the earlier one's — the same "session's
+  // best set represents it" rule applied across entries, not just sets.
+  final byDate = <DateTime, ProgressPoint>{};
+  for (final point in points) {
+    final existing = byDate[point.when];
+    if (existing == null || point.value > existing.value) {
+      byDate[point.when] = point;
+    }
+  }
+
   // `exerciseHistory` is newest first; the chart reads left to right.
-  points.sort((a, b) => a.when.compareTo(b.when));
-  return points;
+  final merged = byDate.values.toList()
+    ..sort((a, b) => a.when.compareTo(b.when));
+  return merged;
 }

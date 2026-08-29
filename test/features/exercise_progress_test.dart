@@ -90,6 +90,22 @@ void main() {
     expect(points, isEmpty, reason: 'no point beats a point at zero');
   });
 
+  test('collapses two entries on the same date into one, keeping the best',
+      () {
+    // Reachable in practice: adding an exercise mid-session that the
+    // routine already contains produces two `exerciseHistory` entries for
+    // the same date, and the chart draws one point per session, not per
+    // entry.
+    final points = exerciseProgress([
+      entry(dayOffset: 0, sets: [set(weight: 60, reps: 5)]),
+      entry(dayOffset: 0, sets: [set(weight: 80, reps: 5)]),
+    ], displayUnit: 'kg');
+
+    expect(points, hasLength(1));
+    expect(points.single.when, base);
+    expect(points.single.value, closeTo(80 * (1 + 5 / 30), 1e-9));
+  });
+
   test('caps reps at 12, so a 20-rep set scores as a 12-rep one', () {
     // Inherited from ADR-004's cap. Documented consequence: progress made by
     // adding reps beyond 12 does not move the line.
